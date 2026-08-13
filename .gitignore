@@ -1,6 +1,28 @@
-# Zed editor settings
-.zed/
+# Executables & Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+build/bin/
 
-build/bin
-node_modules
-frontend/dist
+# Dependency directories
+vendor/
+
+# Frontend temporary & generated build artifacts
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Go test & coverage binaries
+*.test
+*.out
+
+# Editor / IDE configurations (Keep repository editor-agnostic)
+.vscode/
+.zed/
+.idea/
+
+# OS generated files
+Thumbs.db
+.DS_Store
