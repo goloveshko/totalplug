@@ -70,15 +70,6 @@ Example entry in `plugins.json`:
     "homepage": "https://github.com/rweijnen/MDView",
     "description": "Markdown viewer plugin for Total Commander",
     "author": "Remer Weijnen"
-  },
-  {
-    "id": "Total7zip",
-    "name": "Total7zip",
-    "type": "WCX",
-    "source_type": "github_release",
-    "github_repo": "vdbo/Total7zip",
-    "homepage": "https://github.com/vdbo/Total7zip",
-    "description": "7-Zip archiver wrapper plugin for Total Commander"
   }
 ]
 ```
@@ -89,7 +80,7 @@ Example entry in `plugins.json`:
 
 1. **Repository Setup:**
    - Creating `totalplug-catalog` repository on GitHub.
-   - Initializing `plugins.json` with popular modern plugins (`CudaLister`, `MDView`, `Total7zip`, `PEViewer`, `AkelPad`, `SumatraPDF`).
+   - Initializing `plugins.json` with popular modern plugins (`CudaLister`, `MDView`, `PEViewer`, `AkelPad`, `SumatraPDF`).
 
 2. **Automation & CI/CD:**
    - Setting up GitHub Actions (`validate.yml`) to automatically check JSON formatting on PRs.

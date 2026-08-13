@@ -21,7 +21,6 @@ func NewChecker(forceRefresh bool) *Checker {
 var knownGitHubRepos = map[string]string{
 	"cudalister": "Alexey-T/CudaLister",
 	"mdview":     "rweijnen/MDView",
-	"total7zip":  "vdbo/Total7zip",
 }
 
 var knownAliases = map[string]string{
