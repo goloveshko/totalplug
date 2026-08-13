@@ -12,14 +12,10 @@ import (
 	"totalplug/internal/domain"
 )
 
-// isMetadataKey checks if an INI key represents TC metadata rather than a plugin path.
 func isMetadataKey(keyName string) bool {
-	// Skip checksum keys
 	if strings.HasPrefix(keyName, "$") {
 		return true
 	}
-
-	// Skip metadata suffix keys (_detect, _date, _flags, _default)
 	lowerKey := strings.ToLower(keyName)
 	suffixes := []string{"_detect", "_date", "_flags", "_default"}
 	for _, suffix := range suffixes {
@@ -27,11 +23,22 @@ func isMetadataKey(keyName string) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
-// FindIniFromRegistry searches Windows Registry for Total Commander configuration paths.
+// isNumeric checks if string contains only digits (e.g. "0", "1", "2")
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func FindIniFromRegistry() (iniPath string, installDir string) {
 	roots := []registry.Key{registry.CURRENT_USER, registry.LOCAL_MACHINE}
 	subKeys := []string{
@@ -73,7 +80,6 @@ func FindIniFromRegistry() (iniPath string, installDir string) {
 	return "", ""
 }
 
-// FindDefaultIniPath coordinates registry search and standard fallback locations.
 func FindDefaultIniPath(tcDir string) (string, string) {
 	regIni, regDir := FindIniFromRegistry()
 	if regIni != "" {
@@ -98,7 +104,6 @@ func FindDefaultIniPath(tcDir string) (string, string) {
 	return "", ""
 }
 
-// expandTcVars replaces Total Commander specific environment variables like %COMMANDER_PATH%.
 func expandTcVars(path string, tcDir string) string {
 	if tcDir == "" {
 		return os.ExpandEnv(path)
@@ -117,14 +122,39 @@ func expandTcVars(path string, tcDir string) string {
 	return os.ExpandEnv(path)
 }
 
-// ParsePluginsFromIni loads wincmd.ini and extracts all registered plugins.
+// deriveRealPluginName gets clean human-readable name from folder/file path
+func deriveRealPluginName(keyName string, pluginPath string, pType domain.PluginType) string {
+	// If key is numeric ("0", "1") or Packer type (WCX)
+	if isNumeric(keyName) || pType == domain.TypePacker {
+		dirName := filepath.Base(filepath.Dir(pluginPath))
+		lowerDir := strings.ToLower(dirName)
+
+		// Ignore generic root folder names
+		if dirName != "" && lowerDir != "plugins" && lowerDir != "wlx" && lowerDir != "wcx" && lowerDir != "wfx" && lowerDir != "wdx" {
+			return dirName
+		}
+
+		baseName := filepath.Base(pluginPath)
+		ext := filepath.Ext(baseName)
+		cleanName := strings.TrimSuffix(baseName, ext)
+		cleanName = strings.TrimSuffix(cleanName, "64")
+		cleanName = strings.TrimSuffix(cleanName, "32")
+		if cleanName != "" {
+			return cleanName
+		}
+	}
+	return keyName
+}
+
+// ParsePluginsFromIni loads wincmd.ini and extracts deduplicated plugins.
 func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) {
 	cfg, err := ini.Load(iniPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load ini file: %w", err)
 	}
 
-	var plugins []domain.Plugin
+	uniqueMap := make(map[string]*domain.Plugin)
+	var pluginOrder []string
 
 	parseSection := func(sectionName string, pType domain.PluginType) {
 		sec := cfg.Section(sectionName)
@@ -135,7 +165,6 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 		for _, key := range sec.Keys() {
 			keyName := key.Name()
 
-			// Skip TC metadata keys (_detect, _date, _flags, $checksum$)
 			if isMetadataKey(keyName) {
 				continue
 			}
@@ -152,9 +181,17 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 			pluginPath = strings.TrimSpace(pluginPath)
 			pluginPath = expandTcVars(pluginPath, tcDir)
 
+			realName := deriveRealPluginName(keyName, pluginPath, pType)
+			pathKey := strings.ToLower(pluginPath)
+
+			if existing, exists := uniqueMap[pathKey]; exists {
+				_ = existing
+				continue
+			}
+
 			plugin := domain.Plugin{
-				ID:               fmt.Sprintf("%s_%s", pType, keyName),
-				Name:             keyName,
+				ID:               fmt.Sprintf("%s_%s", pType, realName),
+				Name:             realName,
 				Type:             pType,
 				Path:             pluginPath,
 				InstalledVersion: "Unknown",
@@ -165,7 +202,8 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 				plugin.Status = domain.StatusNotFound
 			}
 
-			plugins = append(plugins, plugin)
+			uniqueMap[pathKey] = &plugin
+			pluginOrder = append(pluginOrder, pathKey)
 		}
 	}
 
@@ -173,6 +211,13 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 	parseSection("ListerPlugins", domain.TypeLister)
 	parseSection("FileSystemPlugins", domain.TypeFileSystem)
 	parseSection("ContentPlugins", domain.TypeContent)
+
+	var plugins []domain.Plugin
+	for _, key := range pluginOrder {
+		if p, ok := uniqueMap[key]; ok {
+			plugins = append(plugins, *p)
+		}
+	}
 
 	return plugins, nil
 }
