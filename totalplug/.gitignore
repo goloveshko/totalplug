@@ -1,3 +1,6 @@
+# Zed editor settings
+.zed/
+
 build/bin
 node_modules
 frontend/dist
