@@ -18,7 +18,12 @@ func NewChecker(forceRefresh bool) *Checker {
 	}
 }
 
-// Known alias map for mapping weird internal names to totalcmd.net IDs/Titles
+var knownGitHubRepos = map[string]string{
+	"cudalister": "Alexey-T/CudaLister",
+	"mdview":     "rweijnen/MDView",
+	"total7zip":  "vdbo/Total7zip",
+}
+
 var knownAliases = map[string]string{
 	"virtdisk":    "virtual disks",
 	"sftpplug":    "secure ftp",
@@ -27,7 +32,6 @@ var knownAliases = map[string]string{
 	"davplug":     "webdav",
 }
 
-// cleanVersionString strips prefixes, confidence tags, and trailing spaces
 func cleanVersionString(v string) string {
 	if idx := strings.Index(v, "("); idx != -1 {
 		v = v[:idx]
@@ -36,7 +40,6 @@ func cleanVersionString(v string) string {
 	return v
 }
 
-// parseVersionParts converts a version string into an array of integers (e.g. "5.2.0" -> [5, 2, 0])
 func parseVersionParts(v string) []int {
 	var parts []int
 	var current int
@@ -60,8 +63,6 @@ func parseVersionParts(v string) []int {
 	return parts
 }
 
-// CompareVersions compares two version strings mathematically.
-// Returns -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2.
 func CompareVersions(v1, v2 string) int {
 	p1 := parseVersionParts(cleanVersionString(v1))
 	p2 := parseVersionParts(cleanVersionString(v2))
@@ -91,7 +92,6 @@ func CompareVersions(v1, v2 string) int {
 	return 0
 }
 
-// normalizeName strips prefixes, suffixes, spaces, and normalizes plurals ("Virtual Disks" -> "virtualdisk")
 func normalizeName(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 
@@ -125,7 +125,6 @@ func normalizeName(s string) string {
 	return result
 }
 
-// matchesPlugin checks if a local plugin name matches a totalcmd.net catalog item
 func matchesPlugin(localName string, item CatalogItem) bool {
 	normLocal := normalizeName(localName)
 	normTitle := normalizeName(item.Title)
@@ -162,7 +161,34 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		}
 
 		p.LastChecked = time.Now()
+		normLocalName := normalizeName(p.Name)
 
+		// 1. Check custom source or known GitHub repo
+		ghRepo := ""
+		if strings.HasPrefix(p.CustomSource, "github:") {
+			ghRepo = strings.TrimPrefix(p.CustomSource, "github:")
+		} else if repo, isGH := knownGitHubRepos[normLocalName]; isGH {
+			ghRepo = repo
+		}
+
+		if ghRepo != "" {
+			if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil {
+				p.LatestVersion = ghRelease.TagName
+				if len(ghRelease.Assets) > 0 {
+					p.DownloadURL = ghRelease.Assets[0].BrowserDownloadURL
+				}
+
+				cmp := CompareVersions(p.InstalledVersion, ghRelease.TagName)
+				if cmp < 0 {
+					p.Status = domain.StatusUpdateAvail
+				} else {
+					p.Status = domain.StatusUpToDate
+				}
+				continue
+			}
+		}
+
+		// 2. Fallback to totalcmd.net
 		var matchedItem CatalogItem
 		var found bool
 

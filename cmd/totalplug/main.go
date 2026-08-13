@@ -12,12 +12,22 @@ import (
 	"totalplug/internal/storage"
 )
 
-func main() {
-	fmt.Println("==========================================")
-	fmt.Println("   TotalPlug - Total Commander Updater    ")
-	fmt.Println("==========================================")
+// truncateString truncates strings longer than maxLen and appends "..."
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
+}
 
-	// Check CLI flags
+func main() {
+	fmt.Println("================================================================================")
+	fmt.Println("                     TotalPlug - Total Commander Updater                        ")
+	fmt.Println("================================================================================")
+
 	forceRefresh := false
 	for _, arg := range os.Args[1:] {
 		if arg == "--refresh-cache" || arg == "-r" {
@@ -43,12 +53,13 @@ func main() {
 	fmt.Println("[+] Extracting version information...")
 	plugins = scanner.EnrichPluginVersions(plugins)
 
+	// Load DB & User Overrides
 	db, err := storage.NewDatabase("")
 	if err == nil {
-		plugins = db.EnrichFromDatabase(plugins)
+		plugins = db.ApplyOverrides(plugins)
 	}
 
-	fmt.Println("[+] Checking updates against totalcmd.net...")
+	fmt.Println("[+] Checking updates against sources...")
 	chk := checker.NewChecker(forceRefresh)
 	plugins, fromCache, err := chk.CheckUpdates(context.Background(), plugins)
 
@@ -57,7 +68,7 @@ func main() {
 	} else if fromCache {
 		fmt.Println("[i] Used local 24h catalog cache. (Use --refresh-cache to force update)")
 	} else {
-		fmt.Println("[+] Fetched fresh catalog from totalcmd.net!")
+		fmt.Println("[+] Fetched fresh catalog!")
 	}
 
 	categories := []struct {
@@ -90,31 +101,37 @@ func main() {
 		fmt.Printf("\n--- [%s] %s (%d) ---\n", cat.Type, cat.Title, len(group))
 
 		for _, p := range group {
-			statusSymbol := "✓"
+			var statusSymbol string
+
 			if p.Status == domain.StatusNotFound {
-				statusSymbol = "✗ [Missing]"
+				statusSymbol = "✗ "
 				missingCount++
 			} else if p.Status == domain.StatusUpdateAvail {
-				statusSymbol = "🚀 [UPDATE AVAIL]"
+				statusSymbol = "🚀"
 				updateAvailCount++
 				validCount++
+			} else if p.Confidence == domain.ConfidenceFallback || p.Confidence == domain.ConfidenceText {
+				statusSymbol = "⚠️"
+				uncertainCount++
+				validCount++
 			} else {
+				statusSymbol = "✓ "
 				validCount++
 			}
 
+			// Clean ASCII tag formatting without emoji shifts inside the column
 			confidenceTag := fmt.Sprintf("[%s]", p.Confidence)
-			if p.Confidence == domain.ConfidenceFallback || p.Confidence == domain.ConfidenceText {
-				confidenceTag = fmt.Sprintf("⚠️ [%s]", p.Confidence)
-				uncertainCount++
-			}
 
 			latestVerStr := ""
 			if p.LatestVersion != "" && p.LatestVersion != "N/A (Not in catalog)" {
-				latestVerStr = fmt.Sprintf(" ➔ Latest: %s", p.LatestVersion)
+				latestVerStr = fmt.Sprintf("➔ Latest: %s", p.LatestVersion)
 			}
 
-			fmt.Printf("%2d. %-20s %-18s | Ver: %-10s%-12s%s\n",
-				itemIndex, p.Name, statusSymbol, p.InstalledVersion, confidenceTag, latestVerStr)
+			displayName := truncateString(p.Name, 18)
+
+			// Clean fixed-width ASCII column alignment
+			fmt.Printf("%2d. %-18s %s | Ver: %-10s | %-14s %s\n",
+				itemIndex, displayName, statusSymbol, p.InstalledVersion, confidenceTag, latestVerStr)
 			itemIndex++
 		}
 	}
@@ -122,12 +139,18 @@ func main() {
 	fmt.Println("\n================================================================================")
 	fmt.Printf("SUMMARY: Total %d | %d Valid ✓ | %d Updates 🚀 | %d Missing ✗ | %d Uncertain ⚠️\n",
 		len(plugins), validCount, updateAvailCount, missingCount, uncertainCount)
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("LEGEND:")
+	fmt.Println("  ✓  - Up to date")
+	fmt.Println("  🚀 - Update available")
+	fmt.Println("  ⚠️ - Uncertain version (check manually or force update)")
+	fmt.Println("  ✗  - Plugin file missing on disk")
 
 	if updateAvailCount > 0 {
-		fmt.Printf("[🚀] SUCCESS: Found %d plugin update(s) available on totalcmd.net!\n", updateAvailCount)
+		fmt.Printf("\n[🚀] SUCCESS: Found %d plugin update(s) available!\n", updateAvailCount)
 	}
 	if uncertainCount > 0 {
-		fmt.Printf("[!] NOTICE:  %d plugin(s) rely on file dates or readme files.\n", uncertainCount)
+		fmt.Printf("[!] NOTICE:  %d plugin(s) rely on text files or manual overrides.\n", uncertainCount)
 	}
 	if missingCount > 0 {
 		fmt.Printf("[!] WARNING: %d plugin file(s) were not found on disk!\n", missingCount)

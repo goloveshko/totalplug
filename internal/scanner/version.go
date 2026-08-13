@@ -246,15 +246,7 @@ func GetVersionFromReadme(pluginPath string) string {
 	return ""
 }
 
-func GetFileModTime(filePath string) string {
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return "Unknown"
-	}
-	return info.ModTime().Format("2006.01.02")
-}
-
-// EnrichPluginVersions applies 4-level fallback to determine plugin version and confidence.
+// EnrichPluginVersions applies fallback to determine plugin version.
 func EnrichPluginVersions(plugins []domain.Plugin) []domain.Plugin {
 	for i := range plugins {
 		if plugins[i].Status == domain.StatusNotFound {
@@ -263,21 +255,21 @@ func EnrichPluginVersions(plugins []domain.Plugin) []domain.Plugin {
 			continue
 		}
 
-		// Tier 1: PE Version Info on main file
+		// Tier 1: Try PE Version Info on main file
 		if ver, err := GetFileVersion(plugins[i].Path); err == nil && ver != "" {
 			plugins[i].InstalledVersion = ver
 			plugins[i].Confidence = domain.ConfidenceExact
 			continue
 		}
 
-		// Tier 2: PE Version Info on companion DLLs
+		// Tier 2: Try PE Version Info on companion DLLs
 		if dllVer := GetFileVersionFromCompanionDLLs(plugins[i].Path); dllVer != "" {
 			plugins[i].InstalledVersion = dllVer
 			plugins[i].Confidence = domain.ConfidenceExact
 			continue
 		}
 
-		// Tier 3: Readme / INF / History files
+		// Tier 3: Try Readme / INF / History files
 		if txtVer := GetVersionFromReadme(plugins[i].Path); txtVer != "" {
 			plugins[i].InstalledVersion = txtVer
 			plugins[i].Confidence = domain.ConfidenceText
@@ -285,8 +277,8 @@ func EnrichPluginVersions(plugins []domain.Plugin) []domain.Plugin {
 			continue
 		}
 
-		// Tier 4: Fallback to File Modification Date
-		plugins[i].InstalledVersion = GetFileModTime(plugins[i].Path)
+		// Tier 4: Unknown
+		plugins[i].InstalledVersion = "Unknown"
 		plugins[i].Confidence = domain.ConfidenceFallback
 		plugins[i].Status = domain.StatusUncertain
 	}
