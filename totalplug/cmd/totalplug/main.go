@@ -6,6 +6,7 @@ import (
 
 	"totalplug/internal/config"
 	"totalplug/internal/domain"
+	"totalplug/internal/scanner"
 )
 
 func main() {
@@ -13,31 +14,24 @@ func main() {
 	fmt.Println("   TotalPlug - Total Commander Updater    ")
 	fmt.Println("==========================================")
 
-	// 1. Locate wincmd.ini automatically
 	iniPath, tcDir := config.FindDefaultIniPath("")
-
 	if iniPath == "" {
 		fmt.Println("[!] Error: Could not automatically locate wincmd.ini via Registry or AppData.")
-		fmt.Println("[!] Please specify the path to wincmd.ini manually.")
 		os.Exit(1)
 	}
 
 	fmt.Printf("[+] Total Commander Dir: %s\n", tcDir)
 	fmt.Printf("[+] Found wincmd.ini:    %s\n", iniPath)
 
-	// 2. Parse plugins from INI
 	plugins, err := config.ParsePluginsFromIni(iniPath, tcDir)
 	if err != nil {
 		fmt.Printf("[!] Failed to parse plugins: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(plugins) == 0 {
-		fmt.Println("[i] No plugins found in configuration.")
-		return
-	}
+	fmt.Println("[+] Extracting version information...")
+	plugins = scanner.EnrichPluginVersions(plugins)
 
-	// Categories list for structured output
 	categories := []struct {
 		Type  domain.PluginType
 		Title string
@@ -48,12 +42,11 @@ func main() {
 		{Type: domain.TypeContent, Title: "Content / Meta Plugins (WDX)"},
 	}
 
-	var validCount, missingCount int
+	var validCount, missingCount, uncertainCount int
 	itemIndex := 1
 
 	fmt.Printf("\nDiscovered %d installed plugins:\n", len(plugins))
 
-	// 3. Render plugins grouped by category
 	for _, cat := range categories {
 		var group []domain.Plugin
 		for _, p := range plugins {
@@ -77,21 +70,27 @@ func main() {
 				validCount++
 			}
 
-			fmt.Printf("%2d. %-20s %-16s -> %s\n",
-				itemIndex, p.Name, statusSymbol, p.Path)
+			confidenceTag := fmt.Sprintf("[%s]", p.Confidence)
+			if p.Confidence == domain.ConfidenceFallback || p.Confidence == domain.ConfidenceText {
+				confidenceTag = fmt.Sprintf("⚠️ [%s]", p.Confidence)
+				uncertainCount++
+			}
+
+			fmt.Printf("%2d. %-20s %-16s | Ver: %-12s %-15s -> %s\n",
+				itemIndex, p.Name, statusSymbol, p.InstalledVersion, confidenceTag, p.Path)
 			itemIndex++
 		}
 	}
 
-	// 4. Print Summary Status Footer
 	fmt.Println("\n================================================================================")
-	fmt.Printf("SUMMARY: Total %d plugins | %d Valid ✓ | %d Missing ✗\n",
-		len(plugins), validCount, missingCount)
+	fmt.Printf("SUMMARY: Total %d plugins | %d Valid ✓ | %d Missing ✗ | %d Uncertain ⚠️\n",
+		len(plugins), validCount, missingCount, uncertainCount)
 
+	if uncertainCount > 0 {
+		fmt.Printf("[!] NOTICE:  %d plugin(s) rely on file dates or readme files. Version checks may require force update.\n", uncertainCount)
+	}
 	if missingCount > 0 {
-		fmt.Printf("[!] WARNING: %d plugin file(s) configured in wincmd.ini were not found on disk!\n", missingCount)
-	} else {
-		fmt.Println("[+] SUCCESS: All configured plugin files exist on disk.")
+		fmt.Printf("[!] WARNING: %d plugin file(s) were not found on disk!\n", missingCount)
 	}
 	fmt.Println("================================================================================")
 }
