@@ -2,6 +2,8 @@ package checker
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,19 +18,6 @@ func NewChecker(forceRefresh bool) *Checker {
 	return &Checker{
 		forceRefresh: forceRefresh,
 	}
-}
-
-var knownGitHubRepos = map[string]string{
-	"cudalister": "Alexey-T/CudaLister",
-	"mdview":     "rweijnen/MDView",
-}
-
-var knownAliases = map[string]string{
-	"virtdisk":    "virtual disks",
-	"sftpplug":    "secure ftp",
-	"adbplugin":   "adb",
-	"cloudplugin": "cloud",
-	"davplug":     "webdav",
 }
 
 func cleanVersionString(v string) string {
@@ -94,7 +83,7 @@ func CompareVersions(v1, v2 string) int {
 func normalizeName(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 
-	prefixes := []string{"tc_", "tc ", "wfx_", "wlx_", "wcx_", "wdx_"}
+	prefixes := []string{"tc_", "tc ", "wfx_", "wlx_", "wcx_", "wdx_", "totalcmd_"}
 	for _, p := range prefixes {
 		if strings.HasPrefix(s, p) {
 			s = strings.TrimPrefix(s, p)
@@ -116,7 +105,6 @@ func normalizeName(s string) string {
 	}
 
 	result := sb.String()
-
 	if len(result) > 3 && strings.HasSuffix(result, "s") {
 		result = strings.TrimSuffix(result, "s")
 	}
@@ -124,22 +112,28 @@ func normalizeName(s string) string {
 	return result
 }
 
-func matchesPlugin(localName string, item CatalogItem) bool {
-	normLocal := normalizeName(localName)
-	normTitle := normalizeName(item.Title)
-	normID := normalizeName(item.ID)
-
-	if normLocal == normTitle || normLocal == normID {
-		return true
-	}
-
-	if alias, exists := knownAliases[normID]; exists {
-		if normalizeName(alias) == normLocal {
+// matchesPlugin performs multi-tier matching of local installed plugin to catalog entry.
+func matchesPlugin(localPlugin domain.Plugin, entry CatalogEntry) bool {
+	// Tier 1: Match by exact binary filename (e.g. "cudalister.wlx64", "mdview.wlx")
+	localBaseFilename := strings.ToLower(filepath.Base(localPlugin.Path))
+	for _, fn := range entry.Match.Filenames {
+		if strings.ToLower(fn) == localBaseFilename {
 			return true
 		}
 	}
-	if alias, exists := knownAliases[normLocal]; exists {
-		if normalizeName(alias) == normID || normalizeName(alias) == normTitle {
+
+	// Tier 2: Match by normalized name and ID
+	normLocal := normalizeName(localPlugin.Name)
+	normCatalogName := normalizeName(entry.Name)
+	normCatalogID := normalizeName(entry.ID)
+
+	if normLocal == normCatalogName || normLocal == normCatalogID {
+		return true
+	}
+
+	// Tier 3: Match by explicit aliases
+	for _, alias := range entry.Match.Aliases {
+		if normalizeName(alias) == normLocal {
 			return true
 		}
 	}
@@ -147,8 +141,9 @@ func matchesPlugin(localName string, item CatalogItem) bool {
 	return false
 }
 
+// CheckUpdates resolves installed plugins against the community catalog.
 func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]domain.Plugin, bool, error) {
-	catalog, fromCache, err := FetchTotalCmdCatalog(ctx, c.forceRefresh)
+	catalog, fromCache, err := FetchCatalog(ctx, c.forceRefresh)
 	if err != nil {
 		return plugins, false, err
 	}
@@ -160,22 +155,16 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		}
 
 		p.LastChecked = time.Now()
-		normLocalName := normalizeName(p.Name)
 
-		// 1. Check custom source or known GitHub repo
-		ghRepo := ""
+		// 1. Check custom override source (e.g. "github:Alexey-T/CudaLister")
 		if strings.HasPrefix(p.CustomSource, "github:") {
-			ghRepo = strings.TrimPrefix(p.CustomSource, "github:")
-		} else if repo, isGH := knownGitHubRepos[normLocalName]; isGH {
-			ghRepo = repo
-		}
-
-		if ghRepo != "" {
+			ghRepo := strings.TrimPrefix(p.CustomSource, "github:")
 			if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil {
 				p.LatestVersion = ghRelease.TagName
 				if len(ghRelease.Assets) > 0 {
 					p.DownloadURL = ghRelease.Assets[0].BrowserDownloadURL
 				}
+				p.WebURL = fmt.Sprintf("https://github.com/%s", ghRepo)
 
 				cmp := CompareVersions(p.InstalledVersion, ghRelease.TagName)
 				if cmp < 0 {
@@ -187,32 +176,35 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 			}
 		}
 
-		// 2. Fallback to totalcmd.net
-		var matchedItem CatalogItem
-		var found bool
-
-		for _, catItem := range catalog {
-			if matchesPlugin(p.Name, catItem) {
-				matchedItem = catItem
-				found = true
+		// 2. Match against community catalog
+		var matchedEntry *CatalogEntry
+		for _, entry := range catalog {
+			if matchesPlugin(*p, entry) {
+				matchedEntry = &entry
 				break
 			}
 		}
 
-		if found {
-			p.LatestVersion = matchedItem.Version
-			p.DownloadURL = matchedItem.DownloadURL
+		if matchedEntry != nil && matchedEntry.Resolved != nil {
+			p.LatestVersion = matchedEntry.Resolved.Version
+			p.DownloadURL = matchedEntry.Resolved.DownloadURL
+			p.WebURL = matchedEntry.Resolved.WebURL
+			p.Arch = matchedEntry.Arch
+			p.Description = matchedEntry.Description
 
-			cmp := CompareVersions(p.InstalledVersion, matchedItem.Version)
-
-			if cmp < 0 {
-				if p.Confidence == domain.ConfidenceFallback {
-					p.Status = domain.StatusUncertain
-				} else {
-					p.Status = domain.StatusUpdateAvail
-				}
+			if p.InstalledVersion == "Unknown" || p.InstalledVersion == "N/A" {
+				p.Status = domain.StatusUncertain
 			} else {
-				p.Status = domain.StatusUpToDate
+				cmp := CompareVersions(p.InstalledVersion, matchedEntry.Resolved.Version)
+				if cmp < 0 {
+					if p.Confidence == domain.ConfidenceFallback {
+						p.Status = domain.StatusUncertain
+					} else {
+						p.Status = domain.StatusUpdateAvail
+					}
+				} else {
+					p.Status = domain.StatusUpToDate
+				}
 			}
 		} else {
 			p.LatestVersion = "N/A (Not in catalog)"

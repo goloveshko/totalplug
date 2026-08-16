@@ -12,7 +12,6 @@ import (
 	"totalplug/internal/storage"
 )
 
-// truncateString truncates strings longer than maxLen and appends "..."
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -59,16 +58,16 @@ func main() {
 		plugins = db.ApplyOverrides(plugins)
 	}
 
-	fmt.Println("[+] Checking updates against sources...")
+	fmt.Println("[+] Checking updates against TotalPlug community catalog...")
 	chk := checker.NewChecker(forceRefresh)
 	plugins, fromCache, err := chk.CheckUpdates(context.Background(), plugins)
 
 	if err != nil {
 		fmt.Printf("[!] Catalog fetch warning: %v\n", err)
 	} else if fromCache {
-		fmt.Println("[i] Used local 24h catalog cache. (Use --refresh-cache to force update)")
+		fmt.Println("[i] Using local 24h catalog cache. (Use --refresh-cache to force update)")
 	} else {
-		fmt.Println("[+] Fetched fresh catalog!")
+		fmt.Println("[+] Fetched fresh catalog from GitHub CDN!")
 	}
 
 	categories := []struct {
@@ -119,7 +118,6 @@ func main() {
 				validCount++
 			}
 
-			// Clean ASCII tag formatting without emoji shifts inside the column
 			confidenceTag := fmt.Sprintf("[%s]", p.Confidence)
 
 			latestVerStr := ""
@@ -129,7 +127,6 @@ func main() {
 
 			displayName := truncateString(p.Name, 18)
 
-			// Clean fixed-width ASCII column alignment
 			fmt.Printf("%2d. %-18s %s | Ver: %-10s | %-14s %s\n",
 				itemIndex, displayName, statusSymbol, p.InstalledVersion, confidenceTag, latestVerStr)
 			itemIndex++
