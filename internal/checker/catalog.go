@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	// CommunityCatalogURL points to the compiled JSON snapshot on GitHub Pages
-	CommunityCatalogURL = "https://goloveshko.github.io/totalplug-catalog/catalog.resolved.json"
+	// CommunityCatalogURL points to the minified JSON snapshot served by the
+	// totalplug-catalog Pages site (custom domain; identical content to
+	// catalog.resolved.json, just without pretty-printing).
+	CommunityCatalogURL = "https://sergey.is-a.dev/totalplug-catalog/catalog.min.json"
 	CacheTTL            = 24 * time.Hour
 	HTTPTimeout         = 12 * time.Second
 )
