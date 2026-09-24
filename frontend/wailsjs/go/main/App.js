@@ -6,12 +6,20 @@ export function GetUpdateHistory() {
   return window['go']['main']['App']['GetUpdateHistory']();
 }
 
+export function GetWindowEffect() {
+  return window['go']['main']['App']['GetWindowEffect']();
+}
+
 export function SaveOverride(arg1, arg2) {
   return window['go']['main']['App']['SaveOverride'](arg1, arg2);
 }
 
 export function ScanPlugins(arg1) {
   return window['go']['main']['App']['ScanPlugins'](arg1);
+}
+
+export function SetWindowEffect(arg1) {
+  return window['go']['main']['App']['SetWindowEffect'](arg1);
 }
 
 export function UpdatePlugin(arg1) {

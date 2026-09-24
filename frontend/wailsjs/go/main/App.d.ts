@@ -4,8 +4,12 @@ import {domain} from '../models';
 
 export function GetUpdateHistory():Promise<Array<domain.UpdateEntry>>;
 
+export function GetWindowEffect():Promise<string>;
+
 export function SaveOverride(arg1:string,arg2:domain.Override):Promise<void>;
 
 export function ScanPlugins(arg1:boolean):Promise<Array<domain.Plugin>>;
+
+export function SetWindowEffect(arg1:string):Promise<void>;
 
 export function UpdatePlugin(arg1:domain.Plugin):Promise<domain.UpdateResult>;

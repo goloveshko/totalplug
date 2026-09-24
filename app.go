@@ -112,6 +112,19 @@ func (a *App) GetUpdateHistory() ([]domain.UpdateEntry, error) {
 	return a.db.UpdateHistory(), nil
 }
 
+// GetWindowEffect returns the backdrop applied at startup ("none", "mica"
+// or "acrylic"); the frontend mirrors it in the settings select and decides
+// whether to render a transparent body.
+func (a *App) GetWindowEffect() string {
+	return loadWindowEffect()
+}
+
+// SetWindowEffect persists the backdrop choice; it is read once before the
+// window is created, so a restart is required to apply it.
+func (a *App) SetWindowEffect(effect string) error {
+	return saveWindowEffect(effect)
+}
+
 // UpdatePlugin installs the latest version for the specified plugin. A locked
 // target (Total Commander still running) is reported through the structured
 // result instead of an error so the frontend can show recovery guidance.
