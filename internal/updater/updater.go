@@ -2,6 +2,7 @@ package updater
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -30,6 +31,9 @@ var (
 	ErrInsecureScheme = errors.New("refusing insecure download scheme, https required")
 	// ErrDownloadTooLarge aborts downloads above the configured size cap.
 	ErrDownloadTooLarge = errors.New("download exceeds size limit")
+	// ErrUnsupportedArchive marks a downloaded package in a format that cannot
+	// be extracted (RAR, 7z, ...); totalcmd.net ships many plugins as RAR.
+	ErrUnsupportedArchive = errors.New("unsupported archive format, only ZIP can be applied")
 )
 
 // DefaultMaxDownloadBytes caps archive size (256 MiB) to bound disk usage.
@@ -188,6 +192,37 @@ func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error 
 	}
 
 	return nil
+}
+
+// detectArchiveFormat classifies a downloaded package by its magic bytes so
+// unsupported formats fail fast with an actionable message instead of a
+// confusing "zip: not a valid zip file" from the extractor.
+func detectArchiveFormat(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("opening downloaded file: %w", err)
+	}
+	defer f.Close()
+
+	head := make([]byte, 8)
+	n, err := io.ReadFull(f, head)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return "", fmt.Errorf("reading downloaded file header: %w", err)
+	}
+	head = head[:n]
+
+	switch {
+	case len(head) >= 4 && bytes.Equal(head[:4], []byte("PK\x03\x04")):
+		return "zip", nil
+	case len(head) >= 6 && bytes.Equal(head[:6], []byte("Rar!\x1a\x07")):
+		return "rar", nil
+	case len(head) >= 6 && bytes.Equal(head[:6], []byte{0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C}):
+		return "7z", nil
+	case len(head) >= 2 && head[0] == 0x1f && head[1] == 0x8b:
+		return "gzip", nil
+	default:
+		return "", fmt.Errorf("%w: unrecognized file signature", ErrUnsupportedArchive)
+	}
 }
 
 // ExtractZip extracts an archive safely to targetDir (mitigating Zip Slip vulnerability).
@@ -369,6 +404,14 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	archiveFile := filepath.Join(tmpDir, "package.zip")
 	if err := u.DownloadFile(ctx, plugin.DownloadURL, archiveFile); err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
+	}
+
+	format, err := detectArchiveFormat(archiveFile)
+	if err != nil {
+		return "", err
+	}
+	if format != "zip" {
+		return "", fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format)
 	}
 
 	extractedDir := filepath.Join(tmpDir, "extracted")

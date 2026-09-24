@@ -89,6 +89,9 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Databa
 			if errors.Is(err, updater.ErrFileLocked) {
 				fmt.Printf("      ↳ File is locked or read-only. Close Total Commander and run again.\n")
 			}
+			if errors.Is(err, updater.ErrUnsupportedArchive) {
+				fmt.Printf("      ↳ Download manually and unpack the plugin yourself. Homepage: %s\n", p.WebURL)
+			}
 			failed++
 			continue
 		}

@@ -368,3 +368,70 @@ func TestUpdatePluginPrunesOldBackups(t *testing.T) {
 		t.Error("plugin file was not updated")
 	}
 }
+
+func TestDetectArchiveFormat(t *testing.T) {
+	rarHeader := append([]byte("Rar!\x1a\x07\x01"), bytes.Repeat([]byte{0}, 32)...)
+	sevenZip := []byte{0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C, 0x00, 0x04}
+	zipBytes := buildTestZip(t, map[string]string{"a.txt": "x"})
+
+	tests := []struct {
+		name    string
+		data    []byte
+		want    string
+		wantErr bool
+	}{
+		{"zip", zipBytes, "zip", false},
+		{"rar", rarHeader, "rar", false},
+		{"7z", sevenZip, "7z", false},
+		{"gzip", []byte{0x1f, 0x8b, 8, 0}, "gzip", false},
+		{"html page", []byte("<!DOCTYPE html><html>"), "", true},
+		{"empty file", []byte{}, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "pkg.bin")
+			if err := os.WriteFile(path, tt.data, 0644); err != nil {
+				t.Fatal(err)
+			}
+			got, err := detectArchiveFormat(path)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr = %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("format = %q, want %q", got, tt.want)
+			}
+			if err != nil && !errors.Is(err, ErrUnsupportedArchive) {
+				t.Errorf("error must wrap ErrUnsupportedArchive, got %v", err)
+			}
+		})
+	}
+}
+
+func TestUpdatePluginRejectsRarBeforeTouchingPlugin(t *testing.T) {
+	dir := t.TempDir()
+	pluginFile := filepath.Join(dir, "WCX", "nl.wdx")
+	writeTestFile(t, pluginFile, "original")
+
+	rarBody := append([]byte("Rar!\x1a\x07\x01"), bytes.Repeat([]byte{0}, 64)...)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rar")
+		_, _ = w.Write(rarBody)
+	}))
+	defer srv.Close()
+
+	p := domain.Plugin{Path: pluginFile, DownloadURL: srv.URL}
+	_, err := NewUpdater().UpdatePlugin(context.Background(), p)
+	if !errors.Is(err, ErrUnsupportedArchive) {
+		t.Fatalf("error = %v, want ErrUnsupportedArchive", err)
+	}
+	if readTestFile(t, pluginFile) != "original" {
+		t.Error("plugin file must be untouched")
+	}
+	entries, _ := os.ReadDir(filepath.Dir(pluginFile))
+	for _, e := range entries {
+		if strings.Contains(e.Name(), ".bak_") {
+			t.Errorf("no backup must be created for rejected format, found %s", e.Name())
+		}
+	}
+}
