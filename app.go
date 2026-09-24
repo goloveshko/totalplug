@@ -104,6 +104,14 @@ func (a *App) SaveOverride(pluginID string, override domain.Override) error {
 	return a.db.SetUserOverride(pluginID, override)
 }
 
+// GetUpdateHistory returns successfully applied updates, newest first.
+func (a *App) GetUpdateHistory() ([]domain.UpdateEntry, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	return a.db.UpdateHistory(), nil
+}
+
 // UpdatePlugin installs the latest version for the specified plugin. A locked
 // target (Total Commander still running) is reported through the structured
 // result instead of an error so the frontend can show recovery guidance.
@@ -119,7 +127,7 @@ func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
 	// Remember the applied version so blind (unknown-installed) plugins do not
 	// resurface as uncertain on the next scan.
 	if a.db != nil {
-		if err := a.db.RememberVersion(plugin.ID, plugin.LatestVersion); err != nil {
+		if err := a.db.RememberVersion(plugin.ID, plugin.Name, plugin.LatestVersion); err != nil {
 			fmt.Printf("[!] Could not remember version %s for %s: %v\n", plugin.LatestVersion, plugin.ID, err)
 		}
 	}

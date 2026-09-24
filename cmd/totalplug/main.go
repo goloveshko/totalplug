@@ -94,7 +94,7 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Databa
 		}
 		fmt.Printf("  [✓] %-18s updated to %s (backup: %s)\n", name, p.LatestVersion, backupDir)
 		if db != nil {
-			if err := db.RememberVersion(p.ID, p.LatestVersion); err != nil {
+			if err := db.RememberVersion(p.ID, p.Name, p.LatestVersion); err != nil {
 				fmt.Printf("      ↳ Could not remember version %s in history: %v\n", p.LatestVersion, err)
 			}
 		}

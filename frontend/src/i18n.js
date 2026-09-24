@@ -45,6 +45,13 @@ const STRINGS = {
         'update.error_status': 'Update failed for {name}',
         'events.refreshed': 'Cache shown, catalog updated. Plugins: {n}',
         'events.refresh_failed': '⚠ Background catalog refresh failed: {msg}',
+        'btn.history': '🕘 History',
+        'history.title': 'Applied updates',
+        'history.col.plugin': 'Plugin',
+        'history.col.version': 'Version',
+        'history.col.date': 'Applied at',
+        'history.empty': 'No updates applied yet.',
+        'history.error': 'Failed to load history: {err}',
     },
     ru: {
         'status.initial': 'Нажмите «Сканировать», чтобы проверить плагины...',
@@ -91,6 +98,13 @@ const STRINGS = {
         'update.error_status': 'Ошибка при обновлении {name}',
         'events.refreshed': 'Данные из кэша, каталог обновлён. Плагинов: {n}',
         'events.refresh_failed': '⚠ Фоновое обновление каталога не удалось: {msg}',
+        'btn.history': '🕘 История',
+        'history.title': 'Применённые обновления',
+        'history.col.plugin': 'Плагин',
+        'history.col.version': 'Версия',
+        'history.col.date': 'Применено',
+        'history.empty': 'Обновлений ещё не было.',
+        'history.error': 'Не удалось загрузить историю: {err}',
     },
 };
 

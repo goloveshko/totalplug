@@ -146,6 +146,31 @@ tr:hover {
     color: var(--text-main);
 }
 
+.btn-history {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+}
+.btn-history:hover {
+    background: var(--border);
+    color: var(--text-main);
+}
+
+#history-dialog {
+    width: 460px;
+    max-width: 90vw;
+}
+#history-dialog table {
+    width: 100%;
+    font-size: 0.85rem;
+    margin: 10px 0 16px;
+}
+#history-dialog td, #history-dialog th {
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
 dialog {
     background: var(--card-bg);
     color: var(--text-main);

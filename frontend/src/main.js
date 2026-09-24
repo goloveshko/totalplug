@@ -1,5 +1,5 @@
 import './style.css';
-import { ScanPlugins, UpdatePlugin, SaveOverride } from '../wailsjs/go/main/App';
+import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory } from '../wailsjs/go/main/App';
 import { EventsOn } from '../wailsjs/runtime';
 import { t, currentLang, toggleLang } from './i18n.js';
 
@@ -11,6 +11,7 @@ let editingPlugin = null;
 // Reassigned by buildDom() on every (re)render, e.g. after a language switch.
 let statusEl, tbody, btnScan, btnRefresh;
 let editorDialog, editorForm, editorPluginEl, editorVersionEl, editorSourceEl, editorCancelEl;
+let historyDialog, historyBody;
 
 function getStatusBadge(status) {
     switch (status) {
@@ -136,6 +137,26 @@ window.handleUpdate = async function(index) {
     }
 };
 
+async function openHistory() {
+    try {
+        const entries = await GetUpdateHistory();
+        if (!entries || entries.length === 0) {
+            historyBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#777; padding:16px;">${t('history.empty')}</td></tr>`;
+        } else {
+            historyBody.innerHTML = entries.map((e) => `
+                <tr>
+                    <td>${e.plugin_name || e.plugin_id}</td>
+                    <td><code>${e.version}</code></td>
+                    <td>${new Date(e.applied_at).toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+        historyDialog.showModal();
+    } catch (err) {
+        statusEl.innerText = t('history.error', { err });
+    }
+}
+
 function buildDom() {
     app.innerHTML = `
       <div class="header">
@@ -145,6 +166,7 @@ function buildDom() {
         </div>
         <div class="actions">
           <button id="btn-lang" class="btn-lang" title="${t('btn.lang.title')}">${t('btn.lang')}</button>
+          <button id="btn-history" class="btn-history">${t('btn.history')}</button>
           <button id="btn-scan">${t('btn.scan')}</button>
           <button id="btn-refresh" style="background:#555">${t('btn.refresh')}</button>
         </div>
@@ -187,6 +209,23 @@ function buildDom() {
           </div>
         </form>
       </dialog>
+
+      <dialog id="history-dialog">
+        <h2>${t('history.title')}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>${t('history.col.plugin')}</th>
+              <th>${t('history.col.version')}</th>
+              <th>${t('history.col.date')}</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+        <div class="editor-actions">
+          <button type="button" id="history-close">${t('editor.cancel')}</button>
+        </div>
+      </dialog>
     `;
 
     statusEl = document.getElementById('status');
@@ -200,9 +239,12 @@ function buildDom() {
     editorVersionEl = document.getElementById('editor-version');
     editorSourceEl = document.getElementById('editor-source');
     editorCancelEl = document.getElementById('editor-cancel');
+    historyDialog = document.getElementById('history-dialog');
+    historyBody = document.getElementById('history-body');
 
     btnScan.addEventListener('click', () => runScan(false));
     btnRefresh.addEventListener('click', () => runScan(true));
+    document.getElementById('btn-history').addEventListener('click', openHistory);
     document.getElementById('btn-lang').addEventListener('click', () => {
         toggleLang();
         buildDom();
@@ -214,6 +256,7 @@ function buildDom() {
         await saveOverrideFromEditor();
     });
     editorCancelEl.addEventListener('click', () => editorDialog.close());
+    document.getElementById('history-close').addEventListener('click', () => historyDialog.close());
 
     if (currentPlugins.length > 0) {
         renderTable(currentPlugins);

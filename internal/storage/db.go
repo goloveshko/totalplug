@@ -20,14 +20,20 @@ type Record struct {
 }
 
 type Database struct {
-	// mu guards records/overrides: background GUI scans read them while
-	// SaveOverride writes.
+	// mu guards records/overrides/history: background GUI scans read them
+	// while SaveOverride writes.
 	mu            sync.RWMutex
 	filePath      string
 	overridesPath string
+	historyPath   string
 	records       map[string]Record
 	overrides     map[string]domain.Override
+	history       []domain.UpdateEntry
 }
+
+// MaxHistoryEntries caps the append-only update log so the JSON file cannot
+// grow without bound on a long-lived install.
+const MaxHistoryEntries = 200
 
 func GetDefaultDbPath() string {
 	appData := os.Getenv("APPDATA")
@@ -57,6 +63,7 @@ func NewDatabase(dbPath string) (*Database, error) {
 	db := &Database{
 		filePath:      dbPath,
 		overridesPath: GetDefaultOverridesPath(),
+		historyPath:   filepath.Join(filepath.Dir(dbPath), "update_history.json"),
 		records:       make(map[string]Record),
 		overrides:     make(map[string]domain.Override),
 	}
@@ -66,6 +73,9 @@ func NewDatabase(dbPath string) (*Database, error) {
 		errs = append(errs, err)
 	}
 	if err := db.LoadOverrides(); err != nil {
+		errs = append(errs, err)
+	}
+	if err := db.LoadHistory(); err != nil {
 		errs = append(errs, err)
 	}
 	return db, errors.Join(errs...)
@@ -98,6 +108,23 @@ func (db *Database) Load() error {
 
 func (db *Database) LoadOverrides() error {
 	return readJSONFile(db.overridesPath, &db.overrides)
+}
+
+func (db *Database) LoadHistory() error {
+	return readJSONFile(db.historyPath, &db.history)
+}
+
+// saveHistoryLocked serializes the update log; callers must hold mu.
+func (db *Database) saveHistoryLocked() error {
+	file, err := os.Create(db.historyPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(db.history)
 }
 
 // saveOverridesLocked serializes the current overrides map; callers must hold mu.
@@ -140,9 +167,9 @@ func (db *Database) saveRecordsLocked() error {
 }
 
 // RememberVersion stores the version applied by a successful update so later
-// scans start from a known value instead of "Unknown". It seeds the update
-// history in installed_plugins.json.
-func (db *Database) RememberVersion(pluginID, version string) error {
+// scans start from a known value instead of "Unknown", and appends the event
+// to the capped update history log.
+func (db *Database) RememberVersion(pluginID, pluginName, version string) error {
 	if pluginID == "" || version == "" {
 		return nil
 	}
@@ -155,7 +182,30 @@ func (db *Database) RememberVersion(pluginID, version string) error {
 		Version:   version,
 		UpdatedAt: time.Now().UTC(),
 	}
-	return db.saveRecordsLocked()
+	if err := db.saveRecordsLocked(); err != nil {
+		return err
+	}
+
+	db.history = append([]domain.UpdateEntry{{
+		PluginID:   pluginID,
+		PluginName: pluginName,
+		Version:    version,
+		AppliedAt:  time.Now().UTC(),
+	}}, db.history...)
+	if len(db.history) > MaxHistoryEntries {
+		db.history = db.history[:MaxHistoryEntries]
+	}
+	return db.saveHistoryLocked()
+}
+
+// UpdateHistory returns the applied-update log, newest entry first.
+func (db *Database) UpdateHistory() []domain.UpdateEntry {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	out := make([]domain.UpdateEntry, len(db.history))
+	copy(out, db.history)
+	return out
 }
 
 // MigrateLegacyIDs rekeys records and user overrides stored under the old

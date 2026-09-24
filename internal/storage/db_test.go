@@ -129,11 +129,11 @@ func TestRememberVersionRoundtripAppliesAsManual(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.RememberVersion("wlx_Demo", "2.0"); err != nil {
+	if err := db.RememberVersion("wlx_Demo", "Demo", "2.0"); err != nil {
 		t.Fatal(err)
 	}
 	// Empty inputs must be no-ops, not junk records.
-	if err := db.RememberVersion("", "9"); err != nil || db.RememberVersion("x", "") != nil {
+	if err := db.RememberVersion("", "n", "9"); err != nil || db.RememberVersion("x", "n", "") != nil {
 		t.Fatalf("empty RememberVersion inputs should be ignored: %v %v", err, err)
 	}
 	if _, exists := db.records["x"]; exists {
@@ -164,7 +164,7 @@ func TestMigrateLegacyIDs(t *testing.T) {
 	if err := db.SetUserOverride("WLX_CudaLister", domain.Override{CustomSource: "github:Alexey-T/CudaLister"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.RememberVersion("WCX_Total7zip", "3.16"); err != nil {
+	if err := db.RememberVersion("WCX_Total7zip", "Total7zip", "3.16"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -237,5 +237,59 @@ func TestMigrateLegacyIDsNoopWhenTargetExists(t *testing.T) {
 	}
 	if db.overrides["WLX_Old"].CustomVersion != "1.0" {
 		t.Error("legacy entry should stay untouched when target exists")
+	}
+}
+
+func TestRememberVersionAppendsHistoryNewestFirst(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.RememberVersion("WCX:a", "Alpha", "1.0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.RememberVersion("WLX:b", "Beta", "2.0"); err != nil {
+		t.Fatal(err)
+	}
+
+	hist := db.UpdateHistory()
+	if len(hist) != 2 {
+		t.Fatalf("history len = %d, want 2", len(hist))
+	}
+	if hist[0].PluginID != "WLX:b" || hist[0].Version != "2.0" || hist[0].PluginName != "Beta" {
+		t.Errorf("newest entry = %+v", hist[0])
+	}
+	if hist[1].PluginID != "WCX:a" {
+		t.Errorf("older entry = %+v", hist[1])
+	}
+
+	reloaded, err := NewDatabase(db.filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := reloaded.UpdateHistory(); len(got) != 2 || got[0].PluginID != "WLX:b" {
+		t.Errorf("history not persisted: %+v", got)
+	}
+}
+
+func TestHistoryIsCapped(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db.history = make([]domain.UpdateEntry, MaxHistoryEntries)
+	if err := db.RememberVersion("WCX:new", "New", "9.9"); err != nil {
+		t.Fatal(err)
+	}
+	hist := db.UpdateHistory()
+	if len(hist) != MaxHistoryEntries {
+		t.Fatalf("history len = %d, want cap %d", len(hist), MaxHistoryEntries)
+	}
+	if hist[0].PluginID != "WCX:new" {
+		t.Error("new entry must be at the head after capping")
 	}
 }

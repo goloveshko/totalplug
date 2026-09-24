@@ -75,3 +75,11 @@ type UpdateResult struct {
 	// BackupPath is the timestamped backup directory kept after success.
 	BackupPath string `json:"backup_path,omitempty"`
 }
+
+// UpdateEntry is one append-only record of a successfully applied update.
+type UpdateEntry struct {
+	PluginID   string    `json:"plugin_id"`
+	PluginName string    `json:"plugin_name"`
+	Version    string    `json:"version"`
+	AppliedAt  time.Time `json:"applied_at"`
+}
