@@ -80,6 +80,9 @@ and accepted debt we deliberately postponed.
   add "keep last N per plugin" cleanup.~~ Shipped in `3cb2a96` (keep newest 3 per
   plugin, pruned best-effort after each successful update).
 - **`FileHash` verification** — field exists on records but nothing computes or checks it.
+- **Non-ZIP plugin archives** — totalcmd.net serves many plugins as RAR; since `b332687`
+  they are rejected with a clear "unsupported archive format" hint instead of a cryptic
+  zip error. Supporting RAR/7z extraction would make those updates work.
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
   user-menu button to the CLI.
