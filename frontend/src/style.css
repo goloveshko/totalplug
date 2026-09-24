@@ -133,6 +133,19 @@ tr:hover {
     color: var(--text-main);
 }
 
+.btn-lang {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.btn-lang:hover {
+    background: var(--border);
+    color: var(--text-main);
+}
+
 dialog {
     background: var(--card-bg);
     color: var(--text-main);
