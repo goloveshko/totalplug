@@ -54,14 +54,15 @@ and accepted debt we deliberately postponed.
    disk cache; a single-flight background refresh pushes rows via `plugins:refreshed` events.
 2. ~~**Version editor dialog**~~ — done (`ddf59bc`): per-plugin "✎ версия" dialog sets the
    installed version and/or a custom source via `SaveOverride`; empty fields reset the override.
-3. **Lock-aware updates in GUI** — reuse `ErrFileLocked`; show the "close TC" hint
-   in-app instead of a console line; surface the backup path after a successful update.
+3. ~~**Lock-aware updates in GUI**~~ — done (`b5d51e2`): `UpdatePlugin`
+   returns `domain.UpdateResult{locked, backup_path}`; locked targets show an in-app
+   "close Total Commander" hint and success reports the kept backup directory.
 4. **Remember versions after blind updates** — write an update `Record`
    (`storage.Database` records map currently has no writer) so a manually confirmed
    update is not asked about again.
 5. **i18n** — English/Russian locale switch for the frontend (TUI stays English).
-6. Keep Wails binding signatures stable (`ScanPlugins(bool)`, `UpdatePlugin(domain.Plugin)`)
-   to avoid binding regeneration churn.
+6. Binding contract note: `ScanPlugins(bool)` stable; `UpdatePlugin(domain.Plugin)` now
+   returns `domain.UpdateResult` (bindings regenerated in-repo) — prefer additive changes.
 
 ## Backlog / accepted debt
 
