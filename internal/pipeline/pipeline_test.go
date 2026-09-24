@@ -1,0 +1,56 @@
+package pipeline
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestResolveIniExplicitPortable(t *testing.T) {
+	dir := t.TempDir()
+	iniPath := filepath.Join(dir, "wincmd.ini")
+	if err := os.WriteFile(iniPath, []byte("[Configuration]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Portable layout: wincmd.exe sits next to the ini, so the TC dir is
+	// derived from the ini location without touching the registry.
+	if err := os.WriteFile(filepath.Join(dir, "wincmd.exe"), []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	gotIni, gotDir, err := ResolveIni(iniPath)
+	if err != nil {
+		t.Fatalf("ResolveIni: %v", err)
+	}
+	if gotIni != iniPath {
+		t.Errorf("iniPath = %q, want %q", gotIni, iniPath)
+	}
+	if gotDir != dir {
+		t.Errorf("tcDir = %q, want %q", gotDir, dir)
+	}
+}
+
+func TestResolveIniRejectsMissingAndDirectory(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "absent", "wincmd.ini")
+	if _, _, err := ResolveIni(missing); err == nil {
+		t.Error("expected error for missing ini, got nil")
+	}
+
+	dir := t.TempDir()
+	if _, _, err := ResolveIni(dir); err == nil {
+		t.Error("expected error when path is a directory, got nil")
+	}
+}
+
+func TestResolveIniAutoHintMentionsFlag(t *testing.T) {
+	// When no wincmd.ini exists anywhere the CLI-style error must still hint at
+	// --ini. Only meaningful if auto-discovery genuinely fails on this host.
+	iniPath, _, err := ResolveIni("")
+	if err == nil {
+		t.Skipf("host has a discoverable wincmd.ini at %s", iniPath)
+	}
+	if !strings.Contains(err.Error(), "--ini") {
+		t.Errorf("auto-discovery error should mention --ini hint: %v", err)
+	}
+}

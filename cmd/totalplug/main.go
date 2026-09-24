@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
-	"totalplug/internal/checker"
-	"totalplug/internal/config"
 	"totalplug/internal/domain"
-	"totalplug/internal/scanner"
+	"totalplug/internal/pipeline"
 	"totalplug/internal/storage"
 	"totalplug/internal/updater"
 )
@@ -50,36 +47,6 @@ func parseArgs(args []string) (cliOptions, error) {
 		}
 	}
 	return opts, nil
-}
-
-// resolveIni determines the wincmd.ini location and the Total Commander root
-// directory used to expand plugin paths.
-func resolveIni(flagPath string) (iniPath string, tcDir string, err error) {
-	if flagPath == "" {
-		iniPath, tcDir = config.FindDefaultIniPath("")
-		if iniPath == "" {
-			return "", "", fmt.Errorf("could not automatically locate wincmd.ini via Registry or AppData; pass --ini <path> for portable installs")
-		}
-		return iniPath, tcDir, nil
-	}
-
-	abs, err := filepath.Abs(flagPath)
-	if err != nil {
-		return "", "", fmt.Errorf("resolving ini path: %w", err)
-	}
-	if info, statErr := os.Stat(abs); statErr != nil || info.IsDir() {
-		return "", "", fmt.Errorf("wincmd.ini not accessible at %s", abs)
-	}
-
-	// A wincmd.exe next to the ini marks a portable install; otherwise fall back
-	// to the registry install dir for non-portable layouts.
-	tcDir = filepath.Dir(abs)
-	if _, statErr := os.Stat(filepath.Join(tcDir, "wincmd.exe")); statErr != nil {
-		if _, regDir := config.FindIniFromRegistry(); regDir != "" {
-			tcDir = regDir
-		}
-	}
-	return abs, tcDir, nil
 }
 
 func truncateString(s string, maxLen int) string {
@@ -185,37 +152,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	iniPath, tcDir, err := resolveIni(opts.iniPath)
+	db, dbErr := storage.NewDatabase("")
+	if dbErr != nil {
+		fmt.Printf("[!] Storage warning, user overrides disabled: %v\n", dbErr)
+		db = nil
+	}
+
+	fmt.Println("[+] Scanning Total Commander plugins...")
+	res, err := pipeline.Scan(context.Background(), pipeline.Options{
+		IniPath:      opts.iniPath,
+		ForceRefresh: opts.forceRefresh,
+	}, db)
 	if err != nil {
 		fmt.Printf("[!] Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("[+] Total Commander Dir: %s\n", tcDir)
-	fmt.Printf("[+] Found wincmd.ini:    %s\n", iniPath)
+	fmt.Printf("[+] Total Commander Dir: %s\n", res.TCDir)
+	fmt.Printf("[+] Found wincmd.ini:    %s\n", res.IniPath)
 
-	plugins, err := config.ParsePluginsFromIni(iniPath, tcDir)
-	if err != nil {
-		fmt.Printf("[!] Failed to parse plugins: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("[+] Extracting version information...")
-	plugins = scanner.EnrichPluginVersions(plugins)
-
-	// Load DB & User Overrides
-	db, err := storage.NewDatabase("")
-	if err == nil {
-		plugins = db.ApplyOverrides(plugins)
-	}
-
-	fmt.Println("[+] Checking updates against TotalPlug community catalog...")
-	chk := checker.NewChecker(opts.forceRefresh)
-	plugins, fromCache, err := chk.CheckUpdates(context.Background(), plugins)
-
-	if err != nil {
-		fmt.Printf("[!] Catalog fetch warning: %v\n", err)
-	} else if fromCache {
+	plugins := res.Plugins
+	if res.CatalogErr != nil {
+		fmt.Printf("[!] Catalog fetch warning: %v\n", res.CatalogErr)
+	} else if res.FromCache {
 		fmt.Println("[i] Using local 24h catalog cache. (Use --refresh-cache to force update)")
 	} else {
 		fmt.Println("[+] Fetched fresh catalog from GitHub CDN!")
