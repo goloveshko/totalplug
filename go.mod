@@ -2,7 +2,11 @@ module totalplug
 
 go 1.25.0
 
-require github.com/wailsapp/wails/v2 v2.14.0
+require (
+	github.com/wailsapp/wails/v2 v2.14.0
+	golang.org/x/sys v0.47.0
+	gopkg.in/ini.v1 v1.67.3
+)
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
@@ -31,9 +35,7 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.39.0 // indirect
-	gopkg.in/ini.v1 v1.67.3 // indirect
 )
 
 // replace github.com/wailsapp/wails/v2 v2.14.0 => C:\Users\ItzMe\go\pkg\mod
