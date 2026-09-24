@@ -12,6 +12,51 @@ let editingPlugin = null;
 let statusEl, tbody, btnScan, btnRefresh;
 let editorDialog, editorForm, editorPluginEl, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
+let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
+let dialogResolve = null;
+
+// In-app replacement for native confirm()/alert(): those render with the
+// "wails.localhost" origin header and cannot be styled or moved.
+function openAppDialog(message, isConfirm) {
+    return new Promise((resolve) => {
+        dialogResolve = resolve;
+        appDialogMsg.textContent = message;
+        appDialogCancel.style.display = isConfirm ? '' : 'none';
+        appDialog.showModal();
+    });
+}
+const showConfirm = (message) => openAppDialog(message, true);
+const showAlert = (message) => openAppDialog(message, false);
+
+function settleAppDialog(result) {
+    if (dialogResolve) {
+        dialogResolve(result);
+        dialogResolve = null;
+    }
+}
+
+function makeDraggable(dlg, handle) {
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        const rect = dlg.getBoundingClientRect();
+        // Switch from the UA-centered layout to explicit coordinates once.
+        dlg.style.margin = '0';
+        dlg.style.left = rect.left + 'px';
+        dlg.style.top = rect.top + 'px';
+        const dx = e.clientX - rect.left;
+        const dy = e.clientY - rect.top;
+        const move = (ev) => {
+            dlg.style.left = Math.max(0, Math.min(window.innerWidth - rect.width, ev.clientX - dx)) + 'px';
+            dlg.style.top = Math.max(0, Math.min(window.innerHeight - 30, ev.clientY - dy)) + 'px';
+        };
+        const up = () => {
+            handle.removeEventListener('pointermove', move);
+            handle.removeEventListener('pointerup', up);
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', up);
+    });
+}
 
 function getStatusBadge(status) {
     switch (status) {
@@ -114,7 +159,7 @@ window.handleUpdate = async function(index) {
     const plugin = currentPlugins[index];
     if (!plugin) return;
 
-    if (!confirm(t('update.confirm', { name: plugin.name, version: plugin.latest_version }))) {
+    if (!await showConfirm(t('update.confirm', { name: plugin.name, version: plugin.latest_version }))) {
         return;
     }
 
@@ -127,12 +172,12 @@ window.handleUpdate = async function(index) {
             return;
         }
 
-        alert(result && result.backup_path
+        await showAlert(result && result.backup_path
             ? t('update.done_backup', { name: plugin.name, path: result.backup_path })
             : t('update.done', { name: plugin.name }));
         runScan(false);
     } catch (err) {
-        alert(t('update.error_alert', { err }));
+        await showAlert(t('update.error_alert', { err }));
         statusEl.innerText = t('update.error_status', { name: plugin.name });
     }
 };
@@ -226,6 +271,15 @@ function buildDom() {
           <button type="button" id="history-close">${t('editor.cancel')}</button>
         </div>
       </dialog>
+
+      <dialog id="app-dialog">
+        <div class="dlg-header" id="app-dialog-header">TotalPlug</div>
+        <div class="dlg-message" id="app-dialog-msg"></div>
+        <div class="editor-actions">
+          <button type="button" class="btn-save" id="app-dialog-ok">${t('dialog.ok')}</button>
+          <button type="button" id="app-dialog-cancel">${t('dialog.cancel')}</button>
+        </div>
+      </dialog>
     `;
 
     statusEl = document.getElementById('status');
@@ -241,10 +295,22 @@ function buildDom() {
     editorCancelEl = document.getElementById('editor-cancel');
     historyDialog = document.getElementById('history-dialog');
     historyBody = document.getElementById('history-body');
+    appDialog = document.getElementById('app-dialog');
+    appDialogMsg = document.getElementById('app-dialog-msg');
+    appDialogOk = document.getElementById('app-dialog-ok');
+    appDialogCancel = document.getElementById('app-dialog-cancel');
 
     btnScan.addEventListener('click', () => runScan(false));
     btnRefresh.addEventListener('click', () => runScan(true));
     document.getElementById('btn-history').addEventListener('click', openHistory);
+
+    makeDraggable(appDialog, document.getElementById('app-dialog-header'));
+    makeDraggable(editorDialog, editorDialog.querySelector('h2'));
+    makeDraggable(historyDialog, historyDialog.querySelector('h2'));
+    appDialogOk.addEventListener('click', () => { settleAppDialog(true); appDialog.close(); });
+    appDialogCancel.addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
+    // Esc or any other dismissal path must resolve a pending confirm as "no".
+    appDialog.addEventListener('close', () => settleAppDialog(false));
     document.getElementById('btn-lang').addEventListener('click', () => {
         toggleLang();
         buildDom();

@@ -160,6 +160,34 @@ tr:hover {
     width: 460px;
     max-width: 90vw;
 }
+
+#app-dialog {
+    width: 420px;
+    max-width: 90vw;
+}
+.dlg-header {
+    margin: -22px -24px 14px;
+    padding: 10px 24px;
+    background: var(--bg-dark);
+    border-bottom: 1px solid var(--border);
+    border-radius: 10px 10px 0 0;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+}
+#version-editor h2, #history-dialog h2 {
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+}
+.dlg-message {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 18px;
+    user-select: text;
+}
 #history-dialog table {
     width: 100%;
     font-size: 0.85rem;

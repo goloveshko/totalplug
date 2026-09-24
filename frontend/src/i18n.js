@@ -52,6 +52,8 @@ const STRINGS = {
         'history.col.date': 'Applied at',
         'history.empty': 'No updates applied yet.',
         'history.error': 'Failed to load history: {err}',
+        'dialog.ok': 'OK',
+        'dialog.cancel': 'Cancel',
     },
     ru: {
         'status.initial': 'Нажмите «Сканировать», чтобы проверить плагины...',
@@ -105,6 +107,8 @@ const STRINGS = {
         'history.col.date': 'Применено',
         'history.empty': 'Обновлений ещё не было.',
         'history.error': 'Не удалось загрузить историю: {err}',
+        'dialog.ok': 'ОК',
+        'dialog.cancel': 'Отмена',
     },
 };
 
