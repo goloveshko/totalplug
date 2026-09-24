@@ -50,8 +50,8 @@ and accepted debt we deliberately postponed.
 
 ## Next: GUI phase
 
-1. **Cache-first startup scan** — render from disk cache immediately, refresh
-   the catalog in the background and emit an update event; no network wait on launch.
+1. ~~**Cache-first startup scan**~~ — done (`cef9df4`): `ScanPlugins` answers instantly from the
+   disk cache; a single-flight background refresh pushes rows via `plugins:refreshed` events.
 2. **Version editor dialog** — for `StatusUncertain` plugins let the user set the
    installed version and/or a custom source; persist via `SetUserOverride`
    (already works and is covered by tests).
