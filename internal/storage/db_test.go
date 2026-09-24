@@ -121,3 +121,35 @@ func TestOverrideRoundtripThroughDisk(t *testing.T) {
 		t.Fatalf("saved overrides are invalid JSON: %v", err)
 	}
 }
+
+func TestRememberVersionRoundtripAppliesAsManual(t *testing.T) {
+	newTestDb(t)
+
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.RememberVersion("wlx_Demo", "2.0"); err != nil {
+		t.Fatal(err)
+	}
+	// Empty inputs must be no-ops, not junk records.
+	if err := db.RememberVersion("", "9"); err != nil || db.RememberVersion("x", "") != nil {
+		t.Fatalf("empty RememberVersion inputs should be ignored: %v %v", err, err)
+	}
+	if _, exists := db.records["x"]; exists {
+		t.Error("empty version must not create a record")
+	}
+
+	reloaded, err := NewDatabase("")
+	if err != nil {
+		t.Fatalf("records file invalid after write: %v", err)
+	}
+
+	plugins := reloaded.ApplyOverrides([]domain.Plugin{
+		{ID: "wlx_Demo", Name: "Demo", InstalledVersion: "Unknown", Confidence: domain.ConfidenceFallback},
+	})
+	got := plugins[0]
+	if got.InstalledVersion != "2.0" || got.Confidence != domain.ConfidenceManual {
+		t.Fatalf("remembered version not applied: %+v", got)
+	}
+}

@@ -71,7 +71,9 @@ func confirm(reader io.Reader, prompt string) bool {
 }
 
 // runUpdates applies every queued plugin update and reports per-plugin results.
-func runUpdates(ctx context.Context, plugins []domain.Plugin) (succeeded int, failed int) {
+// After each success the applied version is remembered in db (may be nil) so
+// blind updates stop resurfacing as uncertain on the next scan.
+func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Database) (succeeded int, failed int) {
 	upd := updater.NewUpdater()
 	for _, p := range plugins {
 		name := truncateString(p.Name, 18)
@@ -91,6 +93,11 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin) (succeeded int, fa
 			continue
 		}
 		fmt.Printf("  [✓] %-18s updated to %s (backup: %s)\n", name, p.LatestVersion, backupDir)
+		if db != nil {
+			if err := db.RememberVersion(p.ID, p.LatestVersion); err != nil {
+				fmt.Printf("      ↳ Could not remember version %s in history: %v\n", p.LatestVersion, err)
+			}
+		}
 		succeeded++
 	}
 	return succeeded, failed
@@ -293,7 +300,7 @@ func main() {
 
 		if proceed {
 			fmt.Println()
-			s, f := runUpdates(context.Background(), updatable)
+			s, f := runUpdates(context.Background(), updatable, db)
 			totalSucceeded += s
 			totalFailed += f
 		} else {
@@ -308,7 +315,7 @@ func main() {
 			selected := promptBlindUpdates(os.Stdin, unverified)
 			if len(selected) > 0 {
 				fmt.Println()
-				s, f := runUpdates(context.Background(), selected)
+				s, f := runUpdates(context.Background(), selected, db)
 				totalSucceeded += s
 				totalFailed += f
 			}

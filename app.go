@@ -115,5 +115,14 @@ func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
 		}
 		return domain.UpdateResult{}, err
 	}
+
+	// Remember the applied version so blind (unknown-installed) plugins do not
+	// resurface as uncertain on the next scan.
+	if a.db != nil {
+		if err := a.db.RememberVersion(plugin.ID, plugin.LatestVersion); err != nil {
+			fmt.Printf("[!] Could not remember version %s for %s: %v\n", plugin.LatestVersion, plugin.ID, err)
+		}
+	}
+
 	return domain.UpdateResult{BackupPath: backupDir}, nil
 }

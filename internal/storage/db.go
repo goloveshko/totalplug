@@ -126,6 +126,34 @@ func (db *Database) SetUserOverride(pluginID string, override domain.Override) e
 	return db.saveOverridesLocked()
 }
 
+// RememberVersion stores the version applied by a successful update so later
+// scans start from a known value instead of "Unknown". It seeds the update
+// history in installed_plugins.json.
+func (db *Database) RememberVersion(pluginID, version string) error {
+	if pluginID == "" || version == "" {
+		return nil
+	}
+
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	db.records[pluginID] = Record{
+		ID:        pluginID,
+		Version:   version,
+		UpdatedAt: time.Now().UTC(),
+	}
+
+	file, err := os.Create(db.filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(db.records)
+}
+
 // ApplyOverrides applies user-defined names, versions, and sources.
 func (db *Database) ApplyOverrides(plugins []domain.Plugin) []domain.Plugin {
 	db.mu.RLock()
