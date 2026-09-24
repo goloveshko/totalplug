@@ -70,6 +70,19 @@ and accepted debt we deliberately postponed.
 6. Binding contract note: `ScanPlugins(bool)` stable; `UpdatePlugin(domain.Plugin)` now
    returns `domain.UpdateResult` (bindings regenerated in-repo) — prefer additive changes.
 
+## GUI redesign (MQ Studio style) — stage 1 shipped
+
+1. ~~**Themes + settings dialog**~~ — done (`be2f6b0`): light/dark/system via
+   `<html data-theme>` CSS tokens; settings modal (theme cards, font-size slider,
+   language, About); theme/scale persist in localStorage. Dialogs became centered
+   static modals — dragging was glitchy and removed by user request.
+2. **Toolbar + plugin card**: search/filter, GitHub and settings quick buttons under
+   the titlebar; per-plugin detail dialog (version/source editing) designed to grow
+   into install-from-catalog ("Установить", catalog search and filters).
+3. **Frameless window with Mica/Acrylic** (+ "window effect" switch in settings,
+   solid fallback): own caption buttons, drag region, DPI edges — riskiest stage,
+   kept as an isolated commit for easy rollback.
+
 ## Backlog / accepted debt
 
 - ~~**Unstable plugin IDs** — IDs are derived as `<type>_<folder-name>` and break when a
