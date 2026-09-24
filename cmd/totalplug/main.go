@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"totalplug/internal/checker"
 	"totalplug/internal/config"
@@ -11,6 +13,62 @@ import (
 	"totalplug/internal/scanner"
 	"totalplug/internal/storage"
 )
+
+type cliOptions struct {
+	forceRefresh bool
+	iniPath      string
+}
+
+func parseArgs(args []string) (cliOptions, error) {
+	var opts cliOptions
+	for i := 0; i < len(args); i++ {
+		switch arg := args[i]; {
+		case arg == "--refresh-cache" || arg == "-r":
+			opts.forceRefresh = true
+		case arg == "--ini" || arg == "-c":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("flag %q requires a path argument", arg)
+			}
+			i++
+			opts.iniPath = args[i]
+		case strings.HasPrefix(arg, "--ini="):
+			opts.iniPath = strings.TrimPrefix(arg, "--ini=")
+		default:
+			return opts, fmt.Errorf("unknown option %q", arg)
+		}
+	}
+	return opts, nil
+}
+
+// resolveIni determines the wincmd.ini location and the Total Commander root
+// directory used to expand plugin paths.
+func resolveIni(flagPath string) (iniPath string, tcDir string, err error) {
+	if flagPath == "" {
+		iniPath, tcDir = config.FindDefaultIniPath("")
+		if iniPath == "" {
+			return "", "", fmt.Errorf("could not automatically locate wincmd.ini via Registry or AppData; pass --ini <path> for portable installs")
+		}
+		return iniPath, tcDir, nil
+	}
+
+	abs, err := filepath.Abs(flagPath)
+	if err != nil {
+		return "", "", fmt.Errorf("resolving ini path: %w", err)
+	}
+	if info, statErr := os.Stat(abs); statErr != nil || info.IsDir() {
+		return "", "", fmt.Errorf("wincmd.ini not accessible at %s", abs)
+	}
+
+	// A wincmd.exe next to the ini marks a portable install; otherwise fall back
+	// to the registry install dir for non-portable layouts.
+	tcDir = filepath.Dir(abs)
+	if _, statErr := os.Stat(filepath.Join(tcDir, "wincmd.exe")); statErr != nil {
+		if _, regDir := config.FindIniFromRegistry(); regDir != "" {
+			tcDir = regDir
+		}
+	}
+	return abs, tcDir, nil
+}
 
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
@@ -27,16 +85,16 @@ func main() {
 	fmt.Println("                     TotalPlug - Total Commander Updater                        ")
 	fmt.Println("================================================================================")
 
-	forceRefresh := false
-	for _, arg := range os.Args[1:] {
-		if arg == "--refresh-cache" || arg == "-r" {
-			forceRefresh = true
-		}
+	opts, err := parseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Printf("[!] %v\n", err)
+		fmt.Println("Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>]")
+		os.Exit(1)
 	}
 
-	iniPath, tcDir := config.FindDefaultIniPath("")
-	if iniPath == "" {
-		fmt.Println("[!] Error: Could not automatically locate wincmd.ini via Registry or AppData.")
+	iniPath, tcDir, err := resolveIni(opts.iniPath)
+	if err != nil {
+		fmt.Printf("[!] Error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -59,7 +117,7 @@ func main() {
 	}
 
 	fmt.Println("[+] Checking updates against TotalPlug community catalog...")
-	chk := checker.NewChecker(forceRefresh)
+	chk := checker.NewChecker(opts.forceRefresh)
 	plugins, fromCache, err := chk.CheckUpdates(context.Background(), plugins)
 
 	if err != nil {
