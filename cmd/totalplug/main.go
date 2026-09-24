@@ -125,6 +125,50 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin) (succeeded int, fa
 	return succeeded, failed
 }
 
+// readBlindAnswer prompts for one per-item decision: y = update this item,
+// a = update this and all remaining items, anything else = skip.
+func readBlindAnswer(in *bufio.Reader, prompt string) rune {
+	fmt.Print(prompt)
+	line, err := in.ReadString('\n')
+	if err != nil {
+		return 'n'
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return 'y'
+	case "a", "all":
+		return 'a'
+	default:
+		return 'n'
+	}
+}
+
+// promptBlindUpdates lets the user decide item by item which updates with an
+// unresolvable installed version should be applied anyway.
+func promptBlindUpdates(reader io.Reader, candidates []domain.Plugin) []domain.Plugin {
+	fmt.Printf("\nUnverified updates (%d): installed version could not be determined.\n", len(candidates))
+	fmt.Println("Apply anyway? Answer per item: [y]es / [N]o / [a]ll remaining.")
+
+	in := bufio.NewReader(reader)
+	var selected []domain.Plugin
+	allRemaining := false
+	for i, p := range candidates {
+		if allRemaining {
+			selected = append(selected, p)
+			continue
+		}
+		prompt := fmt.Sprintf("  %d. %-18s ? -> %s [y/N/a]: ", i+1, truncateString(p.Name, 18), p.LatestVersion)
+		switch readBlindAnswer(in, prompt) {
+		case 'y':
+			selected = append(selected, p)
+		case 'a':
+			selected = append(selected, p)
+			allRemaining = true
+		}
+	}
+	return selected
+}
+
 func main() {
 	fmt.Println("================================================================================")
 	fmt.Println("                     TotalPlug - Total Commander Updater                        ")
@@ -184,7 +228,7 @@ func main() {
 	}
 
 	var validCount, missingCount, updateAvailCount, uncertainCount int
-	var updatable []domain.Plugin
+	var updatable, unverified []domain.Plugin
 	itemIndex := 1
 
 	fmt.Printf("\nDiscovered %d installed plugins:\n", len(plugins))
@@ -204,6 +248,10 @@ func main() {
 		fmt.Printf("\n--- [%s] %s (%d) ---\n", cat.Type, cat.Title, len(group))
 
 		for _, p := range group {
+			if p.Status == domain.StatusUncertain && p.DownloadURL != "" {
+				unverified = append(unverified, p)
+			}
+
 			var statusSymbol string
 
 			if p.Status == domain.StatusNotFound {
@@ -259,7 +307,7 @@ func main() {
 	}
 	fmt.Println("================================================================================")
 
-	if len(updatable) == 0 {
+	if len(updatable) == 0 && len(unverified) == 0 {
 		return
 	}
 	if !opts.update && !opts.updateAll {
@@ -267,23 +315,49 @@ func main() {
 		return
 	}
 
-	fmt.Printf("\nPending updates (%d):\n", len(updatable))
-	for i, p := range updatable {
-		fmt.Printf("  %d. %-18s %s -> %s\n", i+1, truncateString(p.Name, 18), p.InstalledVersion, p.LatestVersion)
-	}
+	totalSucceeded, totalFailed := 0, 0
 
-	if !opts.updateAll {
-		prompt := "\n[?] Apply the updates listed above? Close Total Commander first. [y/N]: "
-		if !confirm(os.Stdin, prompt) {
-			fmt.Println("[i] Update cancelled.")
-			return
+	if len(updatable) > 0 {
+		fmt.Printf("\nPending updates (%d):\n", len(updatable))
+		for i, p := range updatable {
+			fmt.Printf("  %d. %-18s %s -> %s\n", i+1, truncateString(p.Name, 18), p.InstalledVersion, p.LatestVersion)
+		}
+
+		proceed := opts.updateAll
+		if !proceed {
+			prompt := "\n[?] Apply the updates listed above? Close Total Commander first. [y/N]: "
+			proceed = confirm(os.Stdin, prompt)
+		}
+
+		if proceed {
+			fmt.Println()
+			s, f := runUpdates(context.Background(), updatable)
+			totalSucceeded += s
+			totalFailed += f
+		} else {
+			fmt.Println("[i] Verified updates skipped.")
 		}
 	}
 
-	fmt.Println()
-	succeeded, failed := runUpdates(context.Background(), updatable)
-	fmt.Printf("\nUPDATE SUMMARY: %d succeeded, %d failed\n", succeeded, failed)
-	if failed > 0 {
+	if len(unverified) > 0 {
+		if opts.updateAll {
+			fmt.Printf("\n[i] Skipped %d unverified update(s): --update-all never applies unknown versions.\n", len(unverified))
+		} else {
+			selected := promptBlindUpdates(os.Stdin, unverified)
+			if len(selected) > 0 {
+				fmt.Println()
+				s, f := runUpdates(context.Background(), selected)
+				totalSucceeded += s
+				totalFailed += f
+			}
+		}
+	}
+
+	if totalSucceeded+totalFailed == 0 {
+		return
+	}
+	fmt.Printf("\nUPDATE SUMMARY: %d succeeded, %d failed\n", totalSucceeded, totalFailed)
+	if totalFailed > 0 {
 		os.Exit(1)
 	}
 }

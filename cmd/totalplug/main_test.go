@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"strings"
 	"testing"
 )
@@ -74,5 +75,29 @@ func TestTruncateString(t *testing.T) {
 	}
 	if got := truncateString("abcdef", 2); got != "ab" {
 		t.Errorf("truncateString(abcdef, 2) = %q", got)
+	}
+}
+
+func TestReadBlindAnswer(t *testing.T) {
+	cases := map[string]rune{
+		"y\n":     'y',
+		"YES\n":   'y',
+		"  y  \n": 'y',
+		"a\n":     'a',
+		"all\n":   'a',
+		"n\n":     'n',
+		"\n":      'n',
+		"junk\n":  'n',
+	}
+	for input, want := range cases {
+		got := readBlindAnswer(bufio.NewReader(strings.NewReader(input)), "")
+		if got != want {
+			t.Errorf("readBlindAnswer(%q) = %q, want %q", input, got, want)
+		}
+	}
+
+	// EOF without input must default to skip.
+	if got := readBlindAnswer(bufio.NewReader(strings.NewReader("")), ""); got != 'n' {
+		t.Errorf("readBlindAnswer(EOF) = %q, want 'n'", got)
 	}
 }
