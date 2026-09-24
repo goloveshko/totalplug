@@ -52,9 +52,8 @@ and accepted debt we deliberately postponed.
 
 1. ~~**Cache-first startup scan**~~ — done (`cef9df4`): `ScanPlugins` answers instantly from the
    disk cache; a single-flight background refresh pushes rows via `plugins:refreshed` events.
-2. **Version editor dialog** — for `StatusUncertain` plugins let the user set the
-   installed version and/or a custom source; persist via `SetUserOverride`
-   (already works and is covered by tests).
+2. ~~**Version editor dialog**~~ — done (`ddf59bc`): per-plugin "✎ версия" dialog sets the
+   installed version and/or a custom source via `SaveOverride`; empty fields reset the override.
 3. **Lock-aware updates in GUI** — reuse `ErrFileLocked`; show the "close TC" hint
    in-app instead of a console line; surface the backup path after a successful update.
 4. **Remember versions after blind updates** — write an update `Record`
