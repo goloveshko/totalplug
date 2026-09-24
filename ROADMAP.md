@@ -73,8 +73,9 @@ and accepted debt we deliberately postponed.
   and overrides can be fully trusted.
 - **GitHub releases TTL cache** — unauthenticated API is 60 req/h; add a small TTL
   cache if per-plugin github sources become popular.
-- **Backup prune** — `.bak_*` directories accumulate after successful updates;
-  add "keep last N per plugin" cleanup.
+- ~~**Backup prune** — `.bak_*` directories accumulate after successful updates;
+  add "keep last N per plugin" cleanup.~~ Shipped in `3cb2a96` (keep newest 3 per
+  plugin, pruned best-effort after each successful update).
 - **`FileHash` verification** — field exists on records but nothing computes or checks it.
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
