@@ -77,11 +77,6 @@ func (db *Database) LoadOverrides() error {
 	file, err := os.Open(db.overridesPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Pre-populate CudaLister default override for testing
-			db.overrides["WLX_CudaLister"] = domain.Override{
-				CustomSource: "github:Alexey-T/CudaLister",
-			}
-			_ = db.SaveOverrides()
 			return nil
 		}
 		return err
