@@ -63,6 +63,25 @@ func ResolveIni(flagPath string) (iniPath string, tcDir string, err error) {
 	return abs, tcDir, nil
 }
 
+// buildLegacyIDMap maps old-style "<TYPE>_<name>" IDs to the current stable
+// IDs for freshly parsed plugins. Legacy IDs claimed by several plugins are
+// dropped so migration never guesses which plugin user data belongs to.
+func buildLegacyIDMap(plugins []domain.Plugin) map[string]string {
+	counts := make(map[string]int)
+	mapping := make(map[string]string)
+	for _, p := range plugins {
+		legacy := config.LegacyPluginID(p.Type, p.Name)
+		counts[legacy]++
+		mapping[legacy] = p.ID
+	}
+	for legacy, n := range counts {
+		if n > 1 {
+			delete(mapping, legacy)
+		}
+	}
+	return mapping
+}
+
 // Scan discovers installed plugins, enriches them with versions and user
 // overrides, and resolves updates against the community catalog. A catalog
 // failure is non-fatal and reported via Result.CatalogErr. A nil db simply
@@ -81,6 +100,9 @@ func Scan(ctx context.Context, opts Options, db *storage.Database) (Result, erro
 	plugins = scanner.EnrichPluginVersions(plugins)
 
 	if db != nil {
+		if _, err := db.MigrateLegacyIDs(buildLegacyIDMap(plugins)); err != nil {
+			fmt.Fprintf(os.Stderr, "[!] Could not migrate legacy plugin data: %v\n", err)
+		}
 		plugins = db.ApplyOverrides(plugins)
 	}
 

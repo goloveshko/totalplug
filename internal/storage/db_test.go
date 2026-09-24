@@ -153,3 +153,89 @@ func TestRememberVersionRoundtripAppliesAsManual(t *testing.T) {
 		t.Fatalf("remembered version not applied: %+v", got)
 	}
 }
+
+func TestMigrateLegacyIDs(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.SetUserOverride("WLX_CudaLister", domain.Override{CustomSource: "github:Alexey-T/CudaLister"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.RememberVersion("WCX_Total7zip", "3.16"); err != nil {
+		t.Fatal(err)
+	}
+
+	moved, err := db.MigrateLegacyIDs(map[string]string{
+		"WLX_CudaLister":  "WLX:plugins/wlx/cudalister/cuda.wlx",
+		"WCX_Total7zip":   "WCX:plugins/wcx/total7zip/total7zip64.wcx",
+		"WCX_Nonexistent": "WCX:plugins/nope.nope",
+	})
+	if err != nil {
+		t.Fatalf("MigrateLegacyIDs: %v", err)
+	}
+	if moved != 2 {
+		t.Errorf("moved = %d, want 2", moved)
+	}
+
+	plugins := []domain.Plugin{
+		{ID: "WLX:plugins/wlx/cudalister/cuda.wlx", Name: "Cuda"},
+		{ID: "WCX:plugins/wcx/total7zip/total7zip64.wcx", Name: "7zip"},
+	}
+	res := db.ApplyOverrides(plugins)
+	if res[0].CustomSource != "github:Alexey-T/CudaLister" {
+		t.Errorf("override not migrated: %+v", res[0])
+	}
+	if res[1].InstalledVersion != "3.16" || res[1].Confidence != domain.ConfidenceManual {
+		t.Errorf("record not migrated: %+v", res[1])
+	}
+
+	// Reload from disk: legacy keys must be gone, new keys persisted.
+	reloaded, err := NewDatabase(db.filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := reloaded.overrides["WLX_CudaLister"]; ok {
+		t.Error("legacy override key still present on disk")
+	}
+	if _, ok := reloaded.records["WCX_Total7zip"]; ok {
+		t.Error("legacy record key still present on disk")
+	}
+	if _, ok := reloaded.overrides["WLX:plugins/wlx/cudalister/cuda.wlx"]; !ok {
+		t.Error("migrated override not persisted")
+	}
+	if rec, ok := reloaded.records["WCX:plugins/wcx/total7zip/total7zip64.wcx"]; !ok || rec.Version != "3.16" {
+		t.Errorf("migrated record not persisted: %+v", rec)
+	}
+}
+
+func TestMigrateLegacyIDsNoopWhenTargetExists(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.SetUserOverride("WLX_Old", domain.Override{CustomVersion: "1.0"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetUserOverride("WLX:newid", domain.Override{CustomVersion: "2.0"}); err != nil {
+		t.Fatal(err)
+	}
+
+	moved, err := db.MigrateLegacyIDs(map[string]string{"WLX_Old": "WLX:newid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved != 0 {
+		t.Errorf("moved = %d, want 0 (target key must win)", moved)
+	}
+	if db.overrides["WLX:newid"].CustomVersion != "2.0" {
+		t.Error("existing target override was overwritten")
+	}
+	if db.overrides["WLX_Old"].CustomVersion != "1.0" {
+		t.Error("legacy entry should stay untouched when target exists")
+	}
+}

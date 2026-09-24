@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"totalplug/internal/domain"
 )
 
 func TestResolveIniExplicitPortable(t *testing.T) {
@@ -52,5 +54,21 @@ func TestResolveIniAutoHintMentionsFlag(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--ini") {
 		t.Errorf("auto-discovery error should mention --ini hint: %v", err)
+	}
+}
+
+func TestBuildLegacyIDMapDropsAmbiguous(t *testing.T) {
+	plugins := []domain.Plugin{
+		{ID: "WCX:plugins/a/a.wcx", Type: domain.TypePacker, Name: "Shared"},
+		{ID: "WCX:plugins/b/b.wcx", Type: domain.TypePacker, Name: "Shared"},
+		{ID: "WLX:plugins/uniq/uniq.wlx", Type: domain.TypeLister, Name: "Unique"},
+	}
+
+	mapping := buildLegacyIDMap(plugins)
+	if _, ok := mapping["WCX_Shared"]; ok {
+		t.Error("ambiguous legacy ID must be dropped")
+	}
+	if got := mapping["WLX_Unique"]; got != "WLX:plugins/uniq/uniq.wlx" {
+		t.Errorf("legacy mapping = %q, want stable new ID", got)
 	}
 }

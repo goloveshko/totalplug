@@ -122,3 +122,81 @@ CloudPlugin=%COMMANDER_PATH%\plugins\wfx\cloud.wfx
 		}
 	}
 }
+
+func TestStablePluginID(t *testing.T) {
+	tests := []struct {
+		name       string
+		tcDir      string
+		pluginPath string
+		pType      domain.PluginType
+		expected   string
+	}{
+		{
+			name:       "relative lowercase id",
+			tcDir:      `C:\TotalCmd`,
+			pluginPath: `C:\TotalCmd\plugins\wcx\Total7zip\Total7zip64.wcx`,
+			pType:      domain.TypePacker,
+			expected:   "WCX:plugins/wcx/total7zip/total7zip64.wcx",
+		},
+		{
+			name:       "tc dir move keeps same id",
+			tcDir:      `D:\Tools\totalcmd`,
+			pluginPath: `D:\Tools\totalcmd\plugins\wcx\Total7zip\Total7zip64.wcx`,
+			pType:      domain.TypePacker,
+			expected:   "WCX:plugins/wcx/total7zip/total7zip64.wcx",
+		},
+		{
+			name:       "case-insensitive prefix still relative",
+			tcDir:      `C:\totalcmd`,
+			pluginPath: `C:\TotalCmd\plugins\wlx\Cuda\cuda.wlx`,
+			pType:      domain.TypeLister,
+			expected:   "WLX:plugins/wlx/cuda/cuda.wlx",
+		},
+		{
+			name:       "outside tcDir falls back to absolute path",
+			tcDir:      `C:\TotalCmd`,
+			pluginPath: `D:\Custom\plugin.wfx`,
+			pType:      domain.TypeFileSystem,
+			expected:   "WFX:d:/custom/plugin.wfx",
+		},
+		{
+			name:       "other volume falls back to absolute path",
+			tcDir:      ``,
+			pluginPath: `C:\Elsewhere\p.wdx`,
+			pType:      domain.TypeContent,
+			expected:   "WDX:c:/elsewhere/p.wdx",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stablePluginID(tt.tcDir, tt.pluginPath, tt.pType)
+			if got != tt.expected {
+				t.Errorf("stablePluginID() = %q; want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParsePluginsFromIniIDsAreStable(t *testing.T) {
+	tempDir := t.TempDir()
+	iniContent := `
+[PackerPlugins]
+7z=31,%COMMANDER_PATH%\plugins\wcx\Total7zip\Total7zip64.wcx
+`
+	iniPath := filepath.Join(tempDir, "wincmd.ini")
+	if err := os.WriteFile(iniPath, []byte(iniContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	plugins, err := ParsePluginsFromIni(iniPath, `C:\TotalCmd`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plugins) != 1 {
+		t.Fatalf("expected 1 plugin, got %d", len(plugins))
+	}
+	if got, want := plugins[0].ID, "WCX:plugins/wcx/total7zip/total7zip64.wcx"; got != want {
+		t.Errorf("ID = %q; want %q", got, want)
+	}
+}

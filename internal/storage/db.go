@@ -126,6 +126,19 @@ func (db *Database) SetUserOverride(pluginID string, override domain.Override) e
 	return db.saveOverridesLocked()
 }
 
+// saveRecordsLocked serializes the current records map; callers must hold mu.
+func (db *Database) saveRecordsLocked() error {
+	file, err := os.Create(db.filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(db.records)
+}
+
 // RememberVersion stores the version applied by a successful update so later
 // scans start from a known value instead of "Unknown". It seeds the update
 // history in installed_plugins.json.
@@ -142,16 +155,60 @@ func (db *Database) RememberVersion(pluginID, version string) error {
 		Version:   version,
 		UpdatedAt: time.Now().UTC(),
 	}
+	return db.saveRecordsLocked()
+}
 
-	file, err := os.Create(db.filePath)
-	if err != nil {
-		return err
+// MigrateLegacyIDs rekeys records and user overrides stored under the old
+// "<TYPE>_<name>" identity scheme to the current stable IDs. mapping holds
+// legacyID -> newID for unambiguous plugins only; the pipeline drops shared
+// legacy IDs so user data is never re-assigned to the wrong plugin. Entries
+// whose target key already exists are left untouched. Returns the number of
+// moved entries; files are rewritten only when something actually changed.
+func (db *Database) MigrateLegacyIDs(mapping map[string]string) (int, error) {
+	if len(mapping) == 0 {
+		return 0, nil
 	}
-	defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(db.records)
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	moved := 0
+	recordsChanged, overridesChanged := false, false
+
+	for legacy, next := range mapping {
+		if legacy == "" || next == "" || legacy == next {
+			continue
+		}
+		if rec, ok := db.records[legacy]; ok {
+			if _, exists := db.records[next]; !exists {
+				rec.ID = next
+				db.records[next] = rec
+				delete(db.records, legacy)
+				recordsChanged = true
+				moved++
+			}
+		}
+		if ov, ok := db.overrides[legacy]; ok {
+			if _, exists := db.overrides[next]; !exists {
+				db.overrides[next] = ov
+				delete(db.overrides, legacy)
+				overridesChanged = true
+				moved++
+			}
+		}
+	}
+
+	if recordsChanged {
+		if err := db.saveRecordsLocked(); err != nil {
+			return moved, fmt.Errorf("saving migrated records: %w", err)
+		}
+	}
+	if overridesChanged {
+		if err := db.saveOverridesLocked(); err != nil {
+			return moved, fmt.Errorf("saving migrated overrides: %w", err)
+		}
+	}
+	return moved, nil
 }
 
 // ApplyOverrides applies user-defined names, versions, and sources.

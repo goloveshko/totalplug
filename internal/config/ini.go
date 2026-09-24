@@ -146,6 +146,29 @@ func deriveRealPluginName(keyName string, pluginPath string, pType domain.Plugin
 	return keyName
 }
 
+// LegacyPluginID reproduces the pre-stable-ID format ("<TYPE>_<display name>")
+// so the pipeline can rekey stored overrides and records exactly once.
+func LegacyPluginID(pType domain.PluginType, name string) string {
+	return fmt.Sprintf("%s_%s", pType, name)
+}
+
+// stablePluginID derives the plugin identity from its path relative to the TC
+// directory (lowercased, forward slashes), e.g. "WCX:plugins/7zip/total7zip.wcx".
+// Moving or renaming the Total Commander install therefore keeps IDs intact;
+// paths outside tcDir (or an unknown tcDir) fall back to the absolute path.
+func stablePluginID(tcDir, pluginPath string, pType domain.PluginType) string {
+	normalized := pluginPath
+	if tcDir != "" {
+		// Compare case-insensitively: Rel is purely lexical on Windows and would
+		// emit "../.." hops for a differently-cased but identical prefix.
+		rel, err := filepath.Rel(strings.ToLower(tcDir), strings.ToLower(pluginPath))
+		if err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			normalized = rel
+		}
+	}
+	return fmt.Sprintf("%s:%s", pType, filepath.ToSlash(strings.ToLower(normalized)))
+}
+
 // ParsePluginsFromIni loads wincmd.ini and extracts deduplicated plugins.
 func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) {
 	cfg, err := ini.Load(iniPath)
@@ -190,7 +213,7 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 			}
 
 			plugin := domain.Plugin{
-				ID:               fmt.Sprintf("%s_%s", pType, realName),
+				ID:               stablePluginID(tcDir, pluginPath, pType),
 				Name:             realName,
 				Type:             pType,
 				Path:             pluginPath,
