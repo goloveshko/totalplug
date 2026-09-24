@@ -57,9 +57,9 @@ and accepted debt we deliberately postponed.
 3. ~~**Lock-aware updates in GUI**~~ — done (`b5d51e2`): `UpdatePlugin`
    returns `domain.UpdateResult{locked, backup_path}`; locked targets show an in-app
    "close Total Commander" hint and success reports the kept backup directory.
-4. **Remember versions after blind updates** — write an update `Record`
-   (`storage.Database` records map currently has no writer) so a manually confirmed
-   update is not asked about again.
+4. ~~**Remember versions after blind updates**~~ — done (`46c562b`): `Database.RememberVersion`
+   is the first writer for `installed_plugins.json`; CLI and GUI record the applied version
+   after every successful update. (A full update-history view/API is still open.)
 5. **i18n** — English/Russian locale switch for the frontend (TUI stays English).
 6. Binding contract note: `ScanPlugins(bool)` stable; `UpdatePlugin(domain.Plugin)` now
    returns `domain.UpdateResult` (bindings regenerated in-repo) — prefer additive changes.
