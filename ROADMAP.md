@@ -48,7 +48,7 @@ and accepted debt we deliberately postponed.
   storage and updater (httptest + in-memory zips).
 - Corrupt storage JSON is quarantined to `<file>.corrupt` and reported, not silently dropped.
 
-## Next: GUI phase
+## GUI phase — items 1–5 shipped, backlog below remains
 
 1. ~~**Cache-first startup scan**~~ — done (`cef9df4`): `ScanPlugins` answers instantly from the
    disk cache; a single-flight background refresh pushes rows via `plugins:refreshed` events.
@@ -60,7 +60,9 @@ and accepted debt we deliberately postponed.
 4. ~~**Remember versions after blind updates**~~ — done (`46c562b`): `Database.RememberVersion`
    is the first writer for `installed_plugins.json`; CLI and GUI record the applied version
    after every successful update. (A full update-history view/API is still open.)
-5. **i18n** — English/Russian locale switch for the frontend (TUI stays English).
+5. ~~**i18n**~~ — done: `frontend/src/i18n.js` dictionaries (EN default, RU toggle in the
+   header, choice persisted in localStorage); UI rebuilds in place without reload.
+   The TUI stays English-only for now.
 6. Binding contract note: `ScanPlugins(bool)` stable; `UpdatePlugin(domain.Plugin)` now
    returns `domain.UpdateResult` (bindings regenerated in-repo) — prefer additive changes.
 
