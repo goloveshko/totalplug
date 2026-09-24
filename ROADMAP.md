@@ -89,6 +89,9 @@ and accepted debt we deliberately postponed.
    and a "Window effect" dropdown (Mica/Acrylic/None) persisted in
    `%APPDATA%\TotalPlug\window_effect.txt`, read before window creation — applied on
    restart; webview is translucent only when an effect is active.
+   Refined in `cbc90ff`: search box and history/refresh/scan/settings actions moved
+   into the titlebar as icon buttons (MQ Studio style); fixed-height layout so the
+   titlebar never scrolls — views scroll internally.
 
 ## Backlog / accepted debt
 
