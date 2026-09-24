@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,12 +14,17 @@ import (
 	"totalplug/internal/domain"
 	"totalplug/internal/scanner"
 	"totalplug/internal/storage"
+	"totalplug/internal/updater"
 )
 
 type cliOptions struct {
 	forceRefresh bool
 	iniPath      string
+	update       bool
+	updateAll    bool
 }
+
+const usageLine = "Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>] [-u|--update | --update-all]"
 
 func parseArgs(args []string) (cliOptions, error) {
 	var opts cliOptions
@@ -33,6 +40,10 @@ func parseArgs(args []string) (cliOptions, error) {
 			opts.iniPath = args[i]
 		case strings.HasPrefix(arg, "--ini="):
 			opts.iniPath = strings.TrimPrefix(arg, "--ini=")
+		case arg == "--update" || arg == "-u":
+			opts.update = true
+		case arg == "--update-all":
+			opts.updateAll = true
 		default:
 			return opts, fmt.Errorf("unknown option %q", arg)
 		}
@@ -80,6 +91,39 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
+// confirm reads a yes/no answer from the reader, defaulting to no on EOF.
+func confirm(reader io.Reader, prompt string) bool {
+	fmt.Print(prompt)
+	line, err := bufio.NewReader(reader).ReadString('\n')
+	if err != nil {
+		return false
+	}
+	answer := strings.ToLower(strings.TrimSpace(line))
+	return answer == "y" || answer == "yes"
+}
+
+// runUpdates applies every queued plugin update and reports per-plugin results.
+func runUpdates(ctx context.Context, plugins []domain.Plugin) (succeeded int, failed int) {
+	upd := updater.NewUpdater()
+	for _, p := range plugins {
+		name := truncateString(p.Name, 18)
+		if p.DownloadURL == "" {
+			fmt.Printf("  [!] %-18s no download URL in catalog, update manually\n", name)
+			failed++
+			continue
+		}
+		fmt.Printf("  [⬆] %-18s %s -> %s (downloading...)\n", name, p.InstalledVersion, p.LatestVersion)
+		if err := upd.UpdatePlugin(ctx, p); err != nil {
+			fmt.Printf("  [✗] %-18s %v\n", name, err)
+			failed++
+			continue
+		}
+		fmt.Printf("  [✓] %-18s updated to %s\n", name, p.LatestVersion)
+		succeeded++
+	}
+	return succeeded, failed
+}
+
 func main() {
 	fmt.Println("================================================================================")
 	fmt.Println("                     TotalPlug - Total Commander Updater                        ")
@@ -88,7 +132,7 @@ func main() {
 	opts, err := parseArgs(os.Args[1:])
 	if err != nil {
 		fmt.Printf("[!] %v\n", err)
-		fmt.Println("Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>]")
+		fmt.Println(usageLine)
 		os.Exit(1)
 	}
 
@@ -139,6 +183,7 @@ func main() {
 	}
 
 	var validCount, missingCount, updateAvailCount, uncertainCount int
+	var updatable []domain.Plugin
 	itemIndex := 1
 
 	fmt.Printf("\nDiscovered %d installed plugins:\n", len(plugins))
@@ -167,6 +212,7 @@ func main() {
 				statusSymbol = "🚀"
 				updateAvailCount++
 				validCount++
+				updatable = append(updatable, p)
 			} else if p.Confidence == domain.ConfidenceFallback || p.Confidence == domain.ConfidenceText {
 				statusSymbol = "⚠️"
 				uncertainCount++
@@ -211,4 +257,32 @@ func main() {
 		fmt.Printf("[!] WARNING: %d plugin file(s) were not found on disk!\n", missingCount)
 	}
 	fmt.Println("================================================================================")
+
+	if len(updatable) == 0 {
+		return
+	}
+	if !opts.update && !opts.updateAll {
+		fmt.Println("[i] Run with --update (interactive) or --update-all to apply available updates.")
+		return
+	}
+
+	fmt.Printf("\nPending updates (%d):\n", len(updatable))
+	for i, p := range updatable {
+		fmt.Printf("  %d. %-18s %s -> %s\n", i+1, truncateString(p.Name, 18), p.InstalledVersion, p.LatestVersion)
+	}
+
+	if !opts.updateAll {
+		prompt := "\n[?] Apply the updates listed above? Close Total Commander first. [y/N]: "
+		if !confirm(os.Stdin, prompt) {
+			fmt.Println("[i] Update cancelled.")
+			return
+		}
+	}
+
+	fmt.Println()
+	succeeded, failed := runUpdates(context.Background(), updatable)
+	fmt.Printf("\nUPDATE SUMMARY: %d succeeded, %d failed\n", succeeded, failed)
+	if failed > 0 {
+		os.Exit(1)
+	}
 }

@@ -42,6 +42,22 @@ go run cmd/totalplug/main.go
 go run cmd/totalplug/main.go --refresh-cache
 ```
 
+### Apply Available Updates
+Interactive mode — lists pending updates and asks for confirmation:
+```bash
+go run cmd/totalplug/main.go --update
+```
+Non-interactive mode — applies every available update without prompting (for scripts and Task Scheduler):
+```bash
+go run cmd/totalplug/main.go --update-all
+```
+> Close Total Commander before applying updates, otherwise locked plugin files will fail to replace.
+
+### Point to a Portable Total Commander Install
+```bash
+go run cmd/totalplug/main.go --ini D:\TC\wincmd.ini
+```
+
 ### Example Output
 
 ```text
@@ -78,7 +94,7 @@ SUMMARY: Total 14 | 13 Valid ✓ | 1 Updates 🚀 | 0 Missing ✗ | 1 Uncertain 
 totalplug/
 ├── cmd/
 │   └── totalplug/
-│       └── main.go           # CLI entry point & terminal report
+│       └── main.go           # CLI entry point, terminal report & update runner
 ├── internal/
 │   ├── domain/
 │   │   └── plugin.go         # Core domain models (Plugin, Status, Confidence)
