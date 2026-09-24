@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,36 @@ var (
 	// ErrFileLocked marks a target file that could not be written because it is
 	// held by another process (typically a running Total Commander).
 	ErrFileLocked = errors.New("target file is locked by another process")
+	// ErrInsecureScheme rejects downloads from plaintext or non-network schemes
+	// that could deliver tampered archives.
+	ErrInsecureScheme = errors.New("refusing insecure download scheme, https required")
+	// ErrDownloadTooLarge aborts downloads above the configured size cap.
+	ErrDownloadTooLarge = errors.New("download exceeds size limit")
 )
+
+// DefaultMaxDownloadBytes caps archive size (256 MiB) to bound disk usage.
+const DefaultMaxDownloadBytes int64 = 256 << 20
+
+// validateDownloadURL requires https; plain http is only accepted for loopback
+// hosts so automated tests can serve archives from a local server.
+func validateDownloadURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid download URL: %w", err)
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "https":
+		return nil
+	case "http":
+		host := strings.ToLower(u.Hostname())
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+			return nil
+		}
+		return fmt.Errorf("%w: %s", ErrInsecureScheme, u.Host)
+	default:
+		return fmt.Errorf("%w: %q", ErrInsecureScheme, u.Scheme)
+	}
+}
 
 // isLockedErr reports whether err indicates a file that is in use or denies
 // write access, matching the Windows error codes for access denied, sharing
@@ -43,7 +73,8 @@ func isLockedErr(err error) bool {
 
 // Updater handles downloading and applying plugin updates safely.
 type Updater struct {
-	client *http.Client
+	client           *http.Client
+	maxDownloadBytes int64
 }
 
 // NewUpdater initializes an Updater with reasonable HTTP timeouts.
@@ -52,11 +83,16 @@ func NewUpdater() *Updater {
 		client: &http.Client{
 			Timeout: 60 * time.Second,
 		},
+		maxDownloadBytes: DefaultMaxDownloadBytes,
 	}
 }
 
 // DownloadFile downloads a remote file to a local destination with context cancellation.
 func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error {
+	if err := validateDownloadURL(url); err != nil {
+		return err
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("creating HTTP request: %w", err)
@@ -73,14 +109,26 @@ func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error 
 		return fmt.Errorf("unexpected HTTP status: %s", resp.Status)
 	}
 
+	if u.maxDownloadBytes > 0 && resp.ContentLength > u.maxDownloadBytes {
+		return fmt.Errorf("%w: server advertises %d bytes, limit is %d", ErrDownloadTooLarge, resp.ContentLength, u.maxDownloadBytes)
+	}
+
 	out, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("creating destination file: %w", err)
 	}
 	defer out.Close()
 
-	if _, err = io.Copy(out, resp.Body); err != nil {
+	var src io.Reader = resp.Body
+	if u.maxDownloadBytes > 0 {
+		src = io.LimitReader(resp.Body, u.maxDownloadBytes+1)
+	}
+	written, err := io.Copy(out, src)
+	if err != nil {
 		return fmt.Errorf("writing downloaded payload: %w", err)
+	}
+	if u.maxDownloadBytes > 0 && written > u.maxDownloadBytes {
+		return fmt.Errorf("%w: stream exceeded the limit of %d bytes", ErrDownloadTooLarge, u.maxDownloadBytes)
 	}
 
 	return nil

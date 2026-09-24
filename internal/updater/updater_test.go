@@ -195,3 +195,72 @@ func TestUpdatePluginErrorPaths(t *testing.T) {
 		t.Errorf("missing dir error = %v, want ErrPluginNotFound", err)
 	}
 }
+
+func TestValidateDownloadURL(t *testing.T) {
+	cases := []struct {
+		url     string
+		wantErr bool
+	}{
+		{"https://github.com/x/y.zip", false},
+		{"HTTPS://Example.COM/a.zip", false},
+		{"http://localhost:8080/a.zip", false},
+		{"http://127.0.0.1:9/a.zip", false},
+		{"http://[::1]:9/a.zip", false},
+		{"http://plugins.example.com/a.zip", true},
+		{"ftp://example.com/a.zip", true},
+		{"file:///C:/Windows/x.zip", true},
+		{"/relative/path.zip", true},
+	}
+	for _, tc := range cases {
+		err := validateDownloadURL(tc.url)
+		if tc.wantErr && !errors.Is(err, ErrInsecureScheme) {
+			t.Errorf("validateDownloadURL(%q) = %v, want ErrInsecureScheme", tc.url, err)
+		}
+		if !tc.wantErr && err != nil {
+			t.Errorf("validateDownloadURL(%q) = %v, want nil", tc.url, err)
+		}
+	}
+}
+
+func TestDownloadFileRejectsInsecureURLBeforeNetwork(t *testing.T) {
+	dest := filepath.Join(t.TempDir(), "out.zip")
+	err := NewUpdater().DownloadFile(context.Background(), "http://plugins.example.com/pkg.zip", dest)
+	if !errors.Is(err, ErrInsecureScheme) {
+		t.Fatalf("error = %v, want ErrInsecureScheme", err)
+	}
+	if _, e := os.Stat(dest); !os.IsNotExist(e) {
+		t.Error("destination file must not be created for rejected URLs")
+	}
+}
+
+func TestDownloadFileEnforcesSizeCap(t *testing.T) {
+	// Advertised length path: handler writes a small body in one shot, so the
+	// Go server sets Content-Length automatically.
+	sized := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(bytes.Repeat([]byte("x"), 4096))
+	}))
+	defer sized.Close()
+
+	// Streaming path: chunked body hides the real size from Content-Length.
+	streamed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		chunk := bytes.Repeat([]byte("y"), 512)
+		for i := 0; i < 64; i++ {
+			_, _ = w.Write(chunk)
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+	}))
+	defer streamed.Close()
+
+	upd := NewUpdater()
+	upd.maxDownloadBytes = 1024
+
+	for _, url := range []string{sized.URL, streamed.URL} {
+		dest := filepath.Join(t.TempDir(), "out.zip")
+		err := upd.DownloadFile(context.Background(), url, dest)
+		if !errors.Is(err, ErrDownloadTooLarge) {
+			t.Errorf("DownloadFile(%s) error = %v, want ErrDownloadTooLarge", url, err)
+		}
+	}
+}
