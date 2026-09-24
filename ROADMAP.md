@@ -12,7 +12,8 @@ and accepted debt we deliberately postponed.
 - `wincmd.ini` parsing for all four plugin sections (Packer / Lister / FileSystem / Content)
   with dedup by path and `%COMMANDER_PATH%` / `%COMMANDER_DRIVE%` expansion.
 - Version extraction tiers: PE version resource → companion DLLs → readme/INF regex → `Unknown`.
-- Community catalog from GitHub Pages CDN with 24 h disk cache and offline
+- Community catalog from the totalplug-catalog Pages site (`catalog.min.json` on
+  sergey.is-a.dev) with 24 h disk cache and offline
   expired-cache fallback (`%APPDATA%\TotalPlug\community_catalog_cache.json`).
 - Per-plugin update source override: `github:Owner/Repo` custom source via Releases API.
 - Strict version comparison; unresolvable versions classify as `StatusUncertain`
@@ -61,6 +62,8 @@ and accepted debt we deliberately postponed.
    is the first writer for `installed_plugins.json`; CLI and GUI record the applied version
    after every successful update. ~~(A full update-history view/API is still open.)~~
    Closed by `8fab018`: append-only `update_history.json` (capped at 200) + GUI history dialog.
+   Fixed in `e4a6701`: a successful update now clears a stale manual `CustomVersion`
+   override (source/name kept), so the remembered version is no longer shadowed on rescan.
 5. ~~**i18n**~~ — done: `frontend/src/i18n.js` dictionaries (EN default, RU toggle in the
    header, choice persisted in localStorage); UI rebuilds in place without reload.
    The TUI stays English-only for now.
@@ -80,9 +83,11 @@ and accepted debt we deliberately postponed.
   add "keep last N per plugin" cleanup.~~ Shipped in `3cb2a96` (keep newest 3 per
   plugin, pruned best-effort after each successful update).
 - **`FileHash` verification** — field exists on records but nothing computes or checks it.
-- **Non-ZIP plugin archives** — totalcmd.net serves many plugins as RAR; since `b332687`
+- ~~**Non-ZIP plugin archives** — totalcmd.net serves many plugins as RAR; since `b332687`
   they are rejected with a clear "unsupported archive format" hint instead of a cryptic
-  zip error. Supporting RAR/7z extraction would make those updates work.
+  zip error. Supporting RAR/7z extraction would make those updates work.~~
+  Shipped in `1102346`: RAR (nwaples/rardecode) and 7z (bodgit/sevenzip) extract alongside
+  ZIP, dispatching on the magic-byte format; gzip/unknown still rejected.
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
   user-menu button to the CLI.
