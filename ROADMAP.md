@@ -59,7 +59,8 @@ and accepted debt we deliberately postponed.
    "close Total Commander" hint and success reports the kept backup directory.
 4. ~~**Remember versions after blind updates**~~ — done (`46c562b`): `Database.RememberVersion`
    is the first writer for `installed_plugins.json`; CLI and GUI record the applied version
-   after every successful update. (A full update-history view/API is still open.)
+   after every successful update. ~~(A full update-history view/API is still open.)~~
+   Closed by `8fab018`: append-only `update_history.json` (capped at 200) + GUI history dialog.
 5. ~~**i18n**~~ — done: `frontend/src/i18n.js` dictionaries (EN default, RU toggle in the
    header, choice persisted in localStorage); UI rebuilds in place without reload.
    The TUI stays English-only for now.
