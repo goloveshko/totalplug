@@ -16,6 +16,7 @@ let editorForm, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
 let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
 let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl, effectSelect;
+let titlebarActionsEl;
 let dialogResolve = null;
 
 // Backdrop chosen in Settings; applied by Go at startup, so the UI only shows
@@ -234,10 +235,18 @@ function refreshSettingsState() {
     });
 }
 
+// The titlebar search box and action icons belong to the plugin view only;
+// they hide while the full-window settings view is open.
+function setMainChromeVisible(visible) {
+    searchEl.hidden = !visible;
+    titlebarActionsEl.hidden = !visible;
+}
+
 function openSettings() {
     settingsOpen = true;
     mainView.hidden = true;
     settingsView.hidden = false;
+    setMainChromeVisible(false);
     refreshSettingsState();
 }
 
@@ -245,12 +254,28 @@ function closeSettings() {
     settingsOpen = false;
     settingsView.hidden = true;
     mainView.hidden = false;
+    setMainChromeVisible(true);
 }
 
 function buildDom() {
     app.innerHTML = `
       <div class="titlebar" id="titlebar">
         <span class="titlebar-title">TotalPlug</span>
+        <input type="search" id="plugin-search" placeholder="${t('search.ph')}" autocomplete="off">
+        <div class="titlebar-actions" id="titlebar-actions">
+          <button type="button" id="btn-history" class="icon-btn" title="${t('btn.history')}">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </button>
+          <button type="button" id="btn-refresh" class="icon-btn" title="${t('btn.refresh')}">
+            <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+          <button type="button" id="btn-scan" class="icon-btn primary" title="${t('btn.scan')}">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <button type="button" id="btn-settings" class="icon-btn" title="${t('btn.settings')}">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
         <div class="caption-buttons">
           <button type="button" id="win-min" title="${t('win.min')}">&#8722;</button>
           <button type="button" id="win-max" title="${t('win.max')}">&#9633;</button>
@@ -258,15 +283,6 @@ function buildDom() {
         </div>
       </div>
       <div id="view-main">
-        <div class="toolbar">
-          <input type="search" id="plugin-search" placeholder="${t('search.ph')}" autocomplete="off">
-          <div class="actions">
-            <button id="btn-history" class="btn-history">${t('btn.history')}</button>
-            <button id="btn-settings" class="btn-history">${t('btn.settings')}</button>
-            <button id="btn-refresh" class="btn-secondary">${t('btn.refresh')}</button>
-            <button id="btn-scan">${t('btn.scan')}</button>
-          </div>
-        </div>
         <div class="status-bar" id="status">${t('status.initial')}</div>
         <div class="table-container">
           <table>
@@ -427,6 +443,7 @@ function buildDom() {
     appDialogCancel = document.getElementById('app-dialog-cancel');
     mainView = document.getElementById('view-main');
     settingsView = document.getElementById('view-settings');
+    titlebarActionsEl = document.getElementById('titlebar-actions');
     langSelect = document.getElementById('lang-select');
     fontScaleEl = document.getElementById('font-scale');
     fontScaleValueEl = document.getElementById('font-scale-value');
@@ -500,6 +517,7 @@ function buildDom() {
     // settings, which must stay open).
     settingsView.hidden = !settingsOpen;
     mainView.hidden = settingsOpen;
+    setMainChromeVisible(!settingsOpen);
     if (settingsOpen) refreshSettingsState();
 
     editorForm.addEventListener('submit', async (e) => {
