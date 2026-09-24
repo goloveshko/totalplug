@@ -29,3 +29,7 @@ frontend/*.md5
 # OS generated files
 Thumbs.db
 .DS_Store
+
+# Local session context notes (keep out of repository)
+CONTEXT.md
+totalplug_context.md
