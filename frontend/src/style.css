@@ -268,21 +268,41 @@ dialog input:focus {
     color: var(--text-muted);
 }
 
-/* Settings dialog: left section list, right content, MQ Studio style. */
-#settings-dialog {
-    width: 640px;
-    max-width: 92vw;
-    padding: 0;
+/* Settings is a full-window view with a back button, MQ Studio style. */
+#view-settings {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 32px);
 }
-.settings-header {
+#view-settings[hidden] {
+    display: none;
+}
+.settings-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 20px;
+    padding-bottom: 14px;
     border-bottom: 1px solid var(--border);
 }
-.settings-header h2 {
+.settings-top-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.settings-top h2 {
     margin: 0;
+    font-size: 1.15rem;
+}
+.btn-back {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 14px;
+}
+.btn-back:hover {
+    background: var(--border);
 }
 .settings-save-hint {
     font-size: 0.75rem;
@@ -290,16 +310,18 @@ dialog input:focus {
 }
 .settings-body {
     display: flex;
-    min-height: 340px;
+    flex: 1;
+    min-height: 0;
 }
 .settings-nav {
-    width: 180px;
+    width: 200px;
     flex-shrink: 0;
-    padding: 12px;
+    padding: 16px 12px;
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     gap: 4px;
+    align-self: flex-start;
 }
 .settings-nav button {
     background: transparent;
@@ -318,8 +340,10 @@ dialog input:focus {
 }
 .settings-panel {
     flex: 1;
-    padding: 18px 22px;
+    padding: 20px 26px;
     display: none;
+    overflow-y: auto;
+    max-width: 760px;
 }
 .settings-panel.active {
     display: block;
@@ -373,10 +397,28 @@ dialog input:focus {
 .preview-system { background: linear-gradient(90deg, #ffffff 50%, #16161b 50%); }
 .theme-card .name { font-size: 0.85rem; font-weight: 600; }
 .theme-card .desc { font-size: 0.72rem; color: var(--text-muted); }
-.lang-cards {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+.settings-panel label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+.settings-panel select {
+    display: block;
+    width: 100%;
+    max-width: 280px;
+    margin-top: 4px;
+    box-sizing: border-box;
+    background: var(--input-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+}
+.settings-panel select:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 .font-row {
     display: flex;
