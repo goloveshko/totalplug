@@ -168,7 +168,9 @@ func (db *Database) saveRecordsLocked() error {
 
 // RememberVersion stores the version applied by a successful update so later
 // scans start from a known value instead of "Unknown", and appends the event
-// to the capped update history log.
+// to the capped update history log. A stale manual CustomVersion written
+// before the update would otherwise shadow the new record in ApplyOverrides,
+// so it is cleared here (CustomName and CustomSource are kept).
 func (db *Database) RememberVersion(pluginID, pluginName, version string) error {
 	if pluginID == "" || version == "" {
 		return nil
@@ -186,6 +188,17 @@ func (db *Database) RememberVersion(pluginID, pluginName, version string) error 
 		return err
 	}
 
+	overridesChanged := false
+	if ov, ok := db.overrides[pluginID]; ok && ov.CustomVersion != "" {
+		ov.CustomVersion = ""
+		if ov.CustomName == "" && ov.CustomSource == "" {
+			delete(db.overrides, pluginID)
+		} else {
+			db.overrides[pluginID] = ov
+		}
+		overridesChanged = true
+	}
+
 	db.history = append([]domain.UpdateEntry{{
 		PluginID:   pluginID,
 		PluginName: pluginName,
@@ -195,7 +208,13 @@ func (db *Database) RememberVersion(pluginID, pluginName, version string) error 
 	if len(db.history) > MaxHistoryEntries {
 		db.history = db.history[:MaxHistoryEntries]
 	}
-	return db.saveHistoryLocked()
+	if err := db.saveHistoryLocked(); err != nil {
+		return err
+	}
+	if overridesChanged {
+		return db.saveOverridesLocked()
+	}
+	return nil
 }
 
 // UpdateHistory returns the applied-update log, newest entry first.

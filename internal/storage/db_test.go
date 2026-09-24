@@ -274,6 +274,53 @@ func TestRememberVersionAppendsHistoryNewestFirst(t *testing.T) {
 	}
 }
 
+func TestRememberVersionClearsStaleManualVersion(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.SetUserOverride("WLX:c", domain.Override{
+		CustomVersion: "1.8",
+		CustomSource:  "github:Alexey-T/CudaLister",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetUserOverride("WLX:d", domain.Override{CustomVersion: "0.9"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.RememberVersion("WLX:c", "CudaLister", "1.8.6.3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.RememberVersion("WLX:d", "Delta", "1.0"); err != nil {
+		t.Fatal(err)
+	}
+
+	reloaded, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plugins := reloaded.ApplyOverrides([]domain.Plugin{
+		{ID: "WLX:c", InstalledVersion: "1.8.5"},
+		{ID: "WLX:d", InstalledVersion: "0.9"},
+	})
+	if plugins[0].InstalledVersion != "1.8.6.3" {
+		t.Errorf("updated version must win over stale manual version, got %q", plugins[0].InstalledVersion)
+	}
+	if plugins[0].CustomSource != "github:Alexey-T/CudaLister" {
+		t.Errorf("custom source must survive, got %q", plugins[0].CustomSource)
+	}
+	if plugins[1].InstalledVersion != "1.0" {
+		t.Errorf("record version must win once override is dropped, got %q", plugins[1].InstalledVersion)
+	}
+	if _, ok := reloaded.overrides["WLX:d"]; ok {
+		t.Error("override with only a custom version must be removed after update")
+	}
+}
+
 func TestHistoryIsCapped(t *testing.T) {
 	newTestDb(t)
 	db, err := NewDatabase("")
