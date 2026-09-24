@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -103,8 +104,16 @@ func (a *App) SaveOverride(pluginID string, override domain.Override) error {
 	return a.db.SetUserOverride(pluginID, override)
 }
 
-// UpdatePlugin installs the latest version for the specified plugin
-func (a *App) UpdatePlugin(plugin domain.Plugin) error {
-	_, err := a.updater.UpdatePlugin(a.ctx, plugin)
-	return err
+// UpdatePlugin installs the latest version for the specified plugin. A locked
+// target (Total Commander still running) is reported through the structured
+// result instead of an error so the frontend can show recovery guidance.
+func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
+	backupDir, err := a.updater.UpdatePlugin(a.ctx, plugin)
+	if err != nil {
+		if errors.Is(err, updater.ErrFileLocked) {
+			return domain.UpdateResult{Locked: true}, nil
+		}
+		return domain.UpdateResult{}, err
+	}
+	return domain.UpdateResult{BackupPath: backupDir}, nil
 }

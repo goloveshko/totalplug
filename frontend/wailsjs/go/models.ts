@@ -77,6 +77,20 @@ export namespace domain {
 		    return a;
 		}
 	}
+	export class UpdateResult {
+	    locked: boolean;
+	    backup_path?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.locked = source["locked"];
+	        this.backup_path = source["backup_path"];
+	    }
+	}
 
 }
 

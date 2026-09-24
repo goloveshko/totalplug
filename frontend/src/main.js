@@ -185,8 +185,16 @@ window.handleUpdate = async function(index) {
 
     try {
         statusEl.innerText = `Обновление ${plugin.name}...`;
-        await UpdatePlugin(plugin);
-        alert(`Плагин ${plugin.name} успешно обновлен!`);
+        const result = await UpdatePlugin(plugin);
+
+        if (result && result.locked) {
+            statusEl.innerText = `⚠ Файлы плагина ${plugin.name} заняты. Закройте Total Commander и повторите обновление.`;
+            return;
+        }
+
+        alert(result && result.backup_path
+            ? `Плагин ${plugin.name} обновлен! Резервная копия: ${result.backup_path}`
+            : `Плагин ${plugin.name} успешно обновлен!`);
         runScan(false);
     } catch (err) {
         alert(`Ошибка обновления: ${err}`);

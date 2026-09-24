@@ -66,3 +66,12 @@ type Config struct {
 	Language  string `json:"language"`
 	AutoCheck bool   `json:"auto_check"`
 }
+
+// UpdateResult reports the outcome of a GUI-initiated plugin update.
+type UpdateResult struct {
+	// Locked is true when the update was aborted because plugin files are
+	// held by a running Total Commander; changes were rolled back.
+	Locked bool `json:"locked"`
+	// BackupPath is the timestamped backup directory kept after success.
+	BackupPath string `json:"backup_path,omitempty"`
+}

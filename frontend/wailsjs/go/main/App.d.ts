@@ -6,4 +6,4 @@ export function SaveOverride(arg1:string,arg2:domain.Override):Promise<void>;
 
 export function ScanPlugins(arg1:boolean):Promise<Array<domain.Plugin>>;
 
-export function UpdatePlugin(arg1:domain.Plugin):Promise<void>;
+export function UpdatePlugin(arg1:domain.Plugin):Promise<domain.UpdateResult>;
