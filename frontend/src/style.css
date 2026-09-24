@@ -119,3 +119,78 @@ tr:hover {
 .btn-update:hover {
     background: #d68910;
 }
+
+.btn-edit {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.btn-edit:hover {
+    background: var(--border);
+    color: var(--text-main);
+}
+
+dialog {
+    background: var(--card-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 24px;
+    width: 360px;
+}
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+}
+dialog h2 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+}
+.editor-plugin {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 14px;
+}
+dialog label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+dialog input {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    box-sizing: border-box;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    user-select: text;
+}
+dialog input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.editor-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 4px 0 14px;
+}
+.editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.editor-actions .btn-save {
+    background: var(--accent);
+}
+.editor-actions button[type="button"] {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+}
