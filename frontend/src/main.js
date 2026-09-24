@@ -10,17 +10,28 @@ let currentPlugins = [];
 let editingPlugin = null;
 
 // Reassigned by buildDom() on every (re)render, e.g. after a language switch.
-let statusEl, tbody, btnScan, btnRefresh;
-let editorDialog, editorForm, editorPluginEl, editorVersionEl, editorSourceEl, editorCancelEl;
+let statusEl, tbody, btnScan, btnRefresh, searchEl;
+let cardDialog, cardNameEl, cardSubEl, cardInfoEl;
+let editorForm, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
 let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
 let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl;
 let dialogResolve = null;
 
+// Case-insensitive name filter from the toolbar search box; survives the DOM
+// rebuild on language switch, like the settings state below.
+let searchQuery = '';
+
 // Settings is a full-window view; these survive the DOM rebuild that a
 // language switch triggers so the user stays where they were.
 let settingsOpen = false;
 let settingsSection = 'appearance';
+
+function setStatus(message) {
+    statusEl.innerText = message;
+    // The bar is a single ellipsized line; the tooltip keeps long messages readable.
+    statusEl.title = message;
+}
 
 // In-app replacement for native confirm()/alert(): those render with the
 // "wails.localhost" origin header and cannot be styled.
@@ -59,20 +70,20 @@ async function runScan(forceRefresh = false) {
     try {
         btnScan.disabled = true;
         btnRefresh.disabled = true;
-        statusEl.innerText = forceRefresh ? t('scan.fresh') : t('scan.cached');
+        setStatus(forceRefresh ? t('scan.fresh') : t('scan.cached'));
 
         currentPlugins = await ScanPlugins(forceRefresh);
 
         if (!currentPlugins || currentPlugins.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.none')}</td></tr>`;
-            statusEl.innerText = t('scan.none');
+            setStatus(t('scan.none'));
             return;
         }
 
-        renderTable(currentPlugins);
-        statusEl.innerText = t('status.found', { n: currentPlugins.length });
+        renderTable();
+        setStatus(t('status.found', { n: currentPlugins.length }));
     } catch (err) {
-        statusEl.innerText = t('status.error', { err });
+        setStatus(t('status.error', { err }));
         console.error(err);
     } finally {
         btnScan.disabled = false;
@@ -80,11 +91,19 @@ async function runScan(forceRefresh = false) {
     }
 }
 
-function renderTable(plugins) {
-    tbody.innerHTML = plugins.map((p, idx) => {
+function renderTable() {
+    const q = searchQuery.trim().toLowerCase();
+    const rows = currentPlugins
+        .map((p, idx) => ({ p, idx }))
+        .filter(({ p }) => !q || p.name.toLowerCase().includes(q));
+    if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.noresults')}</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = rows.map(({ p, idx }) => {
         const canUpdate = p.status === 'update_avail' && p.download_url;
         return `
-            <tr>
+            <tr data-idx="${idx}">
                 <td><strong>${p.type}</strong></td>
                 <td>${p.name}</td>
                 <td><code>${p.installed_version}</code></td>
@@ -93,26 +112,35 @@ function renderTable(plugins) {
                 <td>${getStatusBadge(p.status)}</td>
                 <td>
                     ${canUpdate ? `<button class="btn-update" onclick="handleUpdate(${idx})">${t('btn.update')}</button>` : ''}
-                    <button class="btn-edit" title="${t('btn.edit.title')}" onclick="handleEdit(${idx})">${t('btn.edit')}</button>
                 </td>
             </tr>
         `;
     }).join('');
 }
 
-window.handleEdit = function(index) {
+const cardRow = (label, valueHtml) =>
+    `<div class="k">${label}</div><div class="v">${valueHtml}</div>`;
+
+function openCard(index) {
     const plugin = currentPlugins[index];
     if (!plugin) return;
 
     editingPlugin = plugin;
-    editorPluginEl.textContent = `${plugin.name} (${plugin.type})`;
+    cardNameEl.textContent = plugin.name;
+    cardSubEl.textContent = plugin.type + (plugin.arch ? ' · ' + plugin.arch : '');
+    cardInfoEl.innerHTML =
+        cardRow(t('col.installed'), `<code>${plugin.installed_version}</code> <small style="color:var(--text-muted)">${plugin.confidence}</small>`) +
+        cardRow(t('col.latest'), plugin.latest_version ? `<code>${plugin.latest_version}</code>` : '—') +
+        cardRow(t('col.status'), getStatusBadge(plugin.status)) +
+        (plugin.custom_source ? cardRow(t('editor.source'), `<code class="path">${plugin.custom_source}</code>`) : '') +
+        cardRow(t('card.path'), `<code class="path">${plugin.path}</code>`);
 
     const auto = plugin.installed_version || '';
     editorVersionEl.value = /^(unknown|n\/a)/i.test(auto) ? '' : auto;
     editorSourceEl.value = plugin.custom_source || '';
 
-    editorDialog.showModal();
-};
+    cardDialog.showModal();
+}
 
 async function saveOverrideFromEditor() {
     if (!editingPlugin) return;
@@ -125,11 +153,11 @@ async function saveOverrideFromEditor() {
     editorSaveGuard(true);
     try {
         await SaveOverride(editingPlugin.id, override);
-        editorDialog.close();
-        statusEl.innerText = t('editor.saved', { name: editingPlugin.name });
+        cardDialog.close();
+        setStatus(t('editor.saved', { name: editingPlugin.name }));
         runScan(false);
     } catch (err) {
-        statusEl.innerText = t('editor.save_error', { err });
+        setStatus(t('editor.save_error', { err }));
     } finally {
         editorSaveGuard(false);
     }
@@ -148,11 +176,11 @@ window.handleUpdate = async function(index) {
     }
 
     try {
-        statusEl.innerText = t('update.running', { name: plugin.name });
+        setStatus(t('update.running', { name: plugin.name }));
         const result = await UpdatePlugin(plugin);
 
         if (result && result.locked) {
-            statusEl.innerText = t('update.locked', { name: plugin.name });
+            setStatus(t('update.locked', { name: plugin.name }));
             return;
         }
 
@@ -162,7 +190,7 @@ window.handleUpdate = async function(index) {
         runScan(false);
     } catch (err) {
         await showAlert(t('update.error_alert', { err }));
-        statusEl.innerText = t('update.error_status', { name: plugin.name });
+        setStatus(t('update.error_status', { name: plugin.name }));
     }
 };
 
@@ -182,7 +210,7 @@ async function openHistory() {
         }
         historyDialog.showModal();
     } catch (err) {
-        statusEl.innerText = t('history.error', { err });
+        setStatus(t('history.error', { err }));
     }
 }
 
@@ -217,18 +245,17 @@ function closeSettings() {
 function buildDom() {
     app.innerHTML = `
       <div id="view-main">
-        <div class="header">
-          <div>
-            <h1>TotalPlug</h1>
-            <div class="status-bar" id="status">${t('status.initial')}</div>
-          </div>
+        <div class="toolbar">
+          <h1>TotalPlug</h1>
+          <input type="search" id="plugin-search" placeholder="${t('search.ph')}" autocomplete="off">
           <div class="actions">
             <button id="btn-history" class="btn-history">${t('btn.history')}</button>
             <button id="btn-settings" class="btn-history">${t('btn.settings')}</button>
-            <button id="btn-scan">${t('btn.scan')}</button>
             <button id="btn-refresh" class="btn-secondary">${t('btn.refresh')}</button>
+            <button id="btn-scan">${t('btn.scan')}</button>
           </div>
         </div>
+        <div class="status-bar" id="status">${t('status.initial')}</div>
         <div class="table-container">
           <table>
             <thead>
@@ -310,10 +337,12 @@ function buildDom() {
         </div>
       </div>
 
-      <dialog id="version-editor">
+      <dialog id="plugin-card">
+        <h2 id="card-name"></h2>
+        <div class="card-sub" id="card-sub"></div>
+        <div class="card-info" id="card-info"></div>
+        <div class="card-edit-title">${t('editor.title')}</div>
         <form method="dialog" id="editor-form">
-          <h2>${t('editor.title')}</h2>
-          <div class="editor-plugin" id="editor-plugin"></div>
           <label>
             ${t('editor.version')}
             <input type="text" id="editor-version" placeholder="${t('editor.version.ph')}" autocomplete="off">
@@ -361,10 +390,13 @@ function buildDom() {
     tbody = document.getElementById('plugins-body');
     btnScan = document.getElementById('btn-scan');
     btnRefresh = document.getElementById('btn-refresh');
+    searchEl = document.getElementById('plugin-search');
 
-    editorDialog = document.getElementById('version-editor');
+    cardDialog = document.getElementById('plugin-card');
+    cardNameEl = document.getElementById('card-name');
+    cardSubEl = document.getElementById('card-sub');
+    cardInfoEl = document.getElementById('card-info');
     editorForm = document.getElementById('editor-form');
-    editorPluginEl = document.getElementById('editor-plugin');
     editorVersionEl = document.getElementById('editor-version');
     editorSourceEl = document.getElementById('editor-source');
     editorCancelEl = document.getElementById('editor-cancel');
@@ -384,6 +416,18 @@ function buildDom() {
     btnRefresh.addEventListener('click', () => runScan(true));
     document.getElementById('btn-history').addEventListener('click', openHistory);
     document.getElementById('btn-settings').addEventListener('click', openSettings);
+
+    searchEl.value = searchQuery;
+    searchEl.addEventListener('input', () => {
+        searchQuery = searchEl.value;
+        renderTable();
+    });
+    // Row click opens the plugin card; buttons inside the row keep their own action.
+    tbody.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const tr = e.target.closest('tr[data-idx]');
+        if (tr) openCard(Number(tr.dataset.idx));
+    });
 
     appDialogOk.addEventListener('click', () => { settleAppDialog(true); appDialog.close(); });
     appDialogCancel.addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
@@ -427,12 +471,12 @@ function buildDom() {
         e.preventDefault();
         await saveOverrideFromEditor();
     });
-    editorCancelEl.addEventListener('click', () => editorDialog.close());
+    editorCancelEl.addEventListener('click', () => cardDialog.close());
     document.getElementById('history-close').addEventListener('click', () => historyDialog.close());
 
     if (currentPlugins.length > 0) {
-        renderTable(currentPlugins);
-        statusEl.innerText = t('status.found', { n: currentPlugins.length });
+        renderTable();
+        setStatus(t('status.found', { n: currentPlugins.length }));
     }
 }
 
@@ -440,12 +484,12 @@ function buildDom() {
 EventsOn('plugins:refreshed', (plugins) => {
     if (!plugins || plugins.length === 0) return;
     currentPlugins = plugins;
-    renderTable(currentPlugins);
-    statusEl.innerText = t('events.refreshed', { n: currentPlugins.length });
+    renderTable();
+    setStatus(t('events.refreshed', { n: currentPlugins.length }));
 });
 
 EventsOn('plugins:refresh:failed', (msg) => {
-    statusEl.innerText = t('events.refresh_failed', { msg });
+    setStatus(t('events.refresh_failed', { msg }));
 });
 
 buildDom();

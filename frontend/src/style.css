@@ -37,24 +37,43 @@ body {
     user-select: none;
 }
 
-.header {
+.toolbar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 12px;
+    gap: 10px;
+    margin-bottom: 6px;
+    padding-bottom: 10px;
     border-bottom: 1px solid var(--border);
 }
 
-.header h1 {
-    margin: 0;
-    font-size: 1.4rem;
+.toolbar h1 {
+    margin: 0 4px 0 0;
+    font-size: 1.2rem;
     font-weight: 700;
+    white-space: nowrap;
+}
+
+#plugin-search {
+    flex: 1;
+    min-width: 120px;
+    max-width: 340px;
+    background: var(--input-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 0.85rem;
+    user-select: text;
+}
+#plugin-search:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 
 .actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    margin-left: auto;
 }
 
 button {
@@ -62,10 +81,11 @@ button {
     color: white;
     border: none;
     border-radius: 6px;
-    padding: 8px 16px;
+    padding: 8px 14px;
     cursor: pointer;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
     transition: background 0.2s;
 }
 
@@ -78,10 +98,16 @@ button:disabled {
     cursor: not-allowed;
 }
 
+/* Single fixed line: long messages ellipsize (full text in the tooltip),
+   so the layout never jumps when scan status changes. */
 .status-bar {
-    margin-bottom: 12px;
-    font-size: 0.9rem;
+    margin: 2px 0 12px;
+    font-size: 0.85rem;
+    line-height: 1.5;
     color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .table-container {
@@ -115,6 +141,10 @@ tr:hover {
     background-color: var(--row-hover);
 }
 
+#plugins-body tr {
+    cursor: pointer;
+}
+
 .badge {
     padding: 3px 8px;
     border-radius: 4px;
@@ -145,19 +175,6 @@ tr:hover {
 }
 .btn-secondary:hover {
     background: var(--row-hover);
-}
-
-.btn-edit {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    padding: 4px 8px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-.btn-edit:hover {
-    background: var(--border);
-    color: var(--text-main);
 }
 
 .btn-history {
@@ -221,10 +238,46 @@ dialog h2 {
     margin: 0 0 4px;
     font-size: 1.1rem;
 }
-.editor-plugin {
+#plugin-card {
+    width: 480px;
+    max-width: 92vw;
+}
+.card-sub {
     color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-bottom: 12px;
+}
+.card-info {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 14px;
+    align-items: baseline;
     font-size: 0.85rem;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+.card-info .k {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.card-info .v {
+    user-select: text;
+    min-width: 0;
+}
+.card-info code.path {
+    word-break: break-all;
+}
+.card-edit-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
 }
 dialog label {
     display: block;
