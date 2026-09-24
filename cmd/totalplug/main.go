@@ -154,8 +154,7 @@ func main() {
 
 	db, dbErr := storage.NewDatabase("")
 	if dbErr != nil {
-		fmt.Printf("[!] Storage warning, user overrides disabled: %v\n", dbErr)
-		db = nil
+		fmt.Printf("[!] Storage warning, some data was not loaded: %v\n", dbErr)
 	}
 
 	fmt.Println("[+] Scanning Total Commander plugins...")

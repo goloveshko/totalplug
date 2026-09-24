@@ -2,6 +2,8 @@ package storage
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -55,35 +57,43 @@ func NewDatabase(dbPath string) (*Database, error) {
 		overrides:     make(map[string]domain.Override),
 	}
 
-	_ = db.Load()
-	_ = db.LoadOverrides()
-	return db, nil
+	var errs []error
+	if err := db.Load(); err != nil {
+		errs = append(errs, err)
+	}
+	if err := db.LoadOverrides(); err != nil {
+		errs = append(errs, err)
+	}
+	return db, errors.Join(errs...)
+}
+
+// readJSONFile decodes a JSON object into target. A missing file is not an
+// error. A file that exists but cannot be decoded is quarantined by renaming it
+// to <path>.corrupt so the (now empty) in-memory state can be rewritten cleanly
+// without silently clobbering the user's data.
+func readJSONFile(path string, target any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+
+	if decErr := json.Unmarshal(data, target); decErr != nil {
+		quarantine := path + ".corrupt"
+		_ = os.Rename(path, quarantine)
+		return fmt.Errorf("invalid JSON in %s (moved to %s): %w", path, quarantine, decErr)
+	}
+	return nil
 }
 
 func (db *Database) Load() error {
-	file, err := os.Open(db.filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	defer file.Close()
-
-	return json.NewDecoder(file).Decode(&db.records)
+	return readJSONFile(db.filePath, &db.records)
 }
 
 func (db *Database) LoadOverrides() error {
-	file, err := os.Open(db.overridesPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	defer file.Close()
-
-	return json.NewDecoder(file).Decode(&db.overrides)
+	return readJSONFile(db.overridesPath, &db.overrides)
 }
 
 func (db *Database) SaveOverrides() error {
