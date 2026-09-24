@@ -72,10 +72,11 @@ and accepted debt we deliberately postponed.
 
 ## GUI redesign (MQ Studio style) — stage 1 shipped
 
-1. ~~**Themes + settings dialog**~~ — done (`be2f6b0`): light/dark/system via
-   `<html data-theme>` CSS tokens; settings modal (theme cards, font-size slider,
-   language, About); theme/scale persist in localStorage. Dialogs became centered
-   static modals — dragging was glitchy and removed by user request.
+1. ~~**Themes + settings**~~ — done (`be2f6b0`, refined in `5078942`): light/dark/system via
+   `<html data-theme>` CSS tokens; settings is a full-window view with a «‹ Back» button
+   (MQ Studio style), language is a dropdown for future locales; theme/font-scale/language
+   persist in localStorage. Error/confirm/history dialogs stay centered static modals —
+   dragging was glitchy and removed by user request.
 2. **Toolbar + plugin card**: search/filter, GitHub and settings quick buttons under
    the titlebar; per-plugin detail dialog (version/source editing) designed to grow
    into install-from-catalog ("Установить", catalog search and filters).
