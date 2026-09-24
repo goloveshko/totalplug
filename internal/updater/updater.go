@@ -17,6 +17,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bodgit/sevenzip"
+	"github.com/nwaples/rardecode"
+
 	"totalplug/internal/domain"
 )
 
@@ -32,8 +35,8 @@ var (
 	// ErrDownloadTooLarge aborts downloads above the configured size cap.
 	ErrDownloadTooLarge = errors.New("download exceeds size limit")
 	// ErrUnsupportedArchive marks a downloaded package in a format that cannot
-	// be extracted (RAR, 7z, ...); totalcmd.net ships many plugins as RAR.
-	ErrUnsupportedArchive = errors.New("unsupported archive format, only ZIP can be applied")
+	// be extracted (gzip, truncated HTML error pages, ...).
+	ErrUnsupportedArchive = errors.New("unsupported archive format, only ZIP, RAR and 7z can be applied")
 )
 
 // DefaultMaxDownloadBytes caps archive size (256 MiB) to bound disk usage.
@@ -225,6 +228,17 @@ func detectArchiveFormat(path string) (string, error) {
 	}
 }
 
+// sanitizeEntryPath maps one archive entry name to a path under targetDir,
+// rejecting traversal and absolute/drive-prefixed names (Zip Slip) regardless
+// of the archive format.
+func sanitizeEntryPath(targetDir, name string) (string, error) {
+	cleanName := filepath.Clean(name)
+	if strings.HasPrefix(cleanName, "..") || filepath.IsAbs(cleanName) || filepath.VolumeName(cleanName) != "" {
+		return "", fmt.Errorf("illegal file path in archive: %s", name)
+	}
+	return filepath.Join(targetDir, cleanName), nil
+}
+
 // ExtractZip extracts an archive safely to targetDir (mitigating Zip Slip vulnerability).
 func (u *Updater) ExtractZip(zipPath, targetDir string) error {
 	r, err := zip.OpenReader(zipPath)
@@ -234,12 +248,10 @@ func (u *Updater) ExtractZip(zipPath, targetDir string) error {
 	defer r.Close()
 
 	for _, f := range r.File {
-		cleanName := filepath.Clean(f.Name)
-		if strings.HasPrefix(cleanName, "..") || filepath.IsAbs(cleanName) {
-			return fmt.Errorf("illegal file path in zip: %s", f.Name)
+		destPath, err := sanitizeEntryPath(targetDir, f.Name)
+		if err != nil {
+			return err
 		}
-
-		destPath := filepath.Join(targetDir, cleanName)
 
 		if f.FileInfo().IsDir() {
 			if err := os.MkdirAll(destPath, f.Mode()); err != nil {
@@ -268,6 +280,124 @@ func (u *Updater) ExtractZip(zipPath, targetDir string) error {
 		outFile.Close()
 		if err != nil {
 			return fmt.Errorf("extracting entry %q: %w", f.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// ExtractRar unpacks a RAR4/RAR5 archive to targetDir. Entries are streamed
+// sequentially by rardecode. Windows-authored plugin archives carry no usable
+// POSIX permissions, so plain 0644/0755 are applied uniformly; a password on
+// the archive is treated as an error by rardecode.
+func (u *Updater) ExtractRar(rarPath, targetDir string) error {
+	f, err := os.Open(rarPath)
+	if err != nil {
+		return fmt.Errorf("opening rar file %q: %w", rarPath, err)
+	}
+	defer f.Close()
+
+	r, err := rardecode.NewReader(f, "")
+	if err != nil {
+		return fmt.Errorf("opening rar archive %q: %w", rarPath, err)
+	}
+
+	for {
+		hdr, err := r.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("reading rar archive %q: %w", rarPath, err)
+		}
+
+		destPath, err := sanitizeEntryPath(targetDir, hdr.Name)
+		if err != nil {
+			return err
+		}
+
+		if hdr.IsDir {
+			if err := os.MkdirAll(destPath, 0755); err != nil {
+				return fmt.Errorf("creating directory %q: %w", destPath, err)
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return fmt.Errorf("creating parent dir for %q: %w", destPath, err)
+		}
+
+		outFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return fmt.Errorf("opening file for write %q: %w", destPath, err)
+		}
+
+		if _, err := io.Copy(outFile, r); err != nil {
+			outFile.Close()
+			return fmt.Errorf("extracting rar entry %q: %w", hdr.Name, err)
+		}
+		if err := outFile.Close(); err != nil {
+			return fmt.Errorf("closing extracted rar entry %q: %w", hdr.Name, err)
+		}
+	}
+}
+
+// Extract7z unpacks a 7z archive to targetDir using the pure-Go sevenzip
+// reader. Like ExtractRar, archive-stored permissions are ignored in favor of
+// 0644/0755 defaults.
+func (u *Updater) Extract7z(sevenzPath, targetDir string) error {
+	f, err := os.Open(sevenzPath)
+	if err != nil {
+		return fmt.Errorf("opening 7z file %q: %w", sevenzPath, err)
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("stating 7z file %q: %w", sevenzPath, err)
+	}
+
+	r, err := sevenzip.NewReader(f, stat.Size())
+	if err != nil {
+		return fmt.Errorf("opening 7z archive %q: %w", sevenzPath, err)
+	}
+
+	for _, file := range r.File {
+		destPath, err := sanitizeEntryPath(targetDir, file.Name)
+		if err != nil {
+			return err
+		}
+
+		if file.FileInfo().IsDir() {
+			if err := os.MkdirAll(destPath, 0755); err != nil {
+				return fmt.Errorf("creating directory %q: %w", destPath, err)
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return fmt.Errorf("creating parent dir for %q: %w", destPath, err)
+		}
+
+		rc, err := file.Open()
+		if err != nil {
+			return fmt.Errorf("reading 7z entry %q: %w", file.Name, err)
+		}
+
+		outFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			rc.Close()
+			return fmt.Errorf("opening file for write %q: %w", destPath, err)
+		}
+
+		if _, err := io.Copy(outFile, rc); err != nil {
+			rc.Close()
+			outFile.Close()
+			return fmt.Errorf("extracting 7z entry %q: %w", file.Name, err)
+		}
+		rc.Close()
+		if err := outFile.Close(); err != nil {
+			return fmt.Errorf("closing extracted 7z entry %q: %w", file.Name, err)
 		}
 	}
 
@@ -401,7 +531,7 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	}
 	defer os.RemoveAll(tmpDir)
 
-	archiveFile := filepath.Join(tmpDir, "package.zip")
+	archiveFile := filepath.Join(tmpDir, "package.archive")
 	if err := u.DownloadFile(ctx, plugin.DownloadURL, archiveFile); err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
 	}
@@ -410,12 +540,19 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	if err != nil {
 		return "", err
 	}
-	if format != "zip" {
-		return "", fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format)
-	}
 
 	extractedDir := filepath.Join(tmpDir, "extracted")
-	if err := u.ExtractZip(archiveFile, extractedDir); err != nil {
+	switch format {
+	case "zip":
+		err = u.ExtractZip(archiveFile, extractedDir)
+	case "rar":
+		err = u.ExtractRar(archiveFile, extractedDir)
+	case "7z":
+		err = u.Extract7z(archiveFile, extractedDir)
+	default:
+		err = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format)
+	}
+	if err != nil {
 		return "", fmt.Errorf("extraction failed: %w", err)
 	}
 

@@ -408,15 +408,15 @@ func TestDetectArchiveFormat(t *testing.T) {
 	}
 }
 
-func TestUpdatePluginRejectsRarBeforeTouchingPlugin(t *testing.T) {
+func TestUpdatePluginRejectsUnsupportedFormatBeforeTouchingPlugin(t *testing.T) {
 	dir := t.TempDir()
 	pluginFile := filepath.Join(dir, "WCX", "nl.wdx")
 	writeTestFile(t, pluginFile, "original")
 
-	rarBody := append([]byte("Rar!\x1a\x07\x01"), bytes.Repeat([]byte{0}, 64)...)
+	gzipBody := []byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/rar")
-		_, _ = w.Write(rarBody)
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(gzipBody)
 	}))
 	defer srv.Close()
 
@@ -433,5 +433,97 @@ func TestUpdatePluginRejectsRarBeforeTouchingPlugin(t *testing.T) {
 		if strings.Contains(e.Name(), ".bak_") {
 			t.Errorf("no backup must be created for rejected format, found %s", e.Name())
 		}
+	}
+}
+
+func TestUpdatePluginAppliesRar(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join("testdata", "nl_info_1.20.rar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "WDX", "NL_Info")
+	pluginFile := filepath.Join(pluginDir, "NL_Info.wdx")
+	writeTestFile(t, pluginFile, "old-wdx")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rar")
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+		Path:        pluginFile,
+		DownloadURL: srv.URL,
+	})
+	if err != nil {
+		t.Fatalf("UpdatePlugin: %v", err)
+	}
+
+	// The real archive ships both 32- and 64-bit binaries plus a Descript dir.
+	info, err := os.Stat(filepath.Join(pluginDir, "NL_Info.wdx64"))
+	if err != nil {
+		t.Fatalf("NL_Info.wdx64 not extracted: %v", err)
+	}
+	if info.Size() != 47104 {
+		t.Errorf("NL_Info.wdx64 size = %d, want 47104", info.Size())
+	}
+	if got := readTestFile(t, filepath.Join(pluginDir, "Descript", "ReadMe_eng.txt")); !strings.Contains(got, "NL_Info") {
+		t.Error("nested rar entry content missing")
+	}
+	if readTestFile(t, pluginFile) == "old-wdx" {
+		t.Error("NL_Info.wdx was not replaced")
+	}
+	if _, err := os.Stat(filepath.Join(backupDir, "NL_Info.wdx")); err != nil {
+		t.Errorf("backup must contain the pre-update wdx: %v", err)
+	}
+}
+
+func TestUpdatePluginApplies7z(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join("testdata", "test_plugin.7z"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "WCX", "demo")
+	pluginFile := filepath.Join(pluginDir, "demo.dll")
+	writeTestFile(t, pluginFile, "old-dll")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-7z-compressed")
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	if _, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+		Path:        pluginFile,
+		DownloadURL: srv.URL,
+	}); err != nil {
+		t.Fatalf("UpdatePlugin: %v", err)
+	}
+
+	if got := readTestFile(t, pluginFile); got != "sevenzip-payload" {
+		t.Errorf("demo.dll = %q, want sevenzip-payload", got)
+	}
+	if got := readTestFile(t, filepath.Join(pluginDir, "docs", "readme.txt")); got != "hello from 7z" {
+		t.Errorf("docs/readme.txt = %q", got)
+	}
+}
+
+func TestSanitizeEntryPath(t *testing.T) {
+	target := filepath.Join("C:", "tc", "plugins")
+	for _, bad := range []string{"..\\evil.dll", "../../evil.dll", filepath.Join(target, "abs.dll"), ".."} {
+		if _, err := sanitizeEntryPath(target, bad); err == nil {
+			t.Errorf("sanitizeEntryPath(%q) must reject traversal", bad)
+		}
+	}
+	ok, err := sanitizeEntryPath(target, "sub/inner.dll")
+	if err != nil {
+		t.Fatalf("legal name rejected: %v", err)
+	}
+	if ok != filepath.Join(target, "sub", "inner.dll") {
+		t.Errorf("resolved path = %q", ok)
 	}
 }
