@@ -512,6 +512,29 @@ func TestUpdatePluginApplies7z(t *testing.T) {
 	}
 }
 
+func TestUpdatePluginDownloadFailurePointsAtPluginPage(t *testing.T) {
+	dir := t.TempDir()
+	pluginFile := filepath.Join(dir, "WCX", "fi.wlx")
+	writeTestFile(t, pluginFile, "original")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	_, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+		Path:        pluginFile,
+		DownloadURL: srv.URL,
+		WebURL:      "https://totalcmd.net/plugring/fileinfo.html",
+	})
+	if err == nil || !strings.Contains(err.Error(), "plugin page: https://totalcmd.net/plugring/fileinfo.html") {
+		t.Fatalf("error should point at the plugin page, got: %v", err)
+	}
+	if readTestFile(t, pluginFile) != "original" {
+		t.Error("plugin file must be untouched")
+	}
+}
+
 func TestSanitizeEntryPath(t *testing.T) {
 	target := filepath.Join("C:", "tc", "plugins")
 	for _, bad := range []string{"..\\evil.dll", "../../evil.dll", filepath.Join(target, "abs.dll"), ".."} {

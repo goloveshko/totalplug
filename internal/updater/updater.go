@@ -533,6 +533,11 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 
 	archiveFile := filepath.Join(tmpDir, "package.archive")
 	if err := u.DownloadFile(ctx, plugin.DownloadURL, archiveFile); err != nil {
+		// Broken catalog/upstream links are common (totalcmd.net download
+		// counters redirect to dead hosts), so point at the plugin page.
+		if plugin.WebURL != "" {
+			return "", fmt.Errorf("download failed: %w; plugin page: %s", err, plugin.WebURL)
+		}
 		return "", fmt.Errorf("download failed: %w", err)
 	}
 
@@ -551,6 +556,9 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 		err = u.Extract7z(archiveFile, extractedDir)
 	default:
 		err = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format)
+		if plugin.WebURL != "" {
+			err = fmt.Errorf("%w; plugin page: %s", err, plugin.WebURL)
+		}
 	}
 	if err != nil {
 		return "", fmt.Errorf("extraction failed: %w", err)
