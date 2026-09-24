@@ -80,6 +80,35 @@ func CompareVersions(v1, v2 string) int {
 	return 0
 }
 
+// isResolvableVersion reports whether the given version string carries any
+// numeric component usable for comparison. It returns false for the scanner
+// sentinels ("Unknown", "N/A") as well as any value without digits.
+func isResolvableVersion(v string) bool {
+	s := cleanVersionString(v)
+	switch s {
+	case "", "N/A", "Unknown":
+		return false
+	}
+	return len(parseVersionParts(s)) > 0
+}
+
+// classifyUpdate decides the plugin status from an installed and a latest
+// version. When either side cannot be resolved, or the installed version is
+// only a low-confidence fallback, the result is StatusUncertain so that no
+// automatic update is offered for a version we cannot actually verify.
+func classifyUpdate(installed, latest string, confidence domain.VersionConfidence) domain.PluginStatus {
+	if !isResolvableVersion(installed) || !isResolvableVersion(latest) {
+		return domain.StatusUncertain
+	}
+	if CompareVersions(installed, latest) < 0 {
+		if confidence == domain.ConfidenceFallback {
+			return domain.StatusUncertain
+		}
+		return domain.StatusUpdateAvail
+	}
+	return domain.StatusUpToDate
+}
+
 func normalizeName(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 
@@ -166,12 +195,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 				}
 				p.WebURL = fmt.Sprintf("https://github.com/%s", ghRepo)
 
-				cmp := CompareVersions(p.InstalledVersion, ghRelease.TagName)
-				if cmp < 0 {
-					p.Status = domain.StatusUpdateAvail
-				} else {
-					p.Status = domain.StatusUpToDate
-				}
+				p.Status = classifyUpdate(p.InstalledVersion, ghRelease.TagName, p.Confidence)
 				continue
 			}
 		}
@@ -192,20 +216,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 			p.Arch = matchedEntry.Arch
 			p.Description = matchedEntry.Description
 
-			if p.InstalledVersion == "Unknown" || p.InstalledVersion == "N/A" {
-				p.Status = domain.StatusUncertain
-			} else {
-				cmp := CompareVersions(p.InstalledVersion, matchedEntry.Resolved.Version)
-				if cmp < 0 {
-					if p.Confidence == domain.ConfidenceFallback {
-						p.Status = domain.StatusUncertain
-					} else {
-						p.Status = domain.StatusUpdateAvail
-					}
-				} else {
-					p.Status = domain.StatusUpToDate
-				}
-			}
+			p.Status = classifyUpdate(p.InstalledVersion, matchedEntry.Resolved.Version, p.Confidence)
 		} else {
 			p.LatestVersion = "N/A (Not in catalog)"
 		}
