@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -116,6 +117,9 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin) (succeeded int, fa
 		backupDir, err := upd.UpdatePlugin(ctx, p)
 		if err != nil {
 			fmt.Printf("  [✗] %-18s %v\n", name, err)
+			if errors.Is(err, updater.ErrFileLocked) {
+				fmt.Printf("      ↳ File is locked or read-only. Close Total Commander and run again.\n")
+			}
 			failed++
 			continue
 		}

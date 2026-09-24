@@ -54,6 +54,8 @@ go run cmd/totalplug/main.go --update-all
 > Close Total Commander before applying updates, otherwise locked plugin files will fail to replace.
 > Updates are safe by design: the plugin folder is backed up as `<dir>.bak_<timestamp>` next to it,
 > and any mid-apply failure is automatically rolled back to the previous state.
+> Plugins whose installed version cannot be determined are never auto-updated: in `--update` they
+> are offered separately with a per-item `[y]es / [N]o / [a]ll` prompt, and `--update-all` skips them.
 
 ### Point to a Portable Total Commander Install
 ```bash

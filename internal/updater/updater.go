@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"totalplug/internal/domain"
@@ -18,7 +19,27 @@ import (
 var (
 	ErrEmptyDownloadURL = errors.New("download URL is empty")
 	ErrPluginNotFound   = errors.New("plugin file not found on disk")
+	// ErrFileLocked marks a target file that could not be written because it is
+	// held by another process (typically a running Total Commander).
+	ErrFileLocked = errors.New("target file is locked by another process")
 )
+
+// isLockedErr reports whether err indicates a file that is in use or denies
+// write access, matching the Windows error codes for access denied, sharing
+// violation and lock violation.
+func isLockedErr(err error) bool {
+	if errors.Is(err, os.ErrPermission) {
+		return true
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		switch errno {
+		case 5, 32, 33: // ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+			return true
+		}
+	}
+	return false
+}
 
 // Updater handles downloading and applying plugin updates safely.
 type Updater struct {
@@ -257,10 +278,14 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 
 	applied, err := applyTree(extractedDir, pluginDir)
 	if err != nil {
+		locked := isLockedErr(err)
 		if restoreErr := rollback(pluginDir, backupDir, applied); restoreErr != nil {
 			return "", fmt.Errorf("apply failed: %v; automatic rollback failed: %v, restore from %s manually", err, restoreErr, backupDir)
 		}
 		os.RemoveAll(backupDir)
+		if locked {
+			return "", fmt.Errorf("apply failed (changes rolled back from backup): %w: %v", ErrFileLocked, err)
+		}
 		return "", fmt.Errorf("apply failed (changes rolled back from backup): %w", err)
 	}
 

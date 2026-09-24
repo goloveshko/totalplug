@@ -158,6 +158,10 @@ func TestUpdatePluginRollsBackOnApplyFailure(t *testing.T) {
 	if !strings.Contains(err.Error(), "rolled back") {
 		t.Errorf("error should mention rollback: %v", err)
 	}
+	// A read-only (access denied) target must surface as a lockable-file error.
+	if !errors.Is(err, ErrFileLocked) {
+		t.Errorf("error should wrap ErrFileLocked for a locked target: %v", err)
+	}
 
 	if got := readTestFile(t, filepath.Join(pluginDir, "a.txt")); got != "a-old" {
 		t.Errorf("a.txt after rollback = %q, want a-old", got)
