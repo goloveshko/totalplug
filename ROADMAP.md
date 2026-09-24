@@ -68,9 +68,11 @@ and accepted debt we deliberately postponed.
 
 ## Backlog / accepted debt
 
-- **Unstable plugin IDs** — IDs are derived as `<type>_<folder-name>` and break when a
+- ~~**Unstable plugin IDs** — IDs are derived as `<type>_<folder-name>` and break when a
   plugin moves or is renamed; needs a stable identity scheme before update history
-  and overrides can be fully trusted.
+  and overrides can be fully trusted.~~ Shipped in `d32a2a1`: IDs are now
+  `<TYPE>:<TC-relative lowercased path>` with a one-time rekey of legacy
+  records/overrides. Update history can now be built on stable identity.
 - **GitHub releases TTL cache** — unauthenticated API is 60 req/h; add a small TTL
   cache if per-plugin github sources become popular.
 - ~~**Backup prune** — `.bak_*` directories accumulate after successful updates;
