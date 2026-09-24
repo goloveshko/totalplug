@@ -70,7 +70,7 @@ and accepted debt we deliberately postponed.
 6. Binding contract note: `ScanPlugins(bool)` stable; `UpdatePlugin(domain.Plugin)` now
    returns `domain.UpdateResult` (bindings regenerated in-repo) — prefer additive changes.
 
-## GUI redesign (MQ Studio style) — stages 1–2 shipped
+## GUI redesign (MQ Studio style) — all three stages shipped
 
 1. ~~**Themes + settings**~~ — done (`be2f6b0`, refined in `5078942`): light/dark/system via
    `<html data-theme>` CSS tokens; settings is a full-window view with a «‹ Back» button
@@ -84,9 +84,11 @@ and accepted debt we deliberately postponed.
    replacing the per-row "✎ версия" button. The card is the mount point for the
    future install-from-catalog flow ("Установить", catalog search and filters).
    GitHub quick link and true titlebar integration deferred to stage 3 (frameless).
-3. **Frameless window with Mica/Acrylic** (+ "window effect" switch in settings,
-   solid fallback): own caption buttons, drag region, DPI edges — riskiest stage,
-   kept as an isolated commit for easy rollback.
+3. ~~**Frameless window with Mica/Acrylic**~~ — done (`6566d60`): frameless Wails window
+   with a frontend-drawn titlebar (drag region, double-click maximize, caption buttons)
+   and a "Window effect" dropdown (Mica/Acrylic/None) persisted in
+   `%APPDATA%\TotalPlug\window_effect.txt`, read before window creation — applied on
+   restart; webview is translucent only when an effect is active.
 
 ## Backlog / accepted debt
 
