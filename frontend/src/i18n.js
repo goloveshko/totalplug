@@ -4,8 +4,6 @@ const STRINGS = {
         'status.initial': 'Press "Scan" to check plugins...',
         'btn.scan': '🔍 Scan plugins',
         'btn.refresh': '🔄 Refresh catalog',
-        'btn.lang': 'Язык: RU',
-        'btn.lang.title': 'Switch to Russian',
         'col.type': 'Type',
         'col.plugin': 'Plugin',
         'col.installed': 'Installed',
@@ -54,13 +52,34 @@ const STRINGS = {
         'history.error': 'Failed to load history: {err}',
         'dialog.ok': 'OK',
         'dialog.cancel': 'Cancel',
+        'btn.settings': '⚙ Settings',
+        'settings.title': 'Settings',
+        'settings.save_hint': 'All changes save themselves',
+        'settings.close': 'Close',
+        'settings.nav.appearance': 'Appearance',
+        'settings.nav.language': 'Language',
+        'settings.nav.about': 'About',
+        'settings.appearance': 'Theme and font size',
+        'settings.theme': 'Theme',
+        'settings.theme.light': 'Light',
+        'settings.theme.light.desc': 'Default',
+        'settings.theme.dark': 'Dark',
+        'settings.theme.dark.desc': 'Easy on the eyes',
+        'settings.theme.system': 'Follow system',
+        'settings.theme.system.desc': 'Switches automatically',
+        'settings.font': 'Font size',
+        'settings.language': 'Interface language',
+        'settings.lang.en': 'English',
+        'settings.lang.ru': 'Русский',
+        'settings.about': 'About TotalPlug',
+        'about.desc': 'TotalPlug scans Total Commander plugins from wincmd.ini, detects installed versions, compares them with the community catalog and applies safe updates with automatic backup and rollback.',
+        'about.catalog': 'Plugin catalog',
+        'about.records': 'Data is stored in %APPDATA%\\TotalPlug',
     },
     ru: {
         'status.initial': 'Нажмите «Сканировать», чтобы проверить плагины...',
         'btn.scan': '🔍 Сканировать плагины',
         'btn.refresh': '🔄 Обновить каталог',
-        'btn.lang': 'Language: EN',
-        'btn.lang.title': 'Переключить на английский',
         'col.type': 'Тип',
         'col.plugin': 'Имя плагина',
         'col.installed': 'Установлена',
@@ -109,6 +128,29 @@ const STRINGS = {
         'history.error': 'Не удалось загрузить историю: {err}',
         'dialog.ok': 'ОК',
         'dialog.cancel': 'Отмена',
+        'btn.settings': '⚙ Настройки',
+        'settings.title': 'Настройки',
+        'settings.save_hint': 'Все изменения сохраняются сами',
+        'settings.close': 'Закрыть',
+        'settings.nav.appearance': 'Оформление',
+        'settings.nav.language': 'Язык',
+        'settings.nav.about': 'О программе',
+        'settings.appearance': 'Тема и размер шрифта',
+        'settings.theme': 'Тема',
+        'settings.theme.light': 'Светлая',
+        'settings.theme.light.desc': 'По умолчанию',
+        'settings.theme.dark': 'Тёмная',
+        'settings.theme.dark.desc': 'Бережёт глаза',
+        'settings.theme.system': 'Как в системе',
+        'settings.theme.system.desc': 'Переключается сама',
+        'settings.font': 'Размер шрифта',
+        'settings.language': 'Язык интерфейса',
+        'settings.lang.en': 'English',
+        'settings.lang.ru': 'Русский',
+        'settings.about': 'О TotalPlug',
+        'about.desc': 'TotalPlug сканирует плагины Total Commander из wincmd.ini, определяет установленные версии, сравнивает их с общественным каталогом и безопасно обновляет с резервной копией и откатом.',
+        'about.catalog': 'Каталог плагинов',
+        'about.records': 'Данные хранятся в %APPDATA%\\TotalPlug',
     },
 };
 
@@ -123,8 +165,8 @@ export function currentLang() {
     return lang;
 }
 
-export function toggleLang() {
-    lang = lang === 'en' ? 'ru' : 'en';
+export function setLang(next) {
+    lang = next === 'ru' ? 'ru' : 'en';
     localStorage.setItem(LANG_KEY, lang);
 }
 

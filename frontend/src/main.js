@@ -1,7 +1,8 @@
 import './style.css';
 import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory } from '../wailsjs/go/main/App';
-import { EventsOn } from '../wailsjs/runtime';
-import { t, currentLang, toggleLang } from './i18n.js';
+import { EventsOn, BrowserOpenURL } from '../wailsjs/runtime';
+import { t, currentLang, setLang } from './i18n.js';
+import { currentTheme, setTheme, currentScale, setScale } from './theme.js';
 
 const app = document.getElementById('app');
 
@@ -13,10 +14,15 @@ let statusEl, tbody, btnScan, btnRefresh;
 let editorDialog, editorForm, editorPluginEl, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
 let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
+let settingsDialog, fontScaleEl, fontScaleValueEl;
 let dialogResolve = null;
 
+// Settings keeps no server-side state, so the last opened section survives
+// the DOM rebuild that a language switch triggers.
+let settingsSection = 'appearance';
+
 // In-app replacement for native confirm()/alert(): those render with the
-// "wails.localhost" origin header and cannot be styled or moved.
+// "wails.localhost" origin header and cannot be styled.
 function openAppDialog(message, isConfirm) {
     return new Promise((resolve) => {
         dialogResolve = resolve;
@@ -33,29 +39,6 @@ function settleAppDialog(result) {
         dialogResolve(result);
         dialogResolve = null;
     }
-}
-
-function makeDraggable(dlg, handle) {
-    handle.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
-        const rect = dlg.getBoundingClientRect();
-        // Switch from the UA-centered layout to explicit coordinates once.
-        dlg.style.margin = '0';
-        dlg.style.left = rect.left + 'px';
-        dlg.style.top = rect.top + 'px';
-        const dx = e.clientX - rect.left;
-        const dy = e.clientY - rect.top;
-        const move = (ev) => {
-            dlg.style.left = Math.max(0, Math.min(window.innerWidth - rect.width, ev.clientX - dx)) + 'px';
-            dlg.style.top = Math.max(0, Math.min(window.innerHeight - 30, ev.clientY - dy)) + 'px';
-        };
-        const up = () => {
-            handle.removeEventListener('pointermove', move);
-            handle.removeEventListener('pointerup', up);
-        };
-        handle.addEventListener('pointermove', move);
-        handle.addEventListener('pointerup', up);
-    });
 }
 
 function getStatusBadge(status) {
@@ -104,7 +87,7 @@ function renderTable(plugins) {
                 <td><strong>${p.type}</strong></td>
                 <td>${p.name}</td>
                 <td><code>${p.installed_version}</code></td>
-                <td><small style="color:#aaa">${p.confidence}</small></td>
+                <td><small style="color:var(--text-muted)">${p.confidence}</small></td>
                 <td><code>${p.latest_version || '-'}</code></td>
                 <td>${getStatusBadge(p.status)}</td>
                 <td>
@@ -202,6 +185,28 @@ async function openHistory() {
     }
 }
 
+function refreshSettingsState() {
+    settingsDialog.querySelectorAll('[data-theme-choice]').forEach((el) => {
+        el.classList.toggle('selected', el.dataset.themeChoice === currentTheme());
+    });
+    settingsDialog.querySelectorAll('[data-lang-choice]').forEach((el) => {
+        el.classList.toggle('selected', el.dataset.langChoice === currentLang());
+    });
+    fontScaleEl.value = String(currentScale());
+    fontScaleValueEl.textContent = currentScale() + '%';
+    settingsDialog.querySelectorAll('.settings-nav button').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.panel === settingsSection);
+    });
+    settingsDialog.querySelectorAll('.settings-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.id === 'panel-' + settingsSection);
+    });
+}
+
+function openSettings() {
+    refreshSettingsState();
+    settingsDialog.showModal();
+}
+
 function buildDom() {
     app.innerHTML = `
       <div class="header">
@@ -210,10 +215,10 @@ function buildDom() {
           <div class="status-bar" id="status">${t('status.initial')}</div>
         </div>
         <div class="actions">
-          <button id="btn-lang" class="btn-lang" title="${t('btn.lang.title')}">${t('btn.lang')}</button>
           <button id="btn-history" class="btn-history">${t('btn.history')}</button>
+          <button id="btn-settings" class="btn-history">${t('btn.settings')}</button>
           <button id="btn-scan">${t('btn.scan')}</button>
-          <button id="btn-refresh" style="background:#555">${t('btn.refresh')}</button>
+          <button id="btn-refresh" class="btn-secondary">${t('btn.refresh')}</button>
         </div>
       </div>
       <div class="table-container">
@@ -280,6 +285,69 @@ function buildDom() {
           <button type="button" id="app-dialog-cancel">${t('dialog.cancel')}</button>
         </div>
       </dialog>
+
+      <dialog id="settings-dialog">
+        <div class="settings-header">
+          <h2>${t('settings.title')}</h2>
+          <span class="settings-save-hint">${t('settings.save_hint')}</span>
+          <button type="button" class="btn-secondary" id="settings-close" title="${t('settings.close')}">✕</button>
+        </div>
+        <div class="settings-body">
+          <div class="settings-nav">
+            <button type="button" data-panel="appearance">${t('settings.nav.appearance')}</button>
+            <button type="button" data-panel="language">${t('settings.nav.language')}</button>
+            <button type="button" data-panel="about">${t('settings.nav.about')}</button>
+          </div>
+          <div class="settings-panel" id="panel-appearance">
+            <h3>${t('settings.nav.appearance')}</h3>
+            <p class="section-desc">${t('settings.appearance')}</p>
+            <div class="section-label">${t('settings.theme')}</div>
+            <div class="theme-cards">
+              <div class="theme-card" data-theme-choice="light" role="button" tabindex="0">
+                <div class="theme-preview preview-light"></div>
+                <div class="name">${t('settings.theme.light')}</div>
+                <div class="desc">${t('settings.theme.light.desc')}</div>
+              </div>
+              <div class="theme-card" data-theme-choice="dark" role="button" tabindex="0">
+                <div class="theme-preview preview-dark"></div>
+                <div class="name">${t('settings.theme.dark')}</div>
+                <div class="desc">${t('settings.theme.dark.desc')}</div>
+              </div>
+              <div class="theme-card" data-theme-choice="system" role="button" tabindex="0">
+                <div class="theme-preview preview-system"></div>
+                <div class="name">${t('settings.theme.system')}</div>
+                <div class="desc">${t('settings.theme.system.desc')}</div>
+              </div>
+            </div>
+            <div class="section-label">${t('settings.font')}</div>
+            <div class="font-row">
+              <input type="range" id="font-scale" min="80" max="140" step="5">
+              <span class="font-value" id="font-scale-value">100%</span>
+            </div>
+          </div>
+          <div class="settings-panel" id="panel-language">
+            <h3>${t('settings.nav.language')}</h3>
+            <p class="section-desc">${t('settings.language')}</p>
+            <div class="lang-cards">
+              <div class="theme-card" data-lang-choice="en" role="button" tabindex="0">
+                <div class="name">${t('settings.lang.en')}</div>
+              </div>
+              <div class="theme-card" data-lang-choice="ru" role="button" tabindex="0">
+                <div class="name">${t('settings.lang.ru')}</div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-panel" id="panel-about">
+            <h3>${t('settings.nav.about')}</h3>
+            <div class="about-name">TotalPlug</div>
+            <p class="about-desc">${t('about.desc')}</p>
+            <div class="about-links">
+              <button type="button" class="btn-secondary" id="link-catalog">${t('about.catalog')}</button>
+            </div>
+            <p class="editor-hint">${t('about.records')}</p>
+          </div>
+        </div>
+      </dialog>
     `;
 
     statusEl = document.getElementById('status');
@@ -299,21 +367,48 @@ function buildDom() {
     appDialogMsg = document.getElementById('app-dialog-msg');
     appDialogOk = document.getElementById('app-dialog-ok');
     appDialogCancel = document.getElementById('app-dialog-cancel');
+    settingsDialog = document.getElementById('settings-dialog');
+    fontScaleEl = document.getElementById('font-scale');
+    fontScaleValueEl = document.getElementById('font-scale-value');
 
     btnScan.addEventListener('click', () => runScan(false));
     btnRefresh.addEventListener('click', () => runScan(true));
     document.getElementById('btn-history').addEventListener('click', openHistory);
+    document.getElementById('btn-settings').addEventListener('click', openSettings);
 
-    makeDraggable(appDialog, document.getElementById('app-dialog-header'));
-    makeDraggable(editorDialog, editorDialog.querySelector('h2'));
-    makeDraggable(historyDialog, historyDialog.querySelector('h2'));
     appDialogOk.addEventListener('click', () => { settleAppDialog(true); appDialog.close(); });
     appDialogCancel.addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
     // Esc or any other dismissal path must resolve a pending confirm as "no".
     appDialog.addEventListener('close', () => settleAppDialog(false));
-    document.getElementById('btn-lang').addEventListener('click', () => {
-        toggleLang();
-        buildDom();
+
+    document.getElementById('settings-close').addEventListener('click', () => settingsDialog.close());
+    settingsDialog.querySelectorAll('.settings-nav button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            settingsSection = btn.dataset.panel;
+            refreshSettingsState();
+        });
+    });
+    settingsDialog.querySelectorAll('[data-theme-choice]').forEach((card) => {
+        card.addEventListener('click', () => {
+            setTheme(card.dataset.themeChoice);
+            refreshSettingsState();
+        });
+    });
+    fontScaleEl.addEventListener('input', () => {
+        setScale(Number(fontScaleEl.value));
+        fontScaleValueEl.textContent = currentScale() + '%';
+    });
+    settingsDialog.querySelectorAll('[data-lang-choice]').forEach((card) => {
+        card.addEventListener('click', () => {
+            setLang(card.dataset.langChoice);
+            // buildDom() replaces the whole tree (open dialogs included),
+            // so reopen settings to keep the user where they were.
+            buildDom();
+            openSettings();
+        });
+    });
+    document.getElementById('link-catalog').addEventListener('click', () => {
+        BrowserOpenURL('https://sergey.is-a.dev/totalplug-catalog/');
     });
 
     editorForm.addEventListener('submit', async (e) => {
@@ -330,7 +425,7 @@ function buildDom() {
     }
 }
 
-// Фоновое обновление каталога (запускается Go-мостом после каждого скана)
+// Background catalog refresh (pushed by the Go bridge after every scan)
 EventsOn('plugins:refreshed', (plugins) => {
     if (!plugins || plugins.length === 0) return;
     currentPlugins = plugins;
@@ -344,5 +439,5 @@ EventsOn('plugins:refresh:failed', (msg) => {
 
 buildDom();
 
-// Автозапуск кэш-скана при старте окна (без сетевого ожидания)
+// Startup: cache-only scan, no network wait before the window is useful
 runScan(false);
