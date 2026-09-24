@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"totalplug/internal/domain"
 )
@@ -84,8 +86,8 @@ func TestBackupPluginCopiesTreeKeepingOriginal(t *testing.T) {
 	}
 
 	for rel, want := range map[string]string{
-		"demo.wdx":         "binary",
-		"readme.txt":       "readme",
+		"demo.wdx":                       "binary",
+		"readme.txt":                     "readme",
 		filepath.Join("sub", "data.bin"): "data",
 	} {
 		if got := readTestFile(t, filepath.Join(backupDir, rel)); got != want {
@@ -102,8 +104,8 @@ func TestUpdatePluginSuccessKeepsBackup(t *testing.T) {
 	writeTestFile(t, filepath.Join(pluginDir, "keep.txt"), "extra-file")
 
 	downloadURL := serveTestZip(t, buildTestZip(t, map[string]string{
-		"demo.dll":        "new-dll",
-		"docs/info.txt":   "release-notes",
+		"demo.dll":      "new-dll",
+		"docs/info.txt": "release-notes",
 	}))
 
 	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
@@ -262,5 +264,107 @@ func TestDownloadFileEnforcesSizeCap(t *testing.T) {
 		if !errors.Is(err, ErrDownloadTooLarge) {
 			t.Errorf("DownloadFile(%s) error = %v, want ErrDownloadTooLarge", url, err)
 		}
+	}
+}
+
+func TestPruneOldBackups(t *testing.T) {
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "MyPlugin")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	names := []string{
+		"MyPlugin.bak_1001", "MyPlugin.bak_1003", "MyPlugin.bak_1002",
+		"MyPlugin.bak_manual", "Other.bak_9999", "MyPlugin.bak_plain",
+	}
+	for _, n := range names {
+		if err := os.MkdirAll(filepath.Join(dir, n), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTestFile(t, filepath.Join(pluginDir, "plugin.dll"), "core")
+
+	removed, err := PruneOldBackups(pluginDir, 2)
+	if err != nil {
+		t.Fatalf("PruneOldBackups: %v", err)
+	}
+	if len(removed) != 1 || filepath.Base(removed[0]) != "MyPlugin.bak_1001" {
+		t.Errorf("removed = %v, want only MyPlugin.bak_1001", removed)
+	}
+
+	for _, keep := range []string{"MyPlugin.bak_1003", "MyPlugin.bak_1002", "MyPlugin.bak_manual", "Other.bak_9999", "MyPlugin.bak_plain"} {
+		if _, err := os.Stat(filepath.Join(dir, keep)); err != nil {
+			t.Errorf("%s must survive pruning: %v", keep, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "MyPlugin.bak_1001")); !os.IsNotExist(err) {
+		t.Error("oldest backup was not deleted")
+	}
+	if _, err := os.Stat(filepath.Join(pluginDir, "plugin.dll")); err != nil {
+		t.Errorf("plugin dir must stay untouched: %v", err)
+	}
+}
+
+func TestPruneOldBackupsNoopWithinKeepLimit(t *testing.T) {
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "P")
+	if err := os.MkdirAll(filepath.Join(pluginDir), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "P.bak_1"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	removed, err := PruneOldBackups(pluginDir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != nil {
+		t.Errorf("removed = %v, want nil", removed)
+	}
+}
+
+func TestUpdatePluginPrunesOldBackups(t *testing.T) {
+	dir := t.TempDir()
+	pluginDir := filepath.Join(dir, "WCX")
+	pluginFile := filepath.Join(pluginDir, "test.wcx")
+	writeTestFile(t, pluginFile, "old")
+
+	// Backups are siblings of the plugin directory; seeded ones use old
+	// timestamps so the fresh backup always sorts newest.
+	bakOld1 := fmt.Sprintf("WCX.bak_%d", time.Now().Add(-4*time.Hour).Unix())
+	bakOld2 := fmt.Sprintf("WCX.bak_%d", time.Now().Add(-3*time.Hour).Unix())
+	bakOld3 := fmt.Sprintf("WCX.bak_%d", time.Now().Add(-2*time.Hour).Unix())
+	for _, n := range []string{bakOld1, bakOld2, bakOld3} {
+		if err := os.MkdirAll(filepath.Join(dir, n), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	archive := buildTestZip(t, map[string]string{"test.wcx": "new"})
+	p := domain.Plugin{
+		Path:        pluginFile,
+		DownloadURL: serveTestZip(t, archive),
+	}
+	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), p)
+	if err != nil {
+		t.Fatalf("UpdatePlugin: %v", err)
+	}
+
+	// keep=3 out of 4 backups: the oldest seeded one must be pruned while the
+	// fresh backup returned to the caller survives.
+	if _, err := os.Stat(backupDir); err != nil {
+		t.Errorf("fresh backup must survive pruning: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, bakOld1)); !os.IsNotExist(err) {
+		t.Error("oldest seeded backup should have been pruned")
+	}
+	for _, n := range []string{bakOld2, bakOld3} {
+		if _, err := os.Stat(filepath.Join(dir, n)); err != nil {
+			t.Errorf("%s must survive pruning: %v", n, err)
+		}
+	}
+	if readTestFile(t, pluginFile) != "new" {
+		t.Error("plugin file was not updated")
 	}
 }
