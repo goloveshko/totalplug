@@ -1,5 +1,6 @@
 import './style.css';
 import { ScanPlugins, UpdatePlugin } from '../wailsjs/go/main/App';
+import { EventsOn } from '../wailsjs/runtime';
 
 const app = document.getElementById('app');
 
@@ -58,7 +59,7 @@ async function runScan(forceRefresh = false) {
     try {
         btnScan.disabled = true;
         btnRefresh.disabled = true;
-        statusEl.innerText = forceRefresh ? "Загрузка свежего каталога с GitHub..." : "Сканирование wincmd.ini и PE-ресурсов...";
+        statusEl.innerText = forceRefresh ? "Кэш показан, свежий каталог загружается в фоне..." : "Сканирование wincmd.ini и PE-ресурсов (каталог из кэша)...";
 
         currentPlugins = await ScanPlugins(forceRefresh);
 
@@ -120,5 +121,17 @@ window.handleUpdate = async function(index) {
 btnScan.addEventListener('click', () => runScan(false));
 btnRefresh.addEventListener('click', () => runScan(true));
 
-// Автозапуск сканирования при старте окна
+// Фоновое обновление каталога (запускается Go-мостом после каждого скана)
+EventsOn('plugins:refreshed', (plugins) => {
+    if (!plugins || plugins.length === 0) return;
+    currentPlugins = plugins;
+    renderTable(currentPlugins);
+    statusEl.innerText = `Данные из кэша, каталог обновлён. Плагинов: ${currentPlugins.length}`;
+});
+
+EventsOn('plugins:refresh:failed', (msg) => {
+    statusEl.innerText = `⚠ Фоновое обновление каталога не удалось: ${msg}`;
+});
+
+// Автозапуск кэш-скана при старте окна (без сетевого ожидания)
 runScan(false);

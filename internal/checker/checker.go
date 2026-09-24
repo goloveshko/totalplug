@@ -12,11 +12,16 @@ import (
 
 type Checker struct {
 	forceRefresh bool
+	cacheOnly    bool
 }
 
-func NewChecker(forceRefresh bool) *Checker {
+// NewChecker creates an update checker. When cacheOnly is true the checker
+// never touches the network: it reads the catalog from disk ignoring its TTL
+// and skips live GitHub release lookups.
+func NewChecker(forceRefresh, cacheOnly bool) *Checker {
 	return &Checker{
 		forceRefresh: forceRefresh,
+		cacheOnly:    cacheOnly,
 	}
 }
 
@@ -172,9 +177,21 @@ func matchesPlugin(localPlugin domain.Plugin, entry CatalogEntry) bool {
 
 // CheckUpdates resolves installed plugins against the community catalog.
 func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]domain.Plugin, bool, error) {
-	catalog, fromCache, err := FetchCatalog(ctx, c.forceRefresh)
-	if err != nil {
-		return plugins, false, err
+	var catalog []CatalogEntry
+	fromCache := true
+
+	if c.cacheOnly {
+		// Best-effort: an absent or unreadable cache simply leaves the catalog
+		// empty; the plugin list is still valid for a fast first paint.
+		if cache, err := LoadCatalogFromCache(); err == nil {
+			catalog = cache.Snapshot.Plugins
+		}
+	} else {
+		var err error
+		catalog, fromCache, err = FetchCatalog(ctx, c.forceRefresh)
+		if err != nil {
+			return plugins, false, err
+		}
 	}
 
 	for i := range plugins {
@@ -186,7 +203,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		p.LastChecked = time.Now()
 
 		// 1. Check custom override source (e.g. "github:Alexey-T/CudaLister")
-		if strings.HasPrefix(p.CustomSource, "github:") {
+		if strings.HasPrefix(p.CustomSource, "github:") && !c.cacheOnly {
 			ghRepo := strings.TrimPrefix(p.CustomSource, "github:")
 			if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil {
 				p.LatestVersion = ghRelease.TagName

@@ -2,6 +2,7 @@
 package checker
 
 import (
+	"context"
 	"testing"
 
 	"totalplug/internal/domain"
@@ -96,5 +97,67 @@ func TestClassifyUpdate(t *testing.T) {
 					tt.installed, tt.latest, tt.confidence, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCheckUpdatesCacheOnly(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	ctx := context.Background()
+
+	// Seed a disk cache with one resolvable entry.
+	snapshot := CatalogSnapshot{Plugins: []CatalogEntry{{
+		ID:   "demo-lister",
+		Name: "Demo",
+		Type: "lister",
+		Match: MatchRule{
+			Filenames: []string{"demo.wlx64"},
+		},
+		Resolved: &ResolvedSource{
+			Version:     "2.0",
+			DownloadURL: "https://example.invalid/demo.zip",
+		},
+	}}}
+	if err := SaveCatalogToCache(snapshot); err != nil {
+		t.Fatal(err)
+	}
+
+	plugins := []domain.Plugin{
+		{ID: "wlx_Demo", Name: "Demo", Path: `C:\tc\plugins\demo\demo.wlx64`,
+			InstalledVersion: "1.0", Confidence: domain.ConfidenceExact, Status: domain.StatusUpToDate},
+		// Unknown custom source must NOT trigger a network call in cache-only mode.
+		{ID: "wlx_Ghost", Name: "Ghost", Path: `C:\tc\plugins\ghost\ghost.wlx`,
+			InstalledVersion: "1.0", Confidence: domain.ConfidenceExact, Status: domain.StatusUpToDate,
+			CustomSource: "github:ghost-cause/ghost-repo"},
+	}
+
+	got, fromCache, err := NewChecker(false, true).CheckUpdates(ctx, plugins)
+	if err != nil {
+		t.Fatalf("cache-only check must never fail on network state: %v", err)
+	}
+	if !fromCache {
+		t.Error("cache-only check should report fromCache=true")
+	}
+
+	demo, ghost := got[0], got[1]
+	if demo.LatestVersion != "2.0" || demo.Status != domain.StatusUpdateAvail || demo.DownloadURL == "" {
+		t.Errorf("cached catalog entry not applied: %+v", demo)
+	}
+	if ghost.LatestVersion != "N/A (Not in catalog)" || ghost.Status != domain.StatusUpToDate {
+		t.Errorf("github custom source should be skipped offline, got: %+v", ghost)
+	}
+}
+
+func TestCheckUpdatesCacheOnlyWithoutCache(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+
+	plugins := []domain.Plugin{{ID: "wlx_X", Name: "X", Path: `C:\tc\x.wlx`,
+		InstalledVersion: "1.0", Confidence: domain.ConfidenceExact, Status: domain.StatusUpToDate}}
+
+	got, fromCache, err := NewChecker(true, true).CheckUpdates(context.Background(), plugins)
+	if err != nil || !fromCache {
+		t.Fatalf("missing cache with cacheOnly must be non-fatal: err=%v fromCache=%v", err, fromCache)
+	}
+	if got[0].LatestVersion != "N/A (Not in catalog)" {
+		t.Errorf("expected unresolved plugin, got %+v", got[0])
 	}
 }

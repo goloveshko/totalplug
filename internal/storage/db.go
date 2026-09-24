@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"totalplug/internal/domain"
@@ -19,6 +20,9 @@ type Record struct {
 }
 
 type Database struct {
+	// mu guards records/overrides: background GUI scans read them while
+	// SaveOverride writes.
+	mu            sync.RWMutex
 	filePath      string
 	overridesPath string
 	records       map[string]Record
@@ -96,7 +100,8 @@ func (db *Database) LoadOverrides() error {
 	return readJSONFile(db.overridesPath, &db.overrides)
 }
 
-func (db *Database) SaveOverrides() error {
+// saveOverridesLocked serializes the current overrides map; callers must hold mu.
+func (db *Database) saveOverridesLocked() error {
 	file, err := os.Create(db.overridesPath)
 	if err != nil {
 		return err
@@ -108,13 +113,24 @@ func (db *Database) SaveOverrides() error {
 	return encoder.Encode(db.overrides)
 }
 
+func (db *Database) SaveOverrides() error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	return db.saveOverridesLocked()
+}
+
 func (db *Database) SetUserOverride(pluginID string, override domain.Override) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
 	db.overrides[pluginID] = override
-	return db.SaveOverrides()
+	return db.saveOverridesLocked()
 }
 
 // ApplyOverrides applies user-defined names, versions, and sources.
 func (db *Database) ApplyOverrides(plugins []domain.Plugin) []domain.Plugin {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
 	for i := range plugins {
 		p := &plugins[i]
 

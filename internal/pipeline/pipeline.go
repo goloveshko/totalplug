@@ -20,6 +20,7 @@ import (
 type Options struct {
 	IniPath      string // explicit wincmd.ini for portable installs; empty = auto-detect
 	ForceRefresh bool   // bypass the 24h catalog cache
+	CacheOnly    bool   // never touch the network; catalog comes from disk cache
 }
 
 // Result carries everything an interface needs to render a scan.
@@ -83,7 +84,7 @@ func Scan(ctx context.Context, opts Options, db *storage.Database) (Result, erro
 		plugins = db.ApplyOverrides(plugins)
 	}
 
-	chk := checker.NewChecker(opts.ForceRefresh)
+	chk := checker.NewChecker(opts.ForceRefresh, opts.CacheOnly)
 	resolved, fromCache, catalogErr := chk.CheckUpdates(ctx, plugins)
 	if catalogErr == nil {
 		plugins = resolved
