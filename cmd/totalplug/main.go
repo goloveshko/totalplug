@@ -113,12 +113,13 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin) (succeeded int, fa
 			continue
 		}
 		fmt.Printf("  [⬆] %-18s %s -> %s (downloading...)\n", name, p.InstalledVersion, p.LatestVersion)
-		if err := upd.UpdatePlugin(ctx, p); err != nil {
+		backupDir, err := upd.UpdatePlugin(ctx, p)
+		if err != nil {
 			fmt.Printf("  [✗] %-18s %v\n", name, err)
 			failed++
 			continue
 		}
-		fmt.Printf("  [✓] %-18s updated to %s\n", name, p.LatestVersion)
+		fmt.Printf("  [✓] %-18s updated to %s (backup: %s)\n", name, p.LatestVersion, backupDir)
 		succeeded++
 	}
 	return succeeded, failed

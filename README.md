@@ -52,6 +52,8 @@ Non-interactive mode — applies every available update without prompting (for s
 go run cmd/totalplug/main.go --update-all
 ```
 > Close Total Commander before applying updates, otherwise locked plugin files will fail to replace.
+> Updates are safe by design: the plugin folder is backed up as `<dir>.bak_<timestamp>` next to it,
+> and any mid-apply failure is automatically rolled back to the previous state.
 
 ### Point to a Portable Total Commander Install
 ```bash

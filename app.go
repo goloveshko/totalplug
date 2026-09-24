@@ -76,5 +76,6 @@ func (a *App) SaveOverride(pluginID string, override domain.Override) error {
 
 // UpdatePlugin installs the latest version for the specified plugin
 func (a *App) UpdatePlugin(plugin domain.Plugin) error {
-	return a.updater.UpdatePlugin(a.ctx, plugin)
+	_, err := a.updater.UpdatePlugin(a.ctx, plugin)
+	return err
 }
