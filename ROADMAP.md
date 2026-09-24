@@ -70,16 +70,20 @@ and accepted debt we deliberately postponed.
 6. Binding contract note: `ScanPlugins(bool)` stable; `UpdatePlugin(domain.Plugin)` now
    returns `domain.UpdateResult` (bindings regenerated in-repo) — prefer additive changes.
 
-## GUI redesign (MQ Studio style) — stage 1 shipped
+## GUI redesign (MQ Studio style) — stages 1–2 shipped
 
 1. ~~**Themes + settings**~~ — done (`be2f6b0`, refined in `5078942`): light/dark/system via
    `<html data-theme>` CSS tokens; settings is a full-window view with a «‹ Back» button
    (MQ Studio style), language is a dropdown for future locales; theme/font-scale/language
    persist in localStorage. Error/confirm/history dialogs stay centered static modals —
    dragging was glitchy and removed by user request.
-2. **Toolbar + plugin card**: search/filter, GitHub and settings quick buttons under
-   the titlebar; per-plugin detail dialog (version/source editing) designed to grow
-   into install-from-catalog ("Установить", catalog search and filters).
+2. ~~**Toolbar + plugin card**~~ — done (`421b995`): compact toolbar (title, search filter,
+   history/settings/refresh/scan buttons, all nowrap) with a single ellipsized status line
+   below it — the header no longer jumps when scan messages change length;
+   row click opens the plugin card (details + embedded version/source editor),
+   replacing the per-row "✎ версия" button. The card is the mount point for the
+   future install-from-catalog flow ("Установить", catalog search and filters).
+   GitHub quick link and true titlebar integration deferred to stage 3 (frameless).
 3. **Frameless window with Mica/Acrylic** (+ "window effect" switch in settings,
    solid fallback): own caption buttons, drag region, DPI edges — riskiest stage,
    kept as an isolated commit for easy rollback.
