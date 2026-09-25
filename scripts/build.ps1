@@ -2,7 +2,7 @@
 param (
     [Parameter(Position = 0)]
     [Alias("c", "cmd")]
-    [ValidateSet("build", "b", "release", "rel", "wails", "w", "run", "r", "lint", "l", "test", "t", "fmt")]
+    [ValidateSet("build", "b", "release", "rel", "gui", "g", "release-gui", "relg", "run", "r", "lint", "l", "test", "t", "fmt")]
     [string]$Action = "build",
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -13,18 +13,35 @@ $ErrorActionPreference = "Stop"
 Set-Location "$PSScriptRoot\.."
 
 $binDir = "bin"
-$binPath = "$binDir/totalplug.exe"
+$cliPath = "$binDir/totalplug-cli.exe"
+$guiPath = "$binDir/totalplug.exe"
+# Wails always compiles into build/bin ("-o" only renames the file inside it), so
+# the GUI artifact is copied next to the CLI one to keep bin/ the only folder a
+# user needs.
+$wailsDir = "build/bin"
+$wailsExe = "$wailsDir/totalplug.exe"
 
 function Ensure-BinDir {
     if (!(Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir | Out-Null }
 }
 
 function Show-BinarySize {
-    param([string]$Path = $binPath)
+    param([string]$Path = $cliPath)
     if (Test-Path $Path) {
         $sizeMB = [math]::Round((Get-Item $Path).Length / 1MB, 2)
         Write-Host "Binary size: $sizeMB MB ($Path)" -ForegroundColor Gray
     }
+}
+
+function Copy-GuiArtifact {
+    if (!(Test-Path $wailsExe)) {
+        Write-Host "`n❌ Wails left no $wailsExe behind — nothing to publish." -ForegroundColor Red
+        exit 1
+    }
+    Ensure-BinDir
+    Copy-Item $wailsExe $guiPath -Force
+    Write-Host "`n✔ GUI build ready!" -ForegroundColor Green
+    Show-BinarySize $guiPath
 }
 
 function Invoke-Build {
@@ -35,7 +52,7 @@ function Invoke-Build {
     Ensure-BinDir
 
     Write-Host "Compiling development CLI binary..." -ForegroundColor Yellow
-    go build -o $binPath ./cmd/totalplug
+    go build -o $cliPath ./cmd/totalplug
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✔ CLI build successful!" -ForegroundColor Green
@@ -57,7 +74,7 @@ function Invoke-Release {
     $env:CGO_ENABLED = "0"
 
     Write-Host "Compiling optimized release binary (-trimpath -ldflags='-s -w')..." -ForegroundColor Yellow
-    go build -trimpath -ldflags="-s -w" -o $binPath ./cmd/totalplug
+    go build -trimpath -ldflags="-s -w" -o $cliPath ./cmd/totalplug
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✔ Release CLI build ready!" -ForegroundColor Green
@@ -66,7 +83,7 @@ function Invoke-Release {
         # Optional UPX compression if available
         if (Get-Command upx -ErrorAction SilentlyContinue) {
             Write-Host "`nCompressing binary with UPX..." -ForegroundColor Yellow
-            upx --best --lzma $binPath
+            upx --best --lzma $cliPath
             Show-BinarySize
         }
     } else {
@@ -75,26 +92,50 @@ function Invoke-Release {
     }
 }
 
-function Invoke-Wails {
-    Write-Host "======================================" -ForegroundColor Cyan
-    Write-Host "    Building TotalPlug (Wails GUI)    " -ForegroundColor Cyan
-    Write-Host "======================================" -ForegroundColor Cyan
-
+function Test-WailsCli {
     if (!(Get-Command wails -ErrorAction SilentlyContinue)) {
         Write-Host "❌ Wails CLI not found in PATH! Install via: go install github.com/wailsapp/wails/v2/cmd/wails@latest" -ForegroundColor Red
         exit 1
     }
+}
 
-    Write-Host "Compiling production Wails GUI application..." -ForegroundColor Yellow
-    wails build -platform windows/amd64 -clean
+# Neither GUI profile passes wails' "-clean": it deletes build/bin as its very first
+# step, and a handle on that directory (IDE/Defender watcher, a TC or Explorer tab,
+# a shell cwd) makes the build fail AFTER the previous exe is already gone. File
+# deletes still work, so the release profile clears the old binary by name instead.
+function Invoke-Gui {
+    Test-WailsCli
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "`n✔ Wails GUI build ready!" -ForegroundColor Green
-        Show-BinarySize "build/bin/totalplug.exe"
-    } else {
+    Write-Host "======================================" -ForegroundColor Cyan
+    Write-Host "     Building TotalPlug (GUI, dev)    " -ForegroundColor Cyan
+    Write-Host "======================================" -ForegroundColor Cyan
+
+    wails build -platform windows/amd64 @ArgsList
+
+    if ($LASTEXITCODE -ne 0) {
         Write-Host "`n❌ Wails build failed!" -ForegroundColor Red
         exit $LASTEXITCODE
     }
+    Copy-GuiArtifact
+}
+
+function Invoke-ReleaseGui {
+    Test-WailsCli
+
+    Write-Host "======================================" -ForegroundColor Cyan
+    Write-Host "   Building TotalPlug (GUI, release)  " -ForegroundColor Cyan
+    Write-Host "======================================" -ForegroundColor Cyan
+
+    if (Test-Path $wailsExe) { Remove-Item $wailsExe -Force }
+
+    # -trimpath only: wails' production build already passes "-s -w" to the compiler.
+    wails build -platform windows/amd64 -trimpath @ArgsList
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`n❌ Wails release build failed!" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    Copy-GuiArtifact
 }
 
 function Invoke-Run {
@@ -145,11 +186,12 @@ function Invoke-Fmt {
 
 # Router
 switch ($Action) {
-    { $_ -in "build", "b" }     { Invoke-Build }
-    { $_ -in "release", "rel" } { Invoke-Release }
-    { $_ -in "wails", "w" }     { Invoke-Wails }
-    { $_ -in "run",   "r" }     { Invoke-Run }
-    { $_ -in "lint",  "l" }     { Invoke-Lint }
-    { $_ -in "test",  "t" }     { Invoke-Test }
-    { $_ -in "fmt" }            { Invoke-Fmt }
+    { $_ -in "build", "b" }                { Invoke-Build }
+    { $_ -in "release", "rel" }            { Invoke-Release }
+    { $_ -in "gui", "g" }                  { Invoke-Gui }
+    { $_ -in "release-gui", "relg" }       { Invoke-ReleaseGui }
+    { $_ -in "run",   "r" }                { Invoke-Run }
+    { $_ -in "lint",  "l" }                { Invoke-Lint }
+    { $_ -in "test",  "t" }                { Invoke-Test }
+    { $_ -in "fmt" }                       { Invoke-Fmt }
 }
