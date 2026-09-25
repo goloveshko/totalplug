@@ -93,9 +93,11 @@ and accepted debt we deliberately postponed.
    `display:flex` overrode the UA `[hidden]` rule); scan icon became a bolt (the
    magnifier read as search), focus ring softened to accent, «Back» demoted to a
    quiet ghost button.
-   Polished in `e27cace`: settings column centered (880px); app dialog lost its
-   "TotalPlug" title bar for a corner ✕; update errors now lead with a localized
-   friendly sentence and any URLs in dialog text open in the system browser.
+   Polished in `e27cace`/`5843297`: app dialog lost its "TotalPlug" title bar for a
+   corner ✕ (clear of the text); update errors lead with a localized friendly sentence,
+   a named "Open plugin page" link opens in the system browser, and the raw Go error
+   sits collapsed under «Technical details»; settings stay full-width with only the
+   «Settings» heading centered.
    Mica/Acrylic reverted in `8681d38`: the translucent window washed out the themed UI
    (dark theme + Acrylic showed a semi-transparent titlebar) and the backdrop cannot be
    changed without recreating the window. The window is now always solid; the effect
