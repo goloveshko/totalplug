@@ -117,7 +117,7 @@ func TestCheckUpdatesCacheOnly(t *testing.T) {
 			DownloadURL: "https://example.invalid/demo.zip",
 		},
 	}}}
-	if err := SaveCatalogToCache(snapshot); err != nil {
+	if err := SaveCatalogToCache(snapshot, ""); err != nil {
 		t.Fatal(err)
 	}
 

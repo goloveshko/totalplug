@@ -11,13 +11,17 @@ import (
 )
 
 const (
-	// CommunityCatalogURL points to the minified JSON snapshot served by the
-	// totalplug-catalog Pages site (custom domain; identical content to
-	// catalog.resolved.json, just without pretty-printing).
-	CommunityCatalogURL = "https://sergey.is-a.dev/totalplug-catalog/catalog.min.json"
-	CacheTTL            = 24 * time.Hour
-	HTTPTimeout         = 12 * time.Second
+	// CacheTTL is how long a cached catalog snapshot is served without
+	// touching the network.
+	CacheTTL    = 24 * time.Hour
+	HTTPTimeout = 12 * time.Second
 )
+
+// CommunityCatalogURL points to the minified JSON snapshot served by the
+// totalplug-catalog Pages site (custom domain; identical content to
+// catalog.resolved.json, just without pretty-printing).
+// Declared as var so tests can point it at a local server.
+var CommunityCatalogURL = "https://sergey.is-a.dev/totalplug-catalog/catalog.min.json"
 
 // MatchRule defines how TotalPlug matches local files to catalog items.
 type MatchRule struct {
@@ -75,6 +79,7 @@ type CatalogSnapshot struct {
 // CatalogCache represents disk cache structure on the client.
 type CatalogCache struct {
 	UpdatedAt time.Time       `json:"updated_at"`
+	ETag      string          `json:"etag,omitempty"`
 	Snapshot  CatalogSnapshot `json:"snapshot"`
 }
 
@@ -110,10 +115,12 @@ func LoadCatalogFromCache() (*CatalogCache, error) {
 	return &cache, nil
 }
 
-// SaveCatalogToCache writes downloaded snapshot to local disk.
-func SaveCatalogToCache(snapshot CatalogSnapshot) error {
+// SaveCatalogToCache writes downloaded snapshot to local disk along with the
+// CDN ETag used for conditional revalidation.
+func SaveCatalogToCache(snapshot CatalogSnapshot, etag string) error {
 	return saveCacheAtomically(&CatalogCache{
 		UpdatedAt: time.Now().UTC(),
+		ETag:      etag,
 		Snapshot:  snapshot,
 	})
 }
@@ -143,47 +150,58 @@ func saveCacheAtomically(cache *CatalogCache) error {
 }
 
 // FetchCatalog retrieves the catalog from GitHub Pages CDN or returns 24h disk cache.
+// Once the TTL expires the CDN is revalidated with If-None-Match, so unchanged
+// catalogs cost a small 304 instead of a full ~700 KB download.
 func FetchCatalog(ctx context.Context, forceRefresh bool) ([]CatalogEntry, bool, error) {
-	// 1. Check local cache unless forceRefresh is requested
-	if !forceRefresh {
-		if cache, err := LoadCatalogFromCache(); err == nil {
-			if time.Since(cache.UpdatedAt) < CacheTTL && len(cache.Snapshot.Plugins) > 0 {
-				return cache.Snapshot.Plugins, true, nil // true = loaded from local cache
-			}
-		}
+	cache, cacheErr := LoadCatalogFromCache()
+	haveCache := cacheErr == nil && len(cache.Snapshot.Plugins) > 0
+
+	// 1. Serve fresh cache without touching the network.
+	if !forceRefresh && haveCache && time.Since(cache.UpdatedAt) < CacheTTL {
+		return cache.Snapshot.Plugins, true, nil
 	}
 
-	// 2. HTTP GET to our GitHub Pages endpoint
+	// 2. HTTP GET to our GitHub Pages endpoint, revalidating when possible.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, CommunityCatalogURL, nil)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "TotalPlug/1.0 (Total Commander Plugin Manager)")
+	if haveCache && cache.ETag != "" {
+		req.Header.Set("If-None-Match", cache.ETag)
+	}
 
 	client := &http.Client{Timeout: HTTPTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		// Offline fallback: try to use expired cache if network is unavailable
-		if cache, cacheErr := LoadCatalogFromCache(); cacheErr == nil && len(cache.Snapshot.Plugins) > 0 {
+		if haveCache {
 			return cache.Snapshot.Plugins, true, nil
 		}
 		return nil, false, fmt.Errorf("network request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// 3. Content unchanged: refresh the cache timestamp, keep the snapshot.
+	if resp.StatusCode == http.StatusNotModified && haveCache {
+		cache.UpdatedAt = time.Now().UTC()
+		_ = saveCacheAtomically(cache)
+		return cache.Snapshot.Plugins, true, nil
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, false, fmt.Errorf("HTTP error: %s", resp.Status)
 	}
 
-	// 3. Decode JSON snapshot
+	// 4. Decode JSON snapshot
 	var snapshot CatalogSnapshot
 	if err := json.NewDecoder(resp.Body).Decode(&snapshot); err != nil {
 		return nil, false, fmt.Errorf("failed to decode catalog JSON: %w", err)
 	}
 
-	// 4. Save to local cache
+	// 5. Save to local cache with the new ETag for future revalidation.
 	if len(snapshot.Plugins) > 0 {
-		_ = SaveCatalogToCache(snapshot)
+		_ = SaveCatalogToCache(snapshot, resp.Header.Get("ETag"))
 	}
 
 	return snapshot.Plugins, false, nil // false = fetched fresh from web
