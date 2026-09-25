@@ -33,3 +33,28 @@ jobs:
 
       - name: Compile CLI Binary
         run: go build -v ./cmd/totalplug
+
+  # The GUI binary is built by `wails build` locally only, so at least the
+  # frontend contract (imports + production bundle) gets checked here.
+  frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
