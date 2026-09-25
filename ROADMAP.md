@@ -122,11 +122,12 @@ and accepted debt we deliberately postponed.
    data, green when the background update lands, red when it fails; the tooltip
    gets the matching localized phrase and the state survives the language-switch
    DOM rebuild.
-6. **Plugin counter chip** — done (`c9906b6`): a pill next to the TotalPlug
-   titlebar title shows the number of plugins; while the search filter hides
-   rows it switches to `shown/total`, and it disappears when nothing is loaded
-   or settings is open. The count lives in module state so it survives the
-   language-switch DOM rebuild.
+6. **Plugin counter chip** — done (`c9906b6`, labeled in `03c0b71`): a muted pill
+   next to the TotalPlug titlebar title shows «плагинов N» / "plugins N"; while
+   the search filter hides rows it switches to `shown/total`, and it disappears
+   when nothing is loaded or settings is open. The count lives in module state
+   so it survives the language-switch DOM rebuild. The status bar no longer
+   repeats the number («Каталог обновлён», «Сканирование завершено»).
 
 ## Backlog / accepted debt
 
