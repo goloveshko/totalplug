@@ -1,4 +1,5 @@
 import './style.css';
+import './mock.js'; // dev-only fake backend; compiles away in production builds
 import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory } from '../wailsjs/go/main/App';
 import { EventsOn, BrowserOpenURL, WindowMinimise, WindowToggleMaximise, Quit } from '../wailsjs/runtime';
 import { t, currentLang, setLang } from './i18n.js';
