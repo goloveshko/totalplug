@@ -23,6 +23,21 @@ let dialogResolve = null;
 // Progress dialog state: while an update runs, the dialog cannot be dismissed.
 let progressResolve = null;
 let progressRunning = false;
+// Catalog freshness shown as a colored dot on the refresh icon: cache (amber),
+// fresh (green), error (red). Survives the buildDom rebuild on language switch.
+let catalogState = '';
+const catalogStateLabels = { cache: 'refresh.state.cache', fresh: 'refresh.state.fresh', error: 'refresh.state.error' };
+
+function setCatalogState(state) {
+    catalogState = state || '';
+    if (!catalogState) {
+        delete btnRefresh.dataset.catalog;
+        btnRefresh.title = t('btn.refresh');
+        return;
+    }
+    btnRefresh.dataset.catalog = catalogState;
+    btnRefresh.title = `${t('btn.refresh')} — ${t(catalogStateLabels[catalogState])}`;
+}
 
 // Case-insensitive name filter from the toolbar search box; survives the DOM
 // rebuild on language switch, like the settings state below.
@@ -135,6 +150,9 @@ async function runScan(forceRefresh = false) {
         setStatus(forceRefresh ? t('scan.fresh') : t('scan.cached'));
 
         currentPlugins = await ScanPlugins(forceRefresh);
+        // Whatever the scan returned is cache-first; the network refresh lands
+        // later through plugins:refreshed.
+        setCatalogState('cache');
 
         if (!currentPlugins || currentPlugins.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.none')}</td></tr>`;
@@ -517,6 +535,8 @@ function buildDom() {
     tbody = document.getElementById('plugins-body');
     btnScan = document.getElementById('btn-scan');
     btnRefresh = document.getElementById('btn-refresh');
+    // The refresh dot is state, not markup: restore it after the rebuild.
+    if (catalogState) setCatalogState(catalogState);
     searchEl = document.getElementById('plugin-search');
 
     cardDialog = document.getElementById('plugin-card');
@@ -654,10 +674,12 @@ EventsOn('plugins:refreshed', (plugins) => {
     if (!plugins || plugins.length === 0) return;
     currentPlugins = plugins;
     renderTable();
+    setCatalogState('fresh');
     setStatus(t('events.refreshed', { n: currentPlugins.length }));
 });
 
 EventsOn('plugins:refresh:failed', (msg) => {
+    setCatalogState('error');
     setStatus(t('events.refresh_failed', { msg }));
 });
 

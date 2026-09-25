@@ -134,6 +134,33 @@ body {
 .icon-btn.primary:hover {
     color: var(--accent-hover);
 }
+/* Catalog freshness dot on the refresh icon: amber = cached data awaiting the
+   background update, green = catalog fresh, red = last refresh failed. */
+#btn-refresh {
+    position: relative;
+}
+#btn-refresh::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: none;
+}
+#btn-refresh[data-catalog="cache"]::after {
+    display: block;
+    background: var(--badge-avail);
+}
+#btn-refresh[data-catalog="fresh"]::after {
+    display: block;
+    background: var(--badge-up);
+}
+#btn-refresh[data-catalog="error"]::after {
+    display: block;
+    background: var(--badge-err);
+}
 .caption-buttons {
     display: flex;
     height: 100%;
