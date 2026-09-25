@@ -47,16 +47,32 @@ const linkify = (escaped) => escaped.replace(
     '<a href="$1" class="dlg-link">$1</a>',
 );
 
-function openAppDialog(message, isConfirm) {
+function openAppDialog(html, isConfirm) {
     return new Promise((resolve) => {
         dialogResolve = resolve;
-        appDialogMsg.innerHTML = linkify(escapeHtml(message));
+        appDialogMsg.innerHTML = html;
         appDialogCancel.style.display = isConfirm ? '' : 'none';
         appDialog.showModal();
     });
 }
-const showConfirm = (message) => openAppDialog(message, true);
-const showAlert = (message) => openAppDialog(message, false);
+const textToDialogHtml = (message) => linkify(escapeHtml(message));
+const showConfirm = (message) => openAppDialog(textToDialogHtml(message), true);
+const showAlert = (message) => openAppDialog(textToDialogHtml(message), false);
+
+// Raw Go errors are technical English; show the localized friendly sentence
+// with a named plugin-page link and hide the exact error behind a disclosure.
+function errorDialogHtml(err, friendlyMessage) {
+    const raw = String(err?.message ?? err);
+    const urlMatch = raw.match(/https?:\/\/[^\s]+/);
+    let html = escapeHtml(friendlyMessage);
+    if (urlMatch) {
+        html += '\n<a href="' + escapeHtml(urlMatch[0]) + '" class="dlg-link">' +
+            escapeHtml(t('dialog.plugin_page')) + '</a>';
+    }
+    html += '<details class="dlg-tech"><summary>' + escapeHtml(t('dialog.tech_details')) +
+        '</summary><div class="dlg-tech-body">' + linkify(escapeHtml(raw)) + '</div></details>';
+    return html;
+}
 
 function settleAppDialog(result) {
     if (dialogResolve) {
@@ -201,7 +217,7 @@ window.handleUpdate = async function(index) {
             : t('update.done', { name: plugin.name }));
         runScan(false);
     } catch (err) {
-        await showAlert(t('update.error_alert', { err }));
+        await openAppDialog(errorDialogHtml(err, t('update.error_friendly')), false);
         setStatus(t('update.error_status', { name: plugin.name }));
     }
 };
@@ -312,10 +328,8 @@ function buildDom() {
 
       <div id="view-settings" hidden>
         <div class="settings-top">
-          <div class="settings-top-left">
-            <button type="button" id="settings-back" class="btn-back">${t('settings.back')}</button>
-            <h2>${t('settings.title')}</h2>
-          </div>
+          <button type="button" id="settings-back" class="btn-back">${t('settings.back')}</button>
+          <h2>${t('settings.title')}</h2>
           <span class="settings-save-hint">${t('settings.save_hint')}</span>
         </div>
         <div class="settings-body">

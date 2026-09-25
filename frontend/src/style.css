@@ -276,13 +276,14 @@ tr:hover {
     width: 420px;
     max-width: 90vw;
 }
-/* No title bar: the dialog closes via OK/Cancel or this corner cross. */
+/* No title bar: the dialog closes via OK/Cancel or this corner cross. It sits
+   above the message strip so it never overlaps text. */
 .dlg-close {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 28px;
-    height: 28px;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     background: transparent;
     color: var(--text-muted);
@@ -291,13 +292,16 @@ tr:hover {
     align-items: center;
     justify-content: center;
 }
+#app-dialog {
+    padding-top: 34px;
+}
 .dlg-close:hover {
     background: var(--row-hover);
     color: var(--text-main);
 }
 .dlg-close svg {
-    width: 13px;
-    height: 13px;
+    width: 12px;
+    height: 12px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -313,6 +317,19 @@ tr:hover {
 }
 .dlg-message a.dlg-link {
     color: var(--accent);
+}
+.dlg-tech {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.dlg-tech summary {
+    cursor: pointer;
+    user-select: none;
+}
+.dlg-tech .dlg-tech-body {
+    margin-top: 6px;
+    user-select: text;
 }
 #history-dialog table {
     width: 100%;
@@ -435,29 +452,23 @@ dialog input:focus {
 #view-settings[hidden] {
     display: none;
 }
+/* Full-width page; only the «Settings» title is centered. */
 .settings-top {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     padding-bottom: 14px;
     border-bottom: 1px solid var(--border);
 }
-/* Center the settings column instead of pinning it to the left edge. */
-.settings-top,
-.settings-body {
-    width: 100%;
-    max-width: 880px;
-    margin-left: auto;
-    margin-right: auto;
-}
-.settings-top-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
 .settings-top h2 {
     margin: 0;
     font-size: 1.15rem;
+    text-align: center;
+}
+.settings-save-hint {
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--text-muted);
 }
 .btn-back {
     background: transparent;
@@ -470,10 +481,6 @@ dialog input:focus {
 .btn-back:hover {
     background: var(--row-hover);
     color: var(--text-main);
-}
-.settings-save-hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
 }
 .settings-body {
     display: flex;
