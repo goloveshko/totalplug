@@ -37,7 +37,7 @@ and accepted debt we deliberately postponed.
   totalplug-catalog repo.
 - Zip-slip guarded extraction.
 
-### CLI (`bin/totalplug.exe`)
+### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
 - Scan report with update summary table.
 - `--refresh-cache / -r`, `--ini <path> / -c` (portable installs),
   `--update / -u`, `--update-all`.
@@ -45,7 +45,7 @@ and accepted debt we deliberately postponed.
   (installed version unknown); `--update-all` never touches blind updates.
 - Non-zero exit code when any update fails.
 
-### GUI (Wails, `build/bin/totalplug.exe`)
+### GUI (Wails, `bin/totalplug.exe`, built by `scripts/build-gui.cmd`)
 - Interactive plugin dashboard with scan, filter and per-plugin update
   (commit `54aa8f4`); pre-existing Russian UI text.
 
@@ -53,6 +53,13 @@ and accepted debt we deliberately postponed.
 - GitHub Actions CI: Windows job (`go mod verify`, vet, `go test -race -cover ./...`,
   CLI build) plus an ubuntu job that runs `npm ci` and `npm run build`, so the
   frontend bundle is actually compiled on every push (`f6702e3`).
+- Build scripts: `scripts/build-gui.cmd` (daily GUI, no cleaning) and
+  `scripts/release-gui.cmd` (`-trimpath`, previous binary removed by name); both
+  copy Wails' output to `bin/totalplug.exe`, next to `bin/totalplug-cli.exe`, so
+  `bin/` is the single artifact folder. Wails' own `-clean` is deliberately unused:
+  it deletes `build/bin` as its first step, and a handle on that directory (IDE or
+  Defender watcher, a TC/Explorer tab, a shell cwd) then fails the build *after*
+  the old binary is already gone.
 - Hermetic unit tests for checker, config, CLI arg/prompt logic, pipeline ini resolution,
   storage and updater (httptest + in-memory zips).
 - Corrupt storage JSON is quarantined to `<file>.corrupt` and reported, not silently dropped.
@@ -257,8 +264,8 @@ and accepted debt we deliberately postponed.
   ready (no inline `onclick`, one delegated click handler), but the pre-paint
   theme/lang script in `index.html` must move to its own file (a static page cannot
   carry a nonce) and a strict `script-src` has to be verified against the
-  Wails-injected runtime on a live `wails build`.~~ Shipped in `28484d3` (stage 13);
-  only the live `build/bin/totalplug.exe` run is left.
+  Wails-injected runtime on a live `wails build`.~~ Shipped in `28484d3` and
+  confirmed on a live `totalplug.exe` (stage 13) — closed.
 - **Column sorting** (at least status and name) — deferred by the review; needs a
   sort state in `main.js` and stable ordering with the search filter.
 - **`domain.Config`** struct is dead code (TCPath/IniPath/Language/AutoCheck unwired);
