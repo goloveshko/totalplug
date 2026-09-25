@@ -76,7 +76,7 @@ and accepted debt we deliberately postponed.
 6. Binding contract note: `ScanPlugins(bool)` stable; `UpdatePlugin(domain.Plugin)` now
    returns `domain.UpdateResult` (bindings regenerated in-repo) — prefer additive changes.
 
-## GUI redesign (MQ Studio style) — all three stages shipped
+## GUI redesign (MQ Studio style) — stages shipped, polish ongoing
 
 1. ~~**Themes + settings**~~ — done (`be2f6b0`, refined in `5078942`): light/dark/system via
    `<html data-theme>` CSS tokens; settings is a full-window view with a «‹ Back» button
@@ -117,6 +117,11 @@ and accepted debt we deliberately postponed.
    download source URL; the final result (success + backup path, locked warning, or
    friendly error with technical details) replaces the progress in the same dialog.
    Not dismissable while running (Esc blocked, OK/✕ hidden until the end).
+5. **Catalog freshness dot** — done (`6b50114`): the refresh icon carries a colored
+   dot instead of status-bar wording — amber while the table shows cached catalog
+   data, green when the background update lands, red when it fails; the tooltip
+   gets the matching localized phrase and the state survives the language-switch
+   DOM rebuild.
 
 ## Backlog / accepted debt
 
