@@ -50,8 +50,10 @@ function installMockBackend() {
         SaveOverride(id, override) {
             const p = plugins.find((x) => x.id === id);
             if (!p) return Promise.reject('mock: unknown plugin ' + id);
-            if (override.custom_version) p.installed_version = override.custom_version;
-            if (override.custom_source) p.source = override.custom_source;
+            // Mirror the Go bridge: the record keeps the override itself and the
+            // effective source is the override, so the editor can prefill it.
+            if (override.custom_version) p.custom_version = p.installed_version = override.custom_version;
+            if (override.custom_source) p.custom_source = p.source = override.custom_source;
             reclassify(p);
             return Promise.resolve(null);
         },
