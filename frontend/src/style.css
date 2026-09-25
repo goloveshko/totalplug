@@ -546,6 +546,9 @@ dialog h2 {
 .card-info .v {
     user-select: text;
     min-width: 0;
+    /* A long URL has no break opportunities: without this it widens the dialog
+       until the horizontal scrollbar appears (overflow-y:auto forces overflow-x). */
+    overflow-wrap: anywhere;
 }
 .card-info code.path {
     word-break: break-all;
