@@ -128,6 +128,12 @@ and accepted debt we deliberately postponed.
    when nothing is loaded or settings is open. The count lives in module state
    so it survives the language-switch DOM rebuild. The status bar no longer
    repeats the number («Каталог обновлён», «Сканирование завершено»).
+7. **Status bar removed** — done (`8cdfeee`): the bar duplicated what the chip
+   and the freshness dot already say, so it is gone. Errors (scan failure,
+   override save, history load) now open the app dialog with friendly text +
+   technical details; a catalog URL in a scan error is labeled «Каталог
+   плагинов». Background refresh failures stay silent — the red dot's tooltip
+   carries the raw reason.
 
 ## Backlog / accepted debt
 
