@@ -256,17 +256,22 @@ function openCard(index) {
     editingPlugin = plugin;
     cardNameEl.textContent = plugin.name;
     cardSubEl.textContent = plugin.type + (plugin.arch ? ' · ' + plugin.arch : '');
+    const source = displaySource(plugin.source);
+    const sourceHtml = !source ? '—'
+        : /^https?:\/\//i.test(source)
+            ? `<a href="${escapeHtml(source)}" class="dlg-link">${escapeHtml(source)}</a>`
+            : `<code class="path">${escapeHtml(source)}</code>`;
     cardInfoEl.innerHTML =
         cardRow(t('col.installed'), `<code>${escapeHtml(plugin.installed_version)}</code> <small class="muted">${escapeHtml(plugin.confidence)}</small>`) +
         cardRow(t('col.latest'), plugin.latest_version ? `<code>${escapeHtml(plugin.latest_version)}</code>` : '—') +
         cardRow(t('col.status'), getStatusBadge(plugin.status)) +
-        cardRow(t('editor.source'), plugin.source ? `<code class="path">${escapeHtml(plugin.source)}</code>` : '—') +
+        cardRow(t('editor.source'), sourceHtml) +
         (plugin.web_url ? cardRow(t('card.home'), `<a href="${escapeHtml(plugin.web_url)}" class="dlg-link">${escapeHtml(plugin.web_url)}</a>`) : '') +
         cardRow(t('card.path'), `<code class="path">${escapeHtml(plugin.path)}</code>`);
 
     const auto = plugin.installed_version || '';
     editorVersionEl.value = /^(unknown|n\/a)/i.test(auto) ? '' : auto;
-    editorSourceEl.value = plugin.custom_source || '';
+    editorSourceEl.value = displaySource(plugin.custom_source);
 
     cardDialog.showModal();
 }
@@ -282,6 +287,13 @@ function normalizeSource(raw) {
         .replace(/\.git$/i, '')
         .replace(/\/+$/, '');
     return /^[\w.-]+\/[\w.-]+$/.test(s) ? `github:${s}` : raw.trim();
+}
+
+// Inverse of normalizeSource for the same value: the stored key stays compact,
+// the UI shows the page URL it came from (and re-folds it on save).
+function displaySource(source) {
+    const match = /^github:([\w.-]+\/[\w.-]+)\/?$/i.exec(source || '');
+    return match ? `https://github.com/${match[1]}` : (source || '');
 }
 
 async function saveOverrideFromEditor() {
