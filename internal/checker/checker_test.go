@@ -161,3 +161,34 @@ func TestCheckUpdatesCacheOnlyWithoutCache(t *testing.T) {
 		t.Errorf("expected unresolved plugin, got %+v", got[0])
 	}
 }
+
+func TestDownloadCandidates(t *testing.T) {
+	entry := CatalogEntry{
+		Resolved: &ResolvedSource{Version: "2.23", DownloadURL: "https://totalcmd.net/download.php?id=fi"},
+		AvailableSources: map[string]ResolvedSource{
+			// Same URL as resolved: must dedupe.
+			"totalcmd": {Version: "2.23", DownloadURL: "https://totalcmd.net/download.php?id=fi"},
+			// Same version, distinct URL: must be kept as a fallback.
+			"wincmd_ru": {Version: "2.23", DownloadURL: "https://wincmd.ru/files/1140597/mirror/wlx_fi_2.23.zip"},
+			// Different version: must not turn an update into a downgrade.
+			"old_mirror": {Version: "2.20", DownloadURL: "https://mirror.test/old.zip"},
+			// No version recorded: kept (URL carries the release).
+			"anonymous": {DownloadURL: "https://other.test/fi.zip"},
+		},
+	}
+
+	got := downloadCandidates(entry)
+	want := []string{
+		"https://totalcmd.net/download.php?id=fi",
+		"https://other.test/fi.zip",
+		"https://wincmd.ru/files/1140597/mirror/wlx_fi_2.23.zip",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("candidates = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("candidate[%d] = %q, want %q (order must be stable: primary first, then sorted by source name)", i, got[i], want[i])
+		}
+	}
+}

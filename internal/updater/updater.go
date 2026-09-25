@@ -193,6 +193,9 @@ func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error 
 	if err := validateDownloadURL(url); err != nil {
 		return err
 	}
+	// Announce the source before the request so mirror attempts are visible in
+	// the UI even when the server fails fast (404, redirect to dead host).
+	u.emit(domain.UpdateProgress{Phase: "download", Percent: -1, URL: url})
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -559,12 +562,29 @@ func rollback(dstDir, backupDir string, applied []string) error {
 	return nil
 }
 
+// downloadCandidates returns the ordered list of URLs to try for a plugin:
+// the checker-provided candidates when present, otherwise the single primary
+// URL. The primary stays first so mirrors are only used as fallback.
+func downloadCandidates(plugin domain.Plugin) []string {
+	if len(plugin.DownloadURLs) > 0 {
+		return plugin.DownloadURLs
+	}
+	if plugin.DownloadURL != "" {
+		return []string{plugin.DownloadURL}
+	}
+	return nil
+}
+
 // UpdatePlugin downloads an update, backs up the current plugin directory, and
 // applies the new files. If applying fails, the files touched so far are rolled
 // back from the backup. On success the backup directory is kept and returned,
 // and older backups beyond DefaultBackupsKept are pruned.
+//
+// Every candidate URL (primary + catalog mirrors) is tried until one yields a
+// usable archive; backup and apply happen only after a good package is secured.
 func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (string, error) {
-	if plugin.DownloadURL == "" {
+	candidates := downloadCandidates(plugin)
+	if len(candidates) == 0 {
 		return "", ErrEmptyDownloadURL
 	}
 
@@ -580,17 +600,35 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	defer os.RemoveAll(tmpDir)
 
 	archiveFile := filepath.Join(tmpDir, "package.archive")
-	if err := u.DownloadFile(ctx, plugin.DownloadURL, archiveFile); err != nil {
+	var format string
+	var lastErr error
+	for _, candidate := range candidates {
+		if err := u.DownloadFile(ctx, candidate, archiveFile); err != nil {
+			lastErr = fmt.Errorf("download failed: %w", err)
+			continue
+		}
+		f, err := detectArchiveFormat(archiveFile)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if f != "zip" && f != "rar" && f != "7z" {
+			lastErr = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, f)
+			continue
+		}
+		format = f
+		break
+	}
+	if format == "" {
 		// Broken catalog/upstream links are common (totalcmd.net download
 		// counters redirect to dead hosts), so point at the plugin page.
+		err := lastErr
 		if plugin.WebURL != "" {
-			return "", fmt.Errorf("download failed: %w; plugin page: %s", err, plugin.WebURL)
+			err = fmt.Errorf("%w; plugin page: %s", lastErr, plugin.WebURL)
 		}
-		return "", fmt.Errorf("download failed: %w", err)
-	}
-
-	format, err := detectArchiveFormat(archiveFile)
-	if err != nil {
+		if len(candidates) > 1 {
+			err = fmt.Errorf("all %d download sources failed, last: %w", len(candidates), err)
+		}
 		return "", err
 	}
 
@@ -603,11 +641,6 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 		err = u.ExtractRar(archiveFile, extractedDir)
 	case "7z":
 		err = u.Extract7z(archiveFile, extractedDir)
-	default:
-		err = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format)
-		if plugin.WebURL != "" {
-			err = fmt.Errorf("%w; plugin page: %s", err, plugin.WebURL)
-		}
 	}
 	if err != nil {
 		return "", fmt.Errorf("extraction failed: %w", err)

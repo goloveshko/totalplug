@@ -52,11 +52,14 @@ type Plugin struct {
 	CustomSource     string            `json:"custom_source,omitempty"`
 	FileHash         string            `json:"file_hash,omitempty"`
 	DownloadURL      string            `json:"download_url,omitempty"`
-	WebURL           string            `json:"web_url,omitempty"`
-	Arch             string            `json:"arch,omitempty"`
-	Description      string            `json:"description,omitempty"`
-	Status           PluginStatus      `json:"status"`
-	LastChecked      time.Time         `json:"last_checked,omitempty"`
+	// DownloadURLs lists ordered candidate sources (primary first, then
+	// catalog mirrors); empty means only DownloadURL is known.
+	DownloadURLs []string     `json:"download_urls,omitempty"`
+	WebURL       string       `json:"web_url,omitempty"`
+	Arch         string       `json:"arch,omitempty"`
+	Description  string       `json:"description,omitempty"`
+	Status       PluginStatus `json:"status"`
+	LastChecked  time.Time    `json:"last_checked,omitempty"`
 }
 
 // Config represents app-level settings.

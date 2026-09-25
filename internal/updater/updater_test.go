@@ -535,6 +535,50 @@ func TestUpdatePluginDownloadFailurePointsAtPluginPage(t *testing.T) {
 	}
 }
 
+func TestUpdatePluginFallsBackToMirrorSource(t *testing.T) {
+	dir := t.TempDir()
+	pluginFile := filepath.Join(dir, "WLX", "fi.wlx")
+	writeTestFile(t, pluginFile, "original")
+
+	zipBody := buildTestZip(t, map[string]string{"fi.wlx": "updated"})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/mirror/") {
+			w.Header().Set("Content-Type", "application/zip")
+			_, _ = w.Write(zipBody)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	dead := srv.URL + "/download.php?id=fi"
+	mirror := srv.URL + "/mirror/wlx_fi_2.23.zip"
+
+	upd := NewUpdater()
+	seen := map[string]bool{}
+	upd.SetProgressListener(func(p domain.UpdateProgress) {
+		if p.Phase == "download" {
+			seen[p.URL] = true
+		}
+	})
+
+	if _, err := upd.UpdatePlugin(context.Background(), domain.Plugin{
+		Path:         pluginFile,
+		DownloadURL:  dead,
+		DownloadURLs: []string{dead, mirror},
+	}); err != nil {
+		t.Fatalf("mirror fallback should succeed: %v", err)
+	}
+
+	if readTestFile(t, pluginFile) != "updated" {
+		t.Error("plugin file should contain the mirrored package")
+	}
+	if !seen[dead] || !seen[mirror] {
+		t.Errorf("progress should report both attempts, seen: %v", seen)
+	}
+	upd.SetProgressListener(nil)
+}
+
 func TestSanitizeEntryPath(t *testing.T) {
 	target := filepath.Join("C:", "tc", "plugins")
 	for _, bad := range []string{"..\\evil.dll", "../../evil.dll", filepath.Join(target, "abs.dll"), ".."} {

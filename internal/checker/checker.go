@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -229,6 +230,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		if matchedEntry != nil && matchedEntry.Resolved != nil {
 			p.LatestVersion = matchedEntry.Resolved.Version
 			p.DownloadURL = matchedEntry.Resolved.DownloadURL
+			p.DownloadURLs = downloadCandidates(*matchedEntry)
 			p.WebURL = matchedEntry.Resolved.WebURL
 			p.Arch = matchedEntry.Arch
 			p.Description = matchedEntry.Description
@@ -240,4 +242,37 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 	}
 
 	return plugins, fromCache, nil
+}
+
+// downloadCandidates lists one-shot download URLs for a catalog entry: the
+// resolved source first, then mirror sources that publish the same version.
+// Mirrors are ordered by source name so the fallback order is stable between
+// scans; scheme safety is left to the updater.
+func downloadCandidates(entry CatalogEntry) []string {
+	primary := entry.Resolved.DownloadURL
+
+	seen := make(map[string]bool, len(entry.AvailableSources)+1)
+	urls := make([]string, 0, len(entry.AvailableSources)+1)
+	add := func(u string) {
+		if u == "" || seen[u] {
+			return
+		}
+		seen[u] = true
+		urls = append(urls, u)
+	}
+
+	add(primary)
+	names := make([]string, 0, len(entry.AvailableSources))
+	for name := range entry.AvailableSources {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		src := entry.AvailableSources[name]
+		if src.Version != "" && src.Version != entry.Resolved.Version {
+			continue
+		}
+		add(src.DownloadURL)
+	}
+	return urls
 }
