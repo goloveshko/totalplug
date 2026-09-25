@@ -10,7 +10,7 @@ let currentPlugins = [];
 let editingPlugin = null;
 
 // Reassigned by buildDom() on every (re)render, e.g. after a language switch.
-let statusEl, tbody, btnScan, btnRefresh, searchEl;
+let tbody, btnScan, btnRefresh, searchEl;
 let cardDialog, cardNameEl, cardSubEl, cardInfoEl;
 let editorForm, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
@@ -26,17 +26,24 @@ let progressRunning = false;
 // Catalog freshness shown as a colored dot on the refresh icon: cache (amber),
 // fresh (green), error (red). Survives the buildDom rebuild on language switch.
 let catalogState = '';
+let catalogStateDetail = '';
 const catalogStateLabels = { cache: 'refresh.state.cache', fresh: 'refresh.state.fresh', error: 'refresh.state.error' };
 
-function setCatalogState(state) {
+// `detail` (the raw background-refresh error) is appended to the tooltip —
+// there is no status bar left to show it.
+function setCatalogState(state, detail) {
     catalogState = state || '';
+    catalogStateDetail = detail || '';
     if (!catalogState) {
         delete btnRefresh.dataset.catalog;
         btnRefresh.title = t('btn.refresh');
         return;
     }
     btnRefresh.dataset.catalog = catalogState;
-    btnRefresh.title = `${t('btn.refresh')} — ${t(catalogStateLabels[catalogState])}`;
+    const label = t(catalogStateLabels[catalogState]);
+    btnRefresh.title = catalogStateDetail
+        ? `${t('btn.refresh')} — ${label}: ${catalogStateDetail}`
+        : `${t('btn.refresh')} — ${label}`;
 }
 
 // Plugin-count chip next to the app title: visible rows, or shown/total while
@@ -68,12 +75,6 @@ let searchQuery = '';
 let settingsOpen = false;
 let settingsSection = 'appearance';
 
-function setStatus(message) {
-    statusEl.innerText = message;
-    // The bar is a single ellipsized line; the tooltip keeps long messages readable.
-    statusEl.title = message;
-}
-
 // In-app replacement for native confirm()/alert(): those render with the
 // "wails" origin header and cannot be styled.
 const escapeHtml = (s) => String(s)
@@ -99,14 +100,15 @@ const textToDialogHtml = (message) => linkify(escapeHtml(message));
 const showConfirm = (message) => openAppDialog(textToDialogHtml(message), true);
 
 // Raw Go errors are technical English; show the localized friendly sentence
-// with a named plugin-page link and hide the exact error behind a disclosure.
-function errorDialogHtml(err, friendlyMessage) {
+// with a named link and hide the exact error behind a disclosure. The link
+// label depends on where the URL came from (plugin page vs catalog).
+function errorDialogHtml(err, friendlyMessage, linkLabel) {
     const raw = String(err?.message ?? err);
     const urlMatch = raw.match(/https?:\/\/[^\s]+/);
     let html = escapeHtml(friendlyMessage);
     if (urlMatch) {
         html += '\n<a href="' + escapeHtml(urlMatch[0]) + '" class="dlg-link">' +
-            escapeHtml(t('dialog.plugin_page')) + '</a>';
+            escapeHtml(linkLabel || t('dialog.plugin_page')) + '</a>';
     }
     html += '<details class="dlg-tech"><summary>' + escapeHtml(t('dialog.tech_details')) +
         '</summary><div class="dlg-tech-body">' + linkify(escapeHtml(raw)) + '</div></details>';
@@ -167,7 +169,6 @@ async function runScan(forceRefresh = false) {
     try {
         btnScan.disabled = true;
         btnRefresh.disabled = true;
-        setStatus(forceRefresh ? t('scan.fresh') : t('scan.cached'));
 
         currentPlugins = await ScanPlugins(forceRefresh);
         // Whatever the scan returned is cache-first; the network refresh lands
@@ -177,14 +178,14 @@ async function runScan(forceRefresh = false) {
         if (!currentPlugins || currentPlugins.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.none')}</td></tr>`;
             setPluginCount(0, 0);
-            setStatus(t('scan.none'));
             return;
         }
 
         renderTable();
-        setStatus(t('status.found'));
     } catch (err) {
-        setStatus(t('status.error', { err }));
+        // No status bar left: a failed scan is an error like any other; the
+        // URL in it points at the catalog, not a plugin page.
+        openAppDialog(errorDialogHtml(err, t('scan.error_friendly'), t('about.catalog')));
         console.error(err);
     } finally {
         btnScan.disabled = false;
@@ -256,10 +257,9 @@ async function saveOverrideFromEditor() {
     try {
         await SaveOverride(editingPlugin.id, override);
         cardDialog.close();
-        setStatus(t('editor.saved', { name: editingPlugin.name }));
         runScan(false);
     } catch (err) {
-        setStatus(t('editor.save_error', { err }));
+        openAppDialog(errorDialogHtml(err, t('editor.save_friendly')));
     } finally {
         editorSaveGuard(false);
     }
@@ -290,7 +290,6 @@ window.handleUpdate = async function(index) {
     progressClose.hidden = true;
     progressRunning = true;
     progressDialog.showModal();
-    setStatus(t('update.running', { name: plugin.name }));
 
     const finishProgress = (html) => {
         progressRunning = false;
@@ -307,7 +306,6 @@ window.handleUpdate = async function(index) {
 
         if (result && result.locked) {
             finishProgress(escapeHtml(t('update.locked', { name: plugin.name })));
-            setStatus(t('update.locked', { name: plugin.name }));
         } else {
             finishProgress(escapeHtml(result && result.backup_path
                 ? t('update.done_backup', { name: plugin.name, path: result.backup_path })
@@ -316,7 +314,6 @@ window.handleUpdate = async function(index) {
         }
     } catch (err) {
         finishProgress(errorDialogHtml(err, t('update.error_friendly')));
-        setStatus(t('update.error_status', { name: plugin.name }));
     }
 
     await new Promise((resolve) => { progressResolve = resolve; });
@@ -339,7 +336,7 @@ async function openHistory() {
         }
         historyDialog.showModal();
     } catch (err) {
-        setStatus(t('history.error', { err }));
+        openAppDialog(errorDialogHtml(err, t('history.error_friendly')));
     }
 }
 
@@ -410,7 +407,6 @@ function buildDom() {
         </div>
       </div>
       <div id="view-main">
-        <div class="status-bar" id="status">${t('status.initial')}</div>
         <div class="table-container">
           <table>
             <thead>
@@ -557,12 +553,11 @@ function buildDom() {
       </dialog>
     `;
 
-    statusEl = document.getElementById('status');
     tbody = document.getElementById('plugins-body');
     btnScan = document.getElementById('btn-scan');
     btnRefresh = document.getElementById('btn-refresh');
     // The refresh dot is state, not markup: restore it after the rebuild.
-    if (catalogState) setCatalogState(catalogState);
+    if (catalogState) setCatalogState(catalogState, catalogStateDetail);
     searchEl = document.getElementById('plugin-search');
     pluginCountEl = document.getElementById('plugin-count');
     // The count chip is state too (language switch rebuilds the titlebar).
@@ -694,7 +689,6 @@ function buildDom() {
 
     if (currentPlugins.length > 0) {
         renderTable();
-        setStatus(t('status.found'));
     }
 }
 
@@ -704,12 +698,11 @@ EventsOn('plugins:refreshed', (plugins) => {
     currentPlugins = plugins;
     renderTable();
     setCatalogState('fresh');
-    setStatus(t('events.refreshed'));
 });
 
 EventsOn('plugins:refresh:failed', (msg) => {
-    setCatalogState('error');
-    setStatus(t('events.refresh_failed', { msg }));
+    // The dot plus its tooltip is the only surface left for this failure.
+    setCatalogState('error', String(msg || ''));
 });
 
 // Update progress stream (pushed by the updater through a progress listener).
