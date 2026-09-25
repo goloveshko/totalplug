@@ -235,6 +235,19 @@ and accepted debt we deliberately postponed.
     of pushing the dialog into a horizontal scrollbar; the dev mock now keeps
     `custom_version`/`custom_source` on the record like the Go bridge does, which is
     what made the prefill checkable without building the exe.
+15. **Card reorganization** — done (`92cc67b`), same feedback pass: the read-only
+    "Update source" row is gone entirely — for a GitHub plugin it restated the
+    homepage, and `totalcmd` is storage vocabulary. The provider that resolved the
+    version is now a 14px glyph beside the «В каталоге» value (octicons
+    `mark-github-16`, a placeholder grid until the catalog has its own mark;
+    `title` + `aria-label` name it), while the two genuinely technical values — the
+    raw `plugin.source` key and the install path — collapsed into a «Подробности»
+    `<details>` block using the error dialog's disclosure pattern. The one remaining
+    link row is «Сайт», whose text drops the `https://` prefix (`shortUrl()`) while
+    the `href` keeps it, so `BrowserOpenURL` still receives a usable address.
+    Verified in the dev harness across all nine mock rows: correct glyph per source,
+    details closed by default and overflow-free open or closed, RU and EN labels
+    both fitting the dialog.
 
 ## Backlog / accepted debt
 
