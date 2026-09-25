@@ -2,7 +2,7 @@ import './style.css';
 import './mock.js'; // dev-only fake backend; compiles away in production builds
 import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory } from '../wailsjs/go/main/App';
 import { EventsOn, BrowserOpenURL, WindowMinimise, WindowToggleMaximise, Quit } from '../wailsjs/runtime';
-import { t, currentLang, setLang } from './i18n.js';
+import { t, tp, currentLang, setLang } from './i18n.js';
 import { currentTheme, setTheme, currentScale, setScale } from './theme.js';
 
 const app = document.getElementById('app');
@@ -21,6 +21,9 @@ let progressPhase, progressUrl, progressResult, progressOk, progressClose;
 let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl;
 let titlebarActionsEl, pluginCountEl;
 let dialogResolve = null;
+// Element that opened the current dialog; focus goes back to it on close so
+// keyboard users do not land at the top of the document.
+let appDialogOpener = null;
 // Progress dialog state: while an update runs, the dialog cannot be dismissed.
 let progressResolve = null;
 let progressRunning = false;
@@ -35,9 +38,11 @@ const catalogStateLabels = { cache: 'refresh.state.cache', fresh: 'refresh.state
 function setCatalogState(state, detail) {
     catalogState = state || '';
     catalogStateDetail = detail || '';
+    // The state lives in title + aria-label: a tooltip alone is mouse-only.
     if (!catalogState) {
         delete btnRefresh.dataset.catalog;
         btnRefresh.title = t('btn.refresh');
+        btnRefresh.setAttribute('aria-label', t('btn.refresh'));
         return;
     }
     btnRefresh.dataset.catalog = catalogState;
@@ -45,6 +50,7 @@ function setCatalogState(state, detail) {
     btnRefresh.title = catalogStateDetail
         ? `${t('btn.refresh')} — ${label}: ${catalogStateDetail}`
         : `${t('btn.refresh')} — ${label}`;
+    btnRefresh.setAttribute('aria-label', `${t('btn.refresh')} — ${label}`);
 }
 
 // Plugin-count chip next to the app title: visible rows, or shown/total while
@@ -61,9 +67,11 @@ function setPluginCount(shown, total) {
 
 function renderPluginCount() {
     const filtered = searchQuery.trim() && pluginCountShown !== pluginCountTotal;
-    const label = t('count.plugins');
-    const value = filtered ? `${pluginCountShown}/${pluginCountTotal}` : String(pluginCountTotal);
-    pluginCountEl.textContent = `${label} ${value}`;
+    // A filtered pair is language-neutral; the plain count needs the localized
+    // plural form («2 плагина», not «2 плагинов»).
+    pluginCountEl.textContent = filtered
+        ? `${pluginCountShown}/${pluginCountTotal}`
+        : tp('count.plugins', pluginCountTotal);
     pluginCountEl.hidden = pluginCountTotal === 0 || settingsOpen;
 }
 
@@ -81,6 +89,10 @@ let settingsSection = 'appearance';
 const escapeHtml = (s) => String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// Placeholder row for the plugin table (scanning / empty / no search hits).
+const emptyRow = (message) =>
+    `<tr class="table-empty"><td colspan="6">${message}</td></tr>`;
+
 // Turn http(s) URLs in already-escaped text into clickable links. Plain anchors
 // would navigate the webview, so clicks are intercepted and routed to the
 // system browser (see the appDialogMsg listener in buildDom).
@@ -92,9 +104,12 @@ const linkify = (escaped) => escaped.replace(
 function openAppDialog(html, isConfirm) {
     return new Promise((resolve) => {
         dialogResolve = resolve;
+        appDialogOpener = document.activeElement;
         appDialogMsg.innerHTML = html;
         appDialogCancel.style.display = isConfirm ? '' : 'none';
         appDialog.showModal();
+        // Enter must never confirm an update by accident: focus the safe button.
+        (isConfirm ? appDialogCancel : appDialogOk).focus();
     });
 }
 const textToDialogHtml = (message) => linkify(escapeHtml(message));
@@ -108,7 +123,10 @@ function errorDialogHtml(err, friendlyMessage, linkLabel) {
     const urlMatch = raw.match(/https?:\/\/[^\s]+/);
     let html = escapeHtml(friendlyMessage);
     if (urlMatch) {
-        html += '\n<a href="' + escapeHtml(urlMatch[0]) + '" class="dlg-link">' +
+        // Go quotes URLs in errors: Get "https://host/x": EOF — the closing
+        // quote and trailing punctuation are not part of the address.
+        const url = urlMatch[0].replace(/[.,;:!?)\]»"']+$/, '');
+        html += '\n<a href="' + escapeHtml(url) + '" class="dlg-link">' +
             escapeHtml(linkLabel || t('dialog.plugin_page')) + '</a>';
     }
     html += '<details class="dlg-tech"><summary>' + escapeHtml(t('dialog.tech_details')) +
@@ -154,15 +172,17 @@ function renderUpdateProgress(p) {
 }
 
 function getStatusBadge(status) {
+    // Monochrome glyphs only: color emoji render differently in WebView2, do not
+    // follow the theme and get read out by screen readers.
     switch (status) {
         case 'up_to_date':
             return `<span class="badge badge-up">✓ ${t('badge.up')}</span>`;
         case 'update_avail':
-            return `<span class="badge badge-update">🚀 ${t('badge.avail')}</span>`;
+            return `<span class="badge badge-update">↑ ${t('badge.avail')}</span>`;
         case 'not_found':
             return `<span class="badge badge-err">✗ ${t('badge.missing')}</span>`;
         default:
-            return `<span class="badge badge-muted">⚠️ ${t('badge.unknown')}</span>`;
+            return `<span class="badge badge-muted">? ${t('badge.unknown')}</span>`;
     }
 }
 
@@ -177,15 +197,17 @@ async function runScan(forceRefresh = false) {
         setCatalogState('cache');
 
         if (!currentPlugins || currentPlugins.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.none')}</td></tr>`;
+            tbody.innerHTML = emptyRow(t('table.none'));
             setPluginCount(0, 0);
             return;
         }
 
         renderTable();
     } catch (err) {
-        // No status bar left: a failed scan is an error like any other; the
-        // URL in it points at the catalog, not a plugin page.
+        // The scan never produced rows, so the "scanning" placeholder must go:
+        // no status bar is left, and the error itself opens a dialog (the URL in
+        // it points at the catalog, not a plugin page).
+        tbody.innerHTML = emptyRow(t('table.error'));
         openAppDialog(errorDialogHtml(err, t('scan.error_friendly'), t('about.catalog')));
         console.error(err);
     } finally {
@@ -201,21 +223,23 @@ function renderTable() {
         .filter(({ p }) => !q || p.name.toLowerCase().includes(q));
     setPluginCount(rows.length, currentPlugins.length);
     if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.noresults')}</td></tr>`;
+        tbody.innerHTML = emptyRow(t('table.noresults'));
         return;
     }
+    // Every cell is built from wincmd.ini / catalog data: a name with "<" or "&"
+    // breaks the markup unless it is escaped. The detection confidence is not a
+    // column any more — it lives in the plugin card.
     tbody.innerHTML = rows.map(({ p, idx }) => {
         const canUpdate = p.status === 'update_avail' && p.download_url;
         return `
             <tr data-idx="${idx}">
-                <td><strong>${p.type}</strong></td>
-                <td>${p.name}</td>
-                <td><code>${p.installed_version}</code></td>
-                <td><small style="color:var(--text-muted)">${p.confidence}</small></td>
-                <td><code>${p.latest_version || '-'}</code></td>
+                <td class="cell-type">${escapeHtml(p.type)}</td>
+                <td>${escapeHtml(p.name)}</td>
+                <td><code>${escapeHtml(p.installed_version)}</code></td>
+                <td><code>${escapeHtml(p.latest_version || '—')}</code></td>
                 <td>${getStatusBadge(p.status)}</td>
                 <td>
-                    ${canUpdate ? `<button class="btn-update" onclick="handleUpdate(${idx})">${t('btn.update')}</button>` : ''}
+                    ${canUpdate ? `<button type="button" class="btn-update" data-update="${idx}">${t('btn.update')}</button>` : ''}
                 </td>
             </tr>
         `;
@@ -233,12 +257,12 @@ function openCard(index) {
     cardNameEl.textContent = plugin.name;
     cardSubEl.textContent = plugin.type + (plugin.arch ? ' · ' + plugin.arch : '');
     cardInfoEl.innerHTML =
-        cardRow(t('col.installed'), `<code>${plugin.installed_version}</code> <small style="color:var(--text-muted)">${plugin.confidence}</small>`) +
-        cardRow(t('col.latest'), plugin.latest_version ? `<code>${plugin.latest_version}</code>` : '—') +
+        cardRow(t('col.installed'), `<code>${escapeHtml(plugin.installed_version)}</code> <small class="muted">${escapeHtml(plugin.confidence)}</small>`) +
+        cardRow(t('col.latest'), plugin.latest_version ? `<code>${escapeHtml(plugin.latest_version)}</code>` : '—') +
         cardRow(t('col.status'), getStatusBadge(plugin.status)) +
         cardRow(t('editor.source'), plugin.source ? `<code class="path">${escapeHtml(plugin.source)}</code>` : '—') +
         (plugin.web_url ? cardRow(t('card.home'), `<a href="${escapeHtml(plugin.web_url)}" class="dlg-link">${escapeHtml(plugin.web_url)}</a>`) : '') +
-        cardRow(t('card.path'), `<code class="path">${plugin.path}</code>`);
+        cardRow(t('card.path'), `<code class="path">${escapeHtml(plugin.path)}</code>`);
 
     const auto = plugin.installed_version || '';
     editorVersionEl.value = /^(unknown|n\/a)/i.test(auto) ? '' : auto;
@@ -284,7 +308,13 @@ function editorSaveGuard(busy) {
     document.getElementById('editor-save').disabled = busy;
 }
 
-window.handleUpdate = async function(index) {
+// Reached only through the delegated tbody click handler (no inline onclick, so
+// a future script-src CSP stays possible).
+async function handleUpdate(index) {
+    // The confirm and the progress dialog are separate modals: without this
+    // guard a second click starts a parallel UpdatePlugin for the same plugin.
+    if (progressRunning) return;
+
     const plugin = currentPlugins[index];
     if (!plugin) return;
 
@@ -313,6 +343,7 @@ window.handleUpdate = async function(index) {
         progressResult.hidden = false;
         progressOk.hidden = false;
         progressClose.hidden = false;
+        progressOk.focus();
     };
 
     let succeeded = false;
@@ -339,17 +370,22 @@ async function openHistory() {
     try {
         const entries = await GetUpdateHistory();
         if (!entries || entries.length === 0) {
-            historyBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#777; padding:16px;">${t('history.empty')}</td></tr>`;
+            historyBody.innerHTML = `<tr class="table-empty"><td colspan="3">${t('history.empty')}</td></tr>`;
         } else {
+            // Dates follow the UI language, not the OS locale.
+            const fmt = new Intl.DateTimeFormat(
+                currentLang() === 'ru' ? 'ru-RU' : 'en-GB',
+                { dateStyle: 'medium', timeStyle: 'short' });
             historyBody.innerHTML = entries.map((e) => `
                 <tr>
-                    <td>${e.plugin_name || e.plugin_id}</td>
-                    <td><code>${e.version}</code></td>
-                    <td>${new Date(e.applied_at).toLocaleString()}</td>
+                    <td>${escapeHtml(e.plugin_name || e.plugin_id)}</td>
+                    <td><code>${escapeHtml(e.version)}</code></td>
+                    <td>${fmt.format(new Date(e.applied_at))}</td>
                 </tr>
             `).join('');
         }
         historyDialog.showModal();
+        document.getElementById('history-close').focus();
     } catch (err) {
         openAppDialog(errorDialogHtml(err, t('history.error_friendly')));
     }
@@ -357,7 +393,9 @@ async function openHistory() {
 
 function refreshSettingsState() {
     settingsView.querySelectorAll('[data-theme-choice]').forEach((el) => {
-        el.classList.toggle('selected', el.dataset.themeChoice === currentTheme());
+        const selected = el.dataset.themeChoice === currentTheme();
+        el.classList.toggle('selected', selected);
+        el.setAttribute('aria-pressed', String(selected));
     });
     langSelect.value = currentLang();
     fontScaleEl.value = String(currentScale());
@@ -400,25 +438,25 @@ function buildDom() {
           <span class="titlebar-title">TotalPlug</span>
           <span class="titlebar-count" id="plugin-count" hidden></span>
         </div>
-        <input type="search" id="plugin-search" placeholder="${t('search.ph')}" autocomplete="off">
+        <input type="search" id="plugin-search" placeholder="${t('search.ph')}" aria-label="${t('search.ph')}" autocomplete="off">
         <div class="titlebar-actions" id="titlebar-actions">
-          <button type="button" id="btn-history" class="icon-btn" title="${t('btn.history')}">
+          <button type="button" id="btn-history" class="icon-btn" title="${t('btn.history')}" aria-label="${t('btn.history')}">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </button>
-          <button type="button" id="btn-refresh" class="icon-btn" title="${t('btn.refresh')}">
+          <button type="button" id="btn-refresh" class="icon-btn" title="${t('btn.refresh')}" aria-label="${t('btn.refresh')}">
             <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           </button>
-          <button type="button" id="btn-scan" class="icon-btn primary" title="${t('btn.scan')}">
+          <button type="button" id="btn-scan" class="icon-btn primary" title="${t('btn.scan')}" aria-label="${t('btn.scan')}">
             <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </button>
-          <button type="button" id="btn-settings" class="icon-btn" title="${t('btn.settings')}">
+          <button type="button" id="btn-settings" class="icon-btn" title="${t('btn.settings')}" aria-label="${t('btn.settings')}">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
         </div>
         <div class="caption-buttons">
-          <button type="button" id="win-min" title="${t('win.min')}">&#8722;</button>
-          <button type="button" id="win-max" title="${t('win.max')}">&#9633;</button>
-          <button type="button" id="win-close" class="win-close" title="${t('win.close')}">&#10005;</button>
+          <button type="button" id="win-min" title="${t('win.min')}" aria-label="${t('win.min')}">&#8722;</button>
+          <button type="button" id="win-max" title="${t('win.max')}" aria-label="${t('win.max')}">&#9633;</button>
+          <button type="button" id="win-close" class="win-close" title="${t('win.close')}" aria-label="${t('win.close')}">&#10005;</button>
         </div>
       </div>
       <div id="view-main">
@@ -429,14 +467,13 @@ function buildDom() {
                 <th>${t('col.type')}</th>
                 <th>${t('col.plugin')}</th>
                 <th>${t('col.installed')}</th>
-                <th>${t('col.source')}</th>
                 <th>${t('col.latest')}</th>
                 <th>${t('col.status')}</th>
                 <th>${t('col.actions')}</th>
               </tr>
             </thead>
             <tbody id="plugins-body">
-              <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding: 24px;">${t('table.empty')}</td></tr>
+              ${emptyRow(t('table.scanning'))}
             </tbody>
           </table>
         </div>
@@ -459,21 +496,21 @@ function buildDom() {
             <p class="section-desc">${t('settings.appearance')}</p>
             <div class="section-label">${t('settings.theme')}</div>
             <div class="theme-cards">
-              <div class="theme-card" data-theme-choice="light" role="button" tabindex="0">
-                <div class="theme-preview preview-light"></div>
-                <div class="name">${t('settings.theme.light')}</div>
-                <div class="desc">${t('settings.theme.light.desc')}</div>
-              </div>
-              <div class="theme-card" data-theme-choice="dark" role="button" tabindex="0">
-                <div class="theme-preview preview-dark"></div>
-                <div class="name">${t('settings.theme.dark')}</div>
-                <div class="desc">${t('settings.theme.dark.desc')}</div>
-              </div>
-              <div class="theme-card" data-theme-choice="system" role="button" tabindex="0">
-                <div class="theme-preview preview-system"></div>
-                <div class="name">${t('settings.theme.system')}</div>
-                <div class="desc">${t('settings.theme.system.desc')}</div>
-              </div>
+              <button type="button" class="theme-card" data-theme-choice="light" aria-pressed="false">
+                <span class="theme-preview preview-light"></span>
+                <span class="name">${t('settings.theme.light')}</span>
+                <span class="desc">${t('settings.theme.light.desc')}</span>
+              </button>
+              <button type="button" class="theme-card" data-theme-choice="dark" aria-pressed="false">
+                <span class="theme-preview preview-dark"></span>
+                <span class="name">${t('settings.theme.dark')}</span>
+                <span class="desc">${t('settings.theme.dark.desc')}</span>
+              </button>
+              <button type="button" class="theme-card" data-theme-choice="system" aria-pressed="false">
+                <span class="theme-preview preview-system"></span>
+                <span class="name">${t('settings.theme.system')}</span>
+                <span class="desc">${t('settings.theme.system.desc')}</span>
+              </button>
             </div>
             <div class="section-label">${t('settings.font')}</div>
             <div class="font-row">
@@ -536,7 +573,7 @@ function buildDom() {
           <tbody id="history-body"></tbody>
         </table>
         <div class="editor-actions">
-          <button type="button" id="history-close">${t('editor.cancel')}</button>
+          <button type="button" id="history-close">${t('dialog.close')}</button>
         </div>
       </dialog>
 
@@ -613,7 +650,10 @@ function buildDom() {
     document.getElementById('win-max').addEventListener('click', WindowToggleMaximise);
     document.getElementById('win-close').addEventListener('click', Quit);
     document.getElementById('titlebar').addEventListener('dblclick', (e) => {
-        if (!e.target.closest('.caption-buttons')) WindowToggleMaximise();
+        // Double-clicking the search box (select a word) or any button must not
+        // maximise the window — only the empty drag area does.
+        if (e.target.closest('input, button')) return;
+        WindowToggleMaximise();
     });
 
     btnScan.addEventListener('click', () => runScan(false));
@@ -626,8 +666,14 @@ function buildDom() {
         searchQuery = searchEl.value;
         renderTable();
     });
-    // Row click opens the plugin card; buttons inside the row keep their own action.
+    // One delegated handler for the table: the update button keeps its own
+    // action, a click anywhere else in the row opens the plugin card.
     tbody.addEventListener('click', (e) => {
+        const updateBtn = e.target.closest('button.btn-update');
+        if (updateBtn) {
+            handleUpdate(Number(updateBtn.dataset.update));
+            return;
+        }
         if (e.target.closest('button')) return;
         const tr = e.target.closest('tr[data-idx]');
         if (tr) openCard(Number(tr.dataset.idx));
@@ -653,7 +699,13 @@ function buildDom() {
         }
     });
     // Esc or any other dismissal path must resolve a pending confirm as "no".
-    appDialog.addEventListener('close', () => settleAppDialog(false));
+    appDialog.addEventListener('close', () => {
+        settleAppDialog(false);
+        if (appDialogOpener) {
+            appDialogOpener.focus?.();
+            appDialogOpener = null;
+        }
+    });
 
     // Update progress dialog: not dismissable while the update is running;
     // afterwards OK or the cross closes it and handleUpdate continues.
@@ -676,6 +728,7 @@ function buildDom() {
             refreshSettingsState();
         });
     });
+    // Real <button>s, so Enter/Space reach the handler through the native click.
     settingsView.querySelectorAll('[data-theme-choice]').forEach((card) => {
         card.addEventListener('click', () => {
             setTheme(card.dataset.themeChoice);

@@ -1,20 +1,21 @@
 // Minimal frontend i18n: EN is the default, the choice persists in localStorage.
 const STRINGS = {
     en: {
-        'btn.scan': '🔍 Scan plugins',
-        'btn.refresh': '🔄 Refresh catalog',
+        'btn.scan': 'Scan plugins',
+        'btn.refresh': 'Refresh catalog',
         'refresh.state.cache': 'catalog from cache, updating...',
         'refresh.state.fresh': 'catalog up to date',
         'refresh.state.error': 'catalog refresh failed',
-        'count.plugins': 'plugins',
+        'count.plugins.one': '{n} plugin',
+        'count.plugins.other': '{n} plugins',
         'col.type': 'Type',
         'col.plugin': 'Plugin',
         'col.installed': 'Installed',
-        'col.source': 'Source',
         'col.latest': 'In catalog',
         'col.status': 'Status',
         'col.actions': 'Actions',
-        'table.empty': 'No plugins loaded',
+        'table.scanning': 'Scanning wincmd.ini...',
+        'table.error': 'Scan failed — see the error message.',
         'table.none': 'No plugins found in wincmd.ini',
         'table.noresults': 'No plugins match the search',
         'search.ph': 'Search plugins...',
@@ -36,7 +37,7 @@ const STRINGS = {
         'editor.cancel': 'Cancel',
         'editor.save_friendly': 'Could not save the override.',
         'update.confirm': 'Update {name} to version {version}?',
-        'update.locked': '⚠ Files of {name} are locked. Close Total Commander and retry the update.',
+        'update.locked': 'Files of {name} are locked. Close Total Commander and retry the update.',
         'update.done_backup': '{name} updated! Backup: {path}',
         'update.done': '{name} updated successfully!',
         'update.error_friendly': 'Couldn\'t install the update. The plugin page may be outdated or the file is temporarily unavailable. Try again later or install manually from the plugin page.',
@@ -45,7 +46,7 @@ const STRINGS = {
         'update.progress.extract': 'Extracting archive',
         'update.progress.install': 'Installing files',
         'update.progress.source': 'from',
-        'btn.history': '🕘 History',
+        'btn.history': 'History',
         'history.title': 'Applied updates',
         'history.col.plugin': 'Plugin',
         'history.col.version': 'Version',
@@ -57,7 +58,7 @@ const STRINGS = {
         'dialog.close': 'Close',
         'dialog.plugin_page': 'Open plugin page',
         'dialog.tech_details': 'Technical details',
-        'btn.settings': '⚙ Settings',
+        'btn.settings': 'Settings',
         'settings.title': 'Settings',
         'settings.back': '‹ Back',
         'settings.save_hint': 'All changes save themselves',
@@ -83,20 +84,23 @@ const STRINGS = {
         'win.close': 'Close',
     },
     ru: {
-        'btn.scan': '🔍 Сканировать плагины',
-        'btn.refresh': '🔄 Обновить каталог',
+        'btn.scan': 'Сканировать плагины',
+        'btn.refresh': 'Обновить каталог',
         'refresh.state.cache': 'каталог из кэша, обновление...',
         'refresh.state.fresh': 'каталог актуален',
         'refresh.state.error': 'не удалось обновить каталог',
-        'count.plugins': 'плагинов',
+        'count.plugins.one': '{n} плагин',
+        'count.plugins.few': '{n} плагина',
+        'count.plugins.many': '{n} плагинов',
+        'count.plugins.other': '{n} плагинов',
         'col.type': 'Тип',
         'col.plugin': 'Имя плагина',
         'col.installed': 'Установлена',
-        'col.source': 'Источник',
         'col.latest': 'В каталоге',
         'col.status': 'Статус',
         'col.actions': 'Действие',
-        'table.empty': 'Плагины не загружены',
+        'table.scanning': 'Сканирую wincmd.ini...',
+        'table.error': 'Сканирование не удалось — см. сообщение об ошибке.',
         'table.none': 'Плагины не найдены в wincmd.ini',
         'table.noresults': 'Ничего не найдено по запросу',
         'search.ph': 'Поиск плагинов...',
@@ -118,16 +122,16 @@ const STRINGS = {
         'editor.cancel': 'Отмена',
         'editor.save_friendly': 'Не удалось сохранить переопределение.',
         'update.confirm': 'Обновить плагин {name} до версии {version}?',
-        'update.locked': '⚠ Файлы плагина {name} заняты. Закройте Total Commander и повторите обновление.',
-        'update.done_backup': 'Плагин {name} обновлен! Резервная копия: {path}',
-        'update.done': 'Плагин {name} успешно обновлен!',
+        'update.locked': 'Файлы плагина {name} заняты. Закройте Total Commander и повторите обновление.',
+        'update.done_backup': 'Плагин {name} обновлён! Резервная копия: {path}',
+        'update.done': 'Плагин {name} успешно обновлён!',
         'update.error_friendly': 'Не удалось установить обновление. Возможно, страница плагина устарела или файл временно недоступен. Попробуйте позже или установите вручную со страницы плагина.',
         'update.progress.title': 'Обновление {name}',
         'update.progress.download': 'Загрузка',
         'update.progress.extract': 'Распаковка архива',
         'update.progress.install': 'Установка файлов',
         'update.progress.source': 'источник',
-        'btn.history': '🕘 История',
+        'btn.history': 'История',
         'history.title': 'Применённые обновления',
         'history.col.plugin': 'Плагин',
         'history.col.version': 'Версия',
@@ -139,7 +143,7 @@ const STRINGS = {
         'dialog.close': 'Закрыть',
         'dialog.plugin_page': 'Открыть страницу плагина',
         'dialog.tech_details': 'Технические детали',
-        'btn.settings': '⚙ Настройки',
+        'btn.settings': 'Настройки',
         'settings.title': 'Настройки',
         'settings.back': '‹ Назад',
         'settings.save_hint': 'Все изменения сохраняются сами',
@@ -157,7 +161,7 @@ const STRINGS = {
         'settings.font': 'Размер шрифта',
         'settings.language': 'Язык интерфейса',
         'settings.about': 'О TotalPlug',
-        'about.desc': 'TotalPlug сканирует плагины Total Commander из wincmd.ini, определяет установленные версии, сравнивает их с общественным каталогом и безопасно обновляет с резервной копией и откатом.',
+        'about.desc': 'TotalPlug сканирует плагины Total Commander из wincmd.ini, определяет установленные версии, сравнивает их с каталогом сообщества и безопасно обновляет с резервной копией и откатом.',
         'about.catalog': 'Каталог плагинов',
         'about.records': 'Данные хранятся в %APPDATA%\\TotalPlug',
         'win.min': 'Свернуть',
@@ -173,19 +177,45 @@ if (lang !== 'ru' && lang !== 'en') {
     lang = 'en';
 }
 
+const pluralRules = { en: new Intl.PluralRules('en'), ru: new Intl.PluralRules('ru') };
+
 export function currentLang() {
     return lang;
+}
+
+// Screen readers and hyphenation follow the document language, not CSS.
+function applyLangAttribute() {
+    document.documentElement.lang = lang;
 }
 
 export function setLang(next) {
     lang = next === 'ru' ? 'ru' : 'en';
     localStorage.setItem(LANG_KEY, lang);
+    applyLangAttribute();
+}
+
+// A replacement string would interpret "$&" etc., and plugin names come from
+// an untrusted wincmd.ini — the function form inserts the value literally.
+function interpolate(s, vars) {
+    let out = s;
+    for (const [name, value] of Object.entries(vars || {})) {
+        out = out.replaceAll(`{${name}}`, () => value);
+    }
+    return out;
 }
 
 export function t(key, vars) {
-    let s = STRINGS[lang][key] ?? STRINGS.en[key] ?? key;
-    for (const [name, value] of Object.entries(vars || {})) {
-        s = s.replaceAll(`{${name}}`, value);
-    }
-    return s;
+    return interpolate(STRINGS[lang][key] ?? STRINGS.en[key] ?? key, vars);
 }
+
+// Countable strings live as `${key}.one|few|many|other` (CLDR categories), so
+// Russian gets «2 плагина» instead of a fixed «плагинов».
+export function tp(key, n, vars) {
+    const category = pluralRules[lang].select(n);
+    const table = STRINGS[lang];
+    const s = table[`${key}.${category}`] ?? STRINGS.en[`${key}.${category}`]
+        ?? table[`${key}.other`] ?? STRINGS.en[`${key}.other`] ?? key;
+    return interpolate(s, { ...vars, n });
+}
+
+applyLangAttribute();
