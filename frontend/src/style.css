@@ -471,6 +471,7 @@ dialog input:focus {
     color: var(--text-muted);
 }
 .btn-back {
+    justify-self: start; /* grid child: don't stretch across the whole column */
     background: transparent;
     border: none;
     color: var(--text-muted);
