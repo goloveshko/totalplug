@@ -1,9 +1,27 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>TotalPlug</title>
+    <style>
+        /* Colors duplicated from style.css on purpose: that file arrives with
+           the module graph, i.e. after the first paint. */
+        html { background: #f4f4f7; }
+        html[data-theme="dark"] { background: #1e1e24; }
+    </style>
+    <script>
+        // Resolve theme and language before first paint: main.js is a module and
+        // would otherwise flash the light theme (and keep <html lang> stale).
+        try {
+            var theme = localStorage.getItem('totalplug.theme');
+            var dark = matchMedia('(prefers-color-scheme: dark)').matches;
+            if (theme === 'dark' || ((theme === null || theme === 'system') && dark))
+                document.documentElement.dataset.theme = 'dark';
+            var lang = localStorage.getItem('totalplug.lang');
+            if (lang === 'ru' || lang === 'en') document.documentElement.lang = lang;
+        } catch (e) {}
+    </script>
 </head>
 <body>
 <div id="app"></div>
