@@ -134,6 +134,13 @@ and accepted debt we deliberately postponed.
    technical details; a catalog URL in a scan error is labeled «Каталог
    плагинов». Background refresh failures stay silent — the red dot's tooltip
    carries the raw reason.
+8. **Plugin card source + homepage** — done (`265d2f1`): the card shows the
+   actual update source (catalog `available_sources` key, `github:Owner/Repo`
+   override, or —) via new `domain.Plugin.Source`, plus a clickable
+   «Домашняя страница» (web_url → BrowserOpenURL). The override editor is
+   deliberately NOT pre-filled: a value there shadows the catalog.
+   User-side source lists were declined — mirrors belong in the catalog repo
+   (`available_sources`), not in per-plugin storage.
 
 ## Backlog / accepted debt
 
