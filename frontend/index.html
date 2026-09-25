@@ -2,26 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
+    <!-- Production-only (vite dev strips it — see vite.config.js). Wails prepends its
+         own runtime scripts to <head> and delivers Go->JS callbacks through WebView2
+         ExecuteScript; neither is affected by a page CSP meta tag. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>TotalPlug</title>
-    <style>
-        /* Colors duplicated from style.css on purpose: that file arrives with
-           the module graph, i.e. after the first paint. */
-        html { background: #f4f4f7; }
-        html[data-theme="dark"] { background: #1e1e24; }
-    </style>
-    <script>
-        // Resolve theme and language before first paint: main.js is a module and
-        // would otherwise flash the light theme (and keep <html lang> stale).
-        try {
-            var theme = localStorage.getItem('totalplug.theme');
-            var dark = matchMedia('(prefers-color-scheme: dark)').matches;
-            if (theme === 'dark' || ((theme === null || theme === 'system') && dark))
-                document.documentElement.dataset.theme = 'dark';
-            var lang = localStorage.getItem('totalplug.lang');
-            if (lang === 'ru' || lang === 'en') document.documentElement.lang = lang;
-        } catch (e) {}
-    </script>
+    <link rel="stylesheet" href="/boot.css"/>
+    <script src="/boot.js"></script>
 </head>
 <body>
 <div id="app"></div>

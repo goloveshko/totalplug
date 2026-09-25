@@ -1,0 +1,4 @@
+/* First-paint background, duplicated from src/style.css on purpose: that file
+   arrives with the module graph, i.e. after this one. */
+html { background: #f4f4f7; }
+html[data-theme="dark"] { background: #1e1e24; }
