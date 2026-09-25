@@ -217,9 +217,17 @@ and accepted debt we deliberately postponed.
     `ExecuteScript`, which a page CSP does not gate. Verified: `wails build`
     succeeds and the binary embeds `boot.*` + the meta tag; under `vite preview`
     (policy active) all four resources load with no violation and both stylesheets
-    parse; the dev harness is unchanged. Still to confirm on a live
-    `build/bin/totalplug.exe`: the GUI renders and bindings answer under WebView2 —
-    the browser harness cannot host the Wails bridge.
+    parse; the dev harness is unchanged. Confirmed on a live
+    `build/bin/totalplug.exe` by the user: table, dark theme, plugin card and
+    updates all work under the policy.
+14. **Card readability pass** — done (`c624e4e`, `c65ee51`, `a98ce65`), from the
+    same live run: the stored `github:Owner/Repo` key is a storage detail, so the
+    card shows it as a clickable `https://github.com/Owner/Repo` and the override
+    editor prefills that same URL form (`displaySource()` is the inverse of
+    `normalizeSource()`, so a save round-trips unchanged); long values wrap instead
+    of pushing the dialog into a horizontal scrollbar; the dev mock now keeps
+    `custom_version`/`custom_source` on the record like the Go bridge does, which is
+    what made the prefill checkable without building the exe.
 
 ## Backlog / accepted debt
 
