@@ -575,6 +575,29 @@ func downloadCandidates(plugin domain.Plugin) []string {
 	return nil
 }
 
+// tryDownloadCandidates downloads and validates archives from an ordered URL
+// list, returning the first usable archive format. An empty format means all
+// candidates failed; lastErr is the most recent failure.
+func (u *Updater) tryDownloadCandidates(ctx context.Context, urls []string, archiveFile string) (format string, lastErr error) {
+	for _, candidate := range urls {
+		if err := u.DownloadFile(ctx, candidate, archiveFile); err != nil {
+			lastErr = fmt.Errorf("download failed: %w", err)
+			continue
+		}
+		f, err := detectArchiveFormat(archiveFile)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if f != "zip" && f != "rar" && f != "7z" {
+			lastErr = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, f)
+			continue
+		}
+		return f, nil
+	}
+	return "", lastErr
+}
+
 // UpdatePlugin downloads an update, backs up the current plugin directory, and
 // applies the new files. If applying fails, the files touched so far are rolled
 // back from the backup. On success the backup directory is kept and returned,
@@ -600,24 +623,21 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	defer os.RemoveAll(tmpDir)
 
 	archiveFile := filepath.Join(tmpDir, "package.archive")
-	var format string
-	var lastErr error
-	for _, candidate := range candidates {
-		if err := u.DownloadFile(ctx, candidate, archiveFile); err != nil {
-			lastErr = fmt.Errorf("download failed: %w", err)
-			continue
+	format, lastErr := u.tryDownloadCandidates(ctx, candidates, archiveFile)
+
+	if format == "" {
+		// All catalog sources failed: for totalcmd.net links, lazily parse the
+		// plugin page for mirrors and retry them (fallback maintained by the
+		// community, e.g. wincmd.ru).
+		if mirrors := u.resolveTotalCmdMirrors(ctx, plugin.DownloadURL); len(mirrors) > 0 {
+			// DownloadFile announces each candidate URL, so mirror attempts are
+			// already visible in the UI.
+			var mirrorErr error
+			format, mirrorErr = u.tryDownloadCandidates(ctx, mirrors, archiveFile)
+			if mirrorErr != nil {
+				lastErr = mirrorErr
+			}
 		}
-		f, err := detectArchiveFormat(archiveFile)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if f != "zip" && f != "rar" && f != "7z" {
-			lastErr = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, f)
-			continue
-		}
-		format = f
-		break
 	}
 	if format == "" {
 		// Broken catalog/upstream links are common (totalcmd.net download
