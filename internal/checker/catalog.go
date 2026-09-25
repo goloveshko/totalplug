@@ -79,13 +79,19 @@ type CatalogCache struct {
 }
 
 func getCachePath() string {
+	return cacheFilePath("community_catalog_cache.json")
+}
+
+// cacheFilePath resolves a file inside the per-user cache directory,
+// creating the directory on demand.
+func cacheFilePath(name string) string {
 	appData := os.Getenv("APPDATA")
 	if appData == "" {
 		appData = "."
 	}
 	dir := filepath.Join(appData, "TotalPlug")
 	_ = os.MkdirAll(dir, 0755)
-	return filepath.Join(dir, "community_catalog_cache.json")
+	return filepath.Join(dir, name)
 }
 
 // LoadCatalogFromCache loads cached catalog from local disk.

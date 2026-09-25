@@ -162,6 +162,51 @@ func TestCheckUpdatesCacheOnlyWithoutCache(t *testing.T) {
 	}
 }
 
+func TestCheckUpdatesCacheOnlyUsesGitHubCache(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip")
+
+	plugins := []domain.Plugin{{ID: "wlx_EdgeView", Name: "EdgeView",
+		Path: `C:\tc\plugins\edgeview\edgeview.wlx`,
+		InstalledVersion: "1.2.5", Confidence: domain.ConfidenceExact,
+		Status: domain.StatusUpToDate, CustomSource: "github:rg-software/wlx-edge-viewer"}}
+
+	got, _, err := NewChecker(false, true).CheckUpdates(context.Background(), plugins)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := got[0]
+	if p.LatestVersion != "1.2.6" || p.Status != domain.StatusUpdateAvail ||
+		p.DownloadURL != "https://example.invalid/edgeview.zip" ||
+		p.WebURL != "https://github.com/rg-software/wlx-edge-viewer" ||
+		p.Source != "github:rg-software/wlx-edge-viewer" {
+		t.Errorf("remembered github release not applied on cache-only paint: %+v", p)
+	}
+}
+
+func TestGitHubReleaseCacheRoundtrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+
+	if loadGitHubRelease("owner/repo") != nil {
+		t.Fatal("expected empty cache")
+	}
+	saveGitHubRelease("owner/repo", "2.0", "https://example.invalid/r.zip")
+	saveGitHubRelease("owner/other", "3.0", "")
+	// Overwrite keeps one entry per repo.
+	saveGitHubRelease("owner/repo", "2.1", "https://example.invalid/r21.zip")
+
+	repo := loadGitHubRelease("owner/repo")
+	if repo == nil || repo.TagName != "2.1" || repo.DownloadURL != "https://example.invalid/r21.zip" {
+		t.Errorf("roundtrip failed: %+v", repo)
+	}
+	if other := loadGitHubRelease("owner/other"); other == nil || other.TagName != "3.0" {
+		t.Errorf("second repo lost: %+v", other)
+	}
+	if missing := loadGitHubRelease("owner/missing"); missing != nil {
+		t.Errorf("unexpected entry: %+v", missing)
+	}
+}
+
 func TestDownloadCandidates(t *testing.T) {
 	entry := CatalogEntry{
 		Resolved: &ResolvedSource{Version: "2.23", DownloadURL: "https://totalcmd.net/download.php?id=fi"},

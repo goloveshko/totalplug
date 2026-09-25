@@ -203,18 +203,34 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 
 		p.LastChecked = time.Now()
 
-		// 1. Check custom override source (e.g. "github:Alexey-T/CudaLister")
-		if strings.HasPrefix(p.CustomSource, "github:") && !c.cacheOnly {
+		// 1. Check custom override source (e.g. "github:Alexey-T/CudaLister").
+		// Network pass fetches the latest release and remembers it; the
+		// cache-only first paint replays that remembered result.
+		if strings.HasPrefix(p.CustomSource, "github:") {
 			ghRepo := strings.TrimPrefix(p.CustomSource, "github:")
-			if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil {
-				p.LatestVersion = ghRelease.TagName
+			var version, downloadURL string
+			found := false
+			if c.cacheOnly {
+				if cached := loadGitHubRelease(ghRepo); cached != nil {
+					version, downloadURL, found = cached.TagName, cached.DownloadURL, true
+				}
+			} else if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil && ghRelease.TagName != "" {
+				version = ghRelease.TagName
 				if len(ghRelease.Assets) > 0 {
-					p.DownloadURL = ghRelease.Assets[0].BrowserDownloadURL
+					downloadURL = ghRelease.Assets[0].BrowserDownloadURL
+				}
+				found = true
+				saveGitHubRelease(ghRepo, version, downloadURL)
+			}
+			if found {
+				p.LatestVersion = version
+				if downloadURL != "" {
+					p.DownloadURL = downloadURL
 				}
 				p.WebURL = fmt.Sprintf("https://github.com/%s", ghRepo)
 				p.Source = p.CustomSource
 
-				p.Status = classifyUpdate(p.InstalledVersion, ghRelease.TagName, p.Confidence)
+				p.Status = classifyUpdate(p.InstalledVersion, version, p.Confidence)
 				continue
 			}
 		}
