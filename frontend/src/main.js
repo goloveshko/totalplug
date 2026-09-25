@@ -53,7 +53,9 @@ function setPluginCount(shown, total) {
 
 function renderPluginCount() {
     const filtered = searchQuery.trim() && pluginCountShown !== pluginCountTotal;
-    pluginCountEl.textContent = filtered ? `${pluginCountShown}/${pluginCountTotal}` : String(pluginCountTotal);
+    const label = t('count.plugins');
+    const value = filtered ? `${pluginCountShown}/${pluginCountTotal}` : String(pluginCountTotal);
+    pluginCountEl.textContent = `${label} ${value}`;
     pluginCountEl.hidden = pluginCountTotal === 0 || settingsOpen;
 }
 
@@ -180,7 +182,7 @@ async function runScan(forceRefresh = false) {
         }
 
         renderTable();
-        setStatus(t('status.found', { n: currentPlugins.length }));
+        setStatus(t('status.found'));
     } catch (err) {
         setStatus(t('status.error', { err }));
         console.error(err);
@@ -692,7 +694,7 @@ function buildDom() {
 
     if (currentPlugins.length > 0) {
         renderTable();
-        setStatus(t('status.found', { n: currentPlugins.length }));
+        setStatus(t('status.found'));
     }
 }
 
@@ -702,7 +704,7 @@ EventsOn('plugins:refreshed', (plugins) => {
     currentPlugins = plugins;
     renderTable();
     setCatalogState('fresh');
-    setStatus(t('events.refreshed', { n: currentPlugins.length }));
+    setStatus(t('events.refreshed'));
 });
 
 EventsOn('plugins:refresh:failed', (msg) => {
