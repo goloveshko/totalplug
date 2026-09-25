@@ -141,6 +141,10 @@ and accepted debt we deliberately postponed.
    deliberately NOT pre-filled: a value there shadows the catalog.
    User-side source lists were declined — mirrors belong in the catalog repo
    (`available_sources`), not in per-plugin storage.
+9. **Update source UX** — done (`f1ade2c`): the editor field now accepts a pasted
+   GitHub page URL (or bare `owner/repo`) and canonicalizes to
+   `github:Owner/Repo` on save; the placeholder says «вставьте страницу
+   GitHub». Non-matching text is stored as typed.
 
 ## Backlog / accepted debt
 
