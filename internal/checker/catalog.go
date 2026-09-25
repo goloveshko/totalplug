@@ -112,21 +112,34 @@ func LoadCatalogFromCache() (*CatalogCache, error) {
 
 // SaveCatalogToCache writes downloaded snapshot to local disk.
 func SaveCatalogToCache(snapshot CatalogSnapshot) error {
-	cache := CatalogCache{
+	return saveCacheAtomically(&CatalogCache{
 		UpdatedAt: time.Now().UTC(),
 		Snapshot:  snapshot,
-	}
+	})
+}
 
+// saveCacheAtomically writes the cache to a temp file first, then renames it
+// over the target, so a crash mid-write cannot corrupt the existing cache.
+func saveCacheAtomically(cache *CatalogCache) error {
 	cacheFile := getCachePath()
-	file, err := os.Create(cacheFile)
+	tmpFile := cacheFile + ".tmp"
+
+	file, err := os.Create(tmpFile)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(cache)
+	// Compact JSON, mirroring catalog.min.json on the CDN.
+	if err := json.NewEncoder(file).Encode(cache); err != nil {
+		file.Close()
+		os.Remove(tmpFile)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(tmpFile)
+		return err
+	}
+	return os.Rename(tmpFile, cacheFile)
 }
 
 // FetchCatalog retrieves the catalog from GitHub Pages CDN or returns 24h disk cache.
