@@ -85,16 +85,22 @@ and accepted debt we deliberately postponed.
    future install-from-catalog flow ("Установить", catalog search and filters).
    GitHub quick link and true titlebar integration deferred to stage 3 (frameless).
 3. ~~**Frameless window with Mica/Acrylic**~~ — done (`6566d60`): frameless Wails window
-   with a frontend-drawn titlebar (drag region, double-click maximize, caption buttons)
-   and a "Window effect" dropdown (Mica/Acrylic/None) persisted in
-   `%APPDATA%\TotalPlug\window_effect.txt`, read before window creation — applied on
-   restart; webview is translucent only when an effect is active.
+   with a frontend-drawn titlebar (drag region, double-click maximize, caption buttons).
    Refined in `cbc90ff`: search box and history/refresh/scan/settings actions moved
    into the titlebar as icon buttons (MQ Studio style); fixed-height layout so the
    titlebar never scrolls — views scroll internally.
+   Mica/Acrylic reverted in `8681d38`: the translucent window washed out the themed UI
+   (dark theme + Acrylic showed a semi-transparent titlebar) and the backdrop cannot be
+   changed without recreating the window. The window is now always solid; the effect
+   dropdown, `html[data-effect]` styling and i18n keys are removed. `window_effect.go`
+   and the Get/SetWindowEffect bindings stay as dormant plumbing for a future
+   full effects/theme pass. See backlog.
 
 ## Backlog / accepted debt
 
+- **Mica/Acrylic window effect** — temporarily disabled (see stage 3). Re-enabling needs
+  a proper theme pass: panels readable over any desktop backdrop, opaque titlebar,
+  solid fallback — with `window_effect.txt` + Get/SetWindowEffect bindings already in place.
 - ~~**Unstable plugin IDs** — IDs are derived as `<type>_<folder-name>` and break when a
   plugin moves or is renamed; needs a stable identity scheme before update history
   and overrides can be fully trusted.~~ Shipped in `d32a2a1`: IDs are now
