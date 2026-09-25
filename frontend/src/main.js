@@ -18,7 +18,7 @@ let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
 let progressDialog, progressTitle, progressLive, progressTrack, progressFill;
 let progressPhase, progressUrl, progressResult, progressOk, progressClose;
 let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl;
-let titlebarActionsEl;
+let titlebarActionsEl, pluginCountEl;
 let dialogResolve = null;
 // Progress dialog state: while an update runs, the dialog cannot be dismissed.
 let progressResolve = null;
@@ -37,6 +37,24 @@ function setCatalogState(state) {
     }
     btnRefresh.dataset.catalog = catalogState;
     btnRefresh.title = `${t('btn.refresh')} — ${t(catalogStateLabels[catalogState])}`;
+}
+
+// Plugin-count chip next to the app title: visible rows, or shown/total while
+// the search filter hides some. Kept as state so the language-switch rebuild
+// and the settings view (chrome hidden) restore it correctly.
+let pluginCountShown = 0;
+let pluginCountTotal = 0;
+
+function setPluginCount(shown, total) {
+    pluginCountShown = shown;
+    pluginCountTotal = total;
+    renderPluginCount();
+}
+
+function renderPluginCount() {
+    const filtered = searchQuery.trim() && pluginCountShown !== pluginCountTotal;
+    pluginCountEl.textContent = filtered ? `${pluginCountShown}/${pluginCountTotal}` : String(pluginCountTotal);
+    pluginCountEl.hidden = pluginCountTotal === 0 || settingsOpen;
 }
 
 // Case-insensitive name filter from the toolbar search box; survives the DOM
@@ -156,6 +174,7 @@ async function runScan(forceRefresh = false) {
 
         if (!currentPlugins || currentPlugins.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.none')}</td></tr>`;
+            setPluginCount(0, 0);
             setStatus(t('scan.none'));
             return;
         }
@@ -176,6 +195,7 @@ function renderTable() {
     const rows = currentPlugins
         .map((p, idx) => ({ p, idx }))
         .filter(({ p }) => !q || p.name.toLowerCase().includes(q));
+    setPluginCount(rows.length, currentPlugins.length);
     if (rows.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">${t('table.noresults')}</td></tr>`;
         return;
@@ -341,6 +361,7 @@ function refreshSettingsState() {
 function setMainChromeVisible(visible) {
     searchEl.hidden = !visible;
     titlebarActionsEl.hidden = !visible;
+    renderPluginCount();
 }
 
 function openSettings() {
@@ -361,7 +382,10 @@ function closeSettings() {
 function buildDom() {
     app.innerHTML = `
       <div class="titlebar" id="titlebar">
-        <span class="titlebar-title">TotalPlug</span>
+        <div class="titlebar-left">
+          <span class="titlebar-title">TotalPlug</span>
+          <span class="titlebar-count" id="plugin-count" hidden></span>
+        </div>
         <input type="search" id="plugin-search" placeholder="${t('search.ph')}" autocomplete="off">
         <div class="titlebar-actions" id="titlebar-actions">
           <button type="button" id="btn-history" class="icon-btn" title="${t('btn.history')}">
@@ -538,6 +562,9 @@ function buildDom() {
     // The refresh dot is state, not markup: restore it after the rebuild.
     if (catalogState) setCatalogState(catalogState);
     searchEl = document.getElementById('plugin-search');
+    pluginCountEl = document.getElementById('plugin-count');
+    // The count chip is state too (language switch rebuilds the titlebar).
+    renderPluginCount();
 
     cardDialog = document.getElementById('plugin-card');
     cardNameEl = document.getElementById('card-name');

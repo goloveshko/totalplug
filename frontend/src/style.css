@@ -58,13 +58,28 @@ body {
     padding-left: 12px;
     --wails-draggable: drag;
 }
+.titlebar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Keeps search/actions/caption buttons flush right in every view; the
+       hidden chrome must not drag the caption buttons next to the title. */
+    margin-right: auto;
+}
 .titlebar-title {
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-muted);
-    /* Keeps search/actions/caption buttons flush right in every view; the
-       hidden chrome must not drag the caption buttons next to the title. */
-    margin-right: auto;
+}
+/* Inline element: the UA [hidden] rule keeps it away without an override. */
+.titlebar-count {
+    font-size: 0.7rem;
+    line-height: 1;
+    color: var(--text-muted);
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 8px;
 }
 #plugin-search {
     width: 220px;
