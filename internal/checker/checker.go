@@ -212,6 +212,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 					p.DownloadURL = ghRelease.Assets[0].BrowserDownloadURL
 				}
 				p.WebURL = fmt.Sprintf("https://github.com/%s", ghRepo)
+				p.Source = p.CustomSource
 
 				p.Status = classifyUpdate(p.InstalledVersion, ghRelease.TagName, p.Confidence)
 				continue
@@ -232,6 +233,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 			p.DownloadURL = matchedEntry.Resolved.DownloadURL
 			p.DownloadURLs = downloadCandidates(*matchedEntry)
 			p.WebURL = matchedEntry.Resolved.WebURL
+			p.Source = resolvedSourceName(*matchedEntry)
 			p.Arch = matchedEntry.Arch
 			p.Description = matchedEntry.Description
 
@@ -275,4 +277,24 @@ func downloadCandidates(entry CatalogEntry) []string {
 		add(src.DownloadURL)
 	}
 	return urls
+}
+
+// resolvedSourceName picks the catalog source key the resolved entry came
+// from (e.g. "totalcmd"), so the GUI can show where the version actually is.
+// Keys are checked in name order for a stable answer when sources share URLs;
+// "catalog" is the fallback when resolved matches no listed source.
+func resolvedSourceName(entry CatalogEntry) string {
+	names := make([]string, 0, len(entry.AvailableSources))
+	for name := range entry.AvailableSources {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		src := entry.AvailableSources[name]
+		if src.DownloadURL == entry.Resolved.DownloadURL &&
+			(src.Version == "" || src.Version == entry.Resolved.Version) {
+			return name
+		}
+	}
+	return "catalog"
 }

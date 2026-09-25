@@ -56,10 +56,13 @@ type Plugin struct {
 	// catalog mirrors); empty means only DownloadURL is known.
 	DownloadURLs []string     `json:"download_urls,omitempty"`
 	WebURL       string       `json:"web_url,omitempty"`
-	Arch         string       `json:"arch,omitempty"`
-	Description  string       `json:"description,omitempty"`
-	Status       PluginStatus `json:"status"`
-	LastChecked  time.Time    `json:"last_checked,omitempty"`
+	// Source names where LatestVersion actually came from: a catalog source
+	// key (e.g. "totalcmd") or the custom override ("github:Owner/Repo").
+	Source      string       `json:"source,omitempty"`
+	Arch        string       `json:"arch,omitempty"`
+	Description string       `json:"description,omitempty"`
+	Status      PluginStatus `json:"status"`
+	LastChecked time.Time    `json:"last_checked,omitempty"`
 }
 
 // Config represents app-level settings.

@@ -235,7 +235,8 @@ function openCard(index) {
         cardRow(t('col.installed'), `<code>${plugin.installed_version}</code> <small style="color:var(--text-muted)">${plugin.confidence}</small>`) +
         cardRow(t('col.latest'), plugin.latest_version ? `<code>${plugin.latest_version}</code>` : '—') +
         cardRow(t('col.status'), getStatusBadge(plugin.status)) +
-        (plugin.custom_source ? cardRow(t('editor.source'), `<code class="path">${plugin.custom_source}</code>`) : '') +
+        cardRow(t('editor.source'), plugin.source ? `<code class="path">${escapeHtml(plugin.source)}</code>` : '—') +
+        (plugin.web_url ? cardRow(t('card.home'), `<a href="${escapeHtml(plugin.web_url)}" class="dlg-link">${escapeHtml(plugin.web_url)}</a>`) : '') +
         cardRow(t('card.path'), `<code class="path">${plugin.path}</code>`);
 
     const auto = plugin.installed_version || '';
@@ -623,6 +624,14 @@ function buildDom() {
     document.getElementById('app-dialog-close').addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
     // Links in dialog messages open in the system browser, never in the webview.
     appDialogMsg.addEventListener('click', (e) => {
+        const a = e.target.closest('a.dlg-link');
+        if (a) {
+            e.preventDefault();
+            BrowserOpenURL(a.href);
+        }
+    });
+    // Same rule for the plugin card homepage link.
+    cardInfoEl.addEventListener('click', (e) => {
         const a = e.target.closest('a.dlg-link');
         if (a) {
             e.preventDefault();

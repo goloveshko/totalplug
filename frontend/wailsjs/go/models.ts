@@ -31,6 +31,7 @@ export namespace domain {
 	    download_url?: string;
 	    download_urls?: string[];
 	    web_url?: string;
+	    source?: string;
 	    arch?: string;
 	    description?: string;
 	    status: string;
@@ -55,6 +56,7 @@ export namespace domain {
 	        this.download_url = source["download_url"];
 	        this.download_urls = source["download_urls"];
 	        this.web_url = source["web_url"];
+	        this.source = source["source"];
 	        this.arch = source["arch"];
 	        this.description = source["description"];
 	        this.status = source["status"];

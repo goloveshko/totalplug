@@ -192,3 +192,26 @@ func TestDownloadCandidates(t *testing.T) {
 		}
 	}
 }
+
+func TestResolvedSourceName(t *testing.T) {
+	resolved := &ResolvedSource{Version: "2.23", DownloadURL: "https://wincmd.ru/files/1140597/mirror/wlx_fi_2.23.zip"}
+	entry := CatalogEntry{
+		Resolved: resolved,
+		AvailableSources: map[string]ResolvedSource{
+			"totalcmd":  {Version: "2.23", DownloadURL: "https://totalcmd.net/download.php?id=fi"},
+			"wincmd_ru": *resolved,
+		},
+	}
+	if got := resolvedSourceName(entry); got != "wincmd_ru" {
+		t.Errorf("resolvedSourceName = %q, want %q", got, "wincmd_ru")
+	}
+
+	// Version mismatch must not claim the source.
+	wrongVersion := CatalogEntry{
+		Resolved:         &ResolvedSource{Version: "2.23", DownloadURL: "https://totalcmd.net/download.php?id=fi"},
+		AvailableSources: map[string]ResolvedSource{"totalcmd": {Version: "2.20", DownloadURL: "https://totalcmd.net/download.php?id=fi"}},
+	}
+	if got := resolvedSourceName(wrongVersion); got != "catalog" {
+		t.Errorf("resolvedSourceName = %q, want %q when no source matches", got, "catalog")
+	}
+}
