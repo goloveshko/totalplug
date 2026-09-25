@@ -89,6 +89,10 @@ and accepted debt we deliberately postponed.
    Refined in `cbc90ff`: search box and history/refresh/scan/settings actions moved
    into the titlebar as icon buttons (MQ Studio style); fixed-height layout so the
    titlebar never scrolls — views scroll internally.
+   Fixed in `b5b0f2c`: action icons now actually hide in the settings view (their
+   `display:flex` overrode the UA `[hidden]` rule); scan icon became a bolt (the
+   magnifier read as search), focus ring softened to accent, «Back» demoted to a
+   quiet ghost button.
    Mica/Acrylic reverted in `8681d38`: the translucent window washed out the themed UI
    (dark theme + Acrylic showed a semi-transparent titlebar) and the backdrop cannot be
    changed without recreating the window. The window is now always solid; the effect
