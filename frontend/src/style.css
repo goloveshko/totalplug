@@ -147,11 +147,6 @@ body {
     color: white;
 }
 
-/* With a Mica/Acrylic backdrop the window itself must stay transparent. */
-html[data-effect] body {
-    background: transparent;
-}
-
 #view-main {
     flex: 1;
     min-height: 0;

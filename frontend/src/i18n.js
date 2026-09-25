@@ -77,12 +77,6 @@ const STRINGS = {
         'win.min': 'Minimize',
         'win.max': 'Maximize',
         'win.close': 'Close',
-        'settings.effect': 'Window effect',
-        'settings.effect.hint': 'Applied after the app is restarted.',
-        'settings.effect.error': 'Failed to save window effect: {err}',
-        'effect.mica': 'Mica',
-        'effect.acrylic': 'Acrylic',
-        'effect.none': 'No effect',
     },
     ru: {
         'status.initial': 'Нажмите «Сканировать», чтобы проверить плагины...',
@@ -161,12 +155,6 @@ const STRINGS = {
         'win.min': 'Свернуть',
         'win.max': 'Развернуть',
         'win.close': 'Закрыть',
-        'settings.effect': 'Эффект окна',
-        'settings.effect.hint': 'Применяется после перезапуска приложения.',
-        'settings.effect.error': 'Не удалось сохранить эффект окна: {err}',
-        'effect.mica': 'Mica',
-        'effect.acrylic': 'Акрил',
-        'effect.none': 'Без эффекта',
     },
 };
 

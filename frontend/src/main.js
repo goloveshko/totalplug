@@ -1,5 +1,5 @@
 import './style.css';
-import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory, GetWindowEffect, SetWindowEffect } from '../wailsjs/go/main/App';
+import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory } from '../wailsjs/go/main/App';
 import { EventsOn, BrowserOpenURL, WindowMinimise, WindowToggleMaximise, Quit } from '../wailsjs/runtime';
 import { t, currentLang, setLang } from './i18n.js';
 import { currentTheme, setTheme, currentScale, setScale } from './theme.js';
@@ -15,13 +15,9 @@ let cardDialog, cardNameEl, cardSubEl, cardInfoEl;
 let editorForm, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
 let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
-let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl, effectSelect;
+let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl;
 let titlebarActionsEl;
 let dialogResolve = null;
-
-// Backdrop chosen in Settings; applied by Go at startup, so the UI only shows
-// it and warns that a restart is needed.
-let effectChoice = 'none';
 
 // Case-insensitive name filter from the toolbar search box; survives the DOM
 // rebuild on language switch, like the settings state below.
@@ -226,7 +222,6 @@ function refreshSettingsState() {
     langSelect.value = currentLang();
     fontScaleEl.value = String(currentScale());
     fontScaleValueEl.textContent = currentScale() + '%';
-    effectSelect.value = effectChoice;
     settingsView.querySelectorAll('.settings-nav button').forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.panel === settingsSection);
     });
@@ -344,13 +339,6 @@ function buildDom() {
               <input type="range" id="font-scale" min="80" max="140" step="5">
               <span class="font-value" id="font-scale-value">100%</span>
             </div>
-            <div class="section-label">${t('settings.effect')}</div>
-            <select id="effect-select">
-              <option value="mica">${t('effect.mica')}</option>
-              <option value="acrylic">${t('effect.acrylic')}</option>
-              <option value="none">${t('effect.none')}</option>
-            </select>
-            <p class="editor-hint">${t('settings.effect.hint')}</p>
           </div>
           <div class="settings-panel" id="panel-language">
             <h3>${t('settings.nav.language')}</h3>
@@ -447,7 +435,6 @@ function buildDom() {
     langSelect = document.getElementById('lang-select');
     fontScaleEl = document.getElementById('font-scale');
     fontScaleValueEl = document.getElementById('font-scale-value');
-    effectSelect = document.getElementById('effect-select');
 
     document.getElementById('win-min').addEventListener('click', WindowMinimise);
     document.getElementById('win-max').addEventListener('click', WindowToggleMaximise);
@@ -495,15 +482,6 @@ function buildDom() {
         setScale(Number(fontScaleEl.value));
         fontScaleValueEl.textContent = currentScale() + '%';
     });
-    effectSelect.addEventListener('change', async () => {
-        try {
-            await SetWindowEffect(effectSelect.value);
-            effectChoice = effectSelect.value;
-        } catch (err) {
-            setStatus(t('settings.effect.error', { err }));
-            effectSelect.value = effectChoice;
-        }
-    });
     langSelect.addEventListener('change', () => {
         setLang(langSelect.value);
         // Rebuild all labels; buildDom() below keeps the settings view open.
@@ -547,20 +525,6 @@ EventsOn('plugins:refresh:failed', (msg) => {
 });
 
 buildDom();
-
-// Startup: mirror the Go-side backdrop (chosen before the window existed) so
-// the settings select and the transparent-body styling match reality.
-GetWindowEffect()
-    .then((effect) => {
-        effectChoice = effect;
-        if (effect !== 'none') {
-            document.documentElement.dataset.effect = effect;
-        } else {
-            delete document.documentElement.dataset.effect;
-        }
-        refreshSettingsState();
-    })
-    .catch((err) => console.error('GetWindowEffect:', err));
 
 // Startup: cache-only scan, no network wait before the window is useful
 runScan(false);

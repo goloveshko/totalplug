@@ -6,7 +6,6 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed all:frontend/dist
@@ -16,23 +15,9 @@ func main() {
 	// Create an instance of the app structure
 	app := NewApp()
 
-	// Frameless window with an optional translucent backdrop (Mica/Acrylic).
-	// With an effect active the webview must be transparent for it to show.
-	effect := loadWindowEffect()
-	var backdrop windows.BackdropType
-	switch effect {
-	case effectMica:
-		backdrop = windows.Mica
-	case effectAcrylic:
-		backdrop = windows.Acrylic
-	}
-	translucent := backdrop != windows.None
-
-	background := &options.RGBA{R: 244, G: 244, B: 247, A: 255}
-	if translucent {
-		background = &options.RGBA{A: 0}
-	}
-
+	// Frameless window with a frontend-drawn titlebar. The Mica/Acrylic backdrop
+	// is temporarily disabled: a translucent window washes out the themed UI,
+	// and a proper effects pass needs its own design work (see ROADMAP).
 	// Create application with options
 	err := wails.Run(&options.App{
 		Title:     "totalplug",
@@ -42,13 +27,8 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: background,
+		BackgroundColour: &options.RGBA{R: 244, G: 244, B: 247, A: 255},
 		OnStartup:        app.startup,
-		Windows: &windows.Options{
-			WebviewIsTransparent: translucent,
-			WindowIsTranslucent:  translucent,
-			BackdropType:         backdrop,
-		},
 		Bind: []interface{}{
 			app,
 		},
