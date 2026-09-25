@@ -145,6 +145,12 @@ and accepted debt we deliberately postponed.
    GitHub page URL (or bare `owner/repo`) and canonicalizes to
    `github:Owner/Repo` on save; the placeholder says «вставьте страницу
    GitHub». Non-matching text is stored as typed.
+10. **GitHub release cache for first paint** — done (`154eb25`): successful
+    `github:Owner/Repo` lookups are remembered per repo in
+    `%APPDATA%\TotalPlug\github_release_cache.json`; the cache-only startup
+    pass replays the last known version/URLs instead of flickering
+    «N/A (Not in catalog)», and the background network pass refreshes both
+    the UI and the cache. Best-effort file, same pattern as the catalog cache.
 
 ## Backlog / accepted debt
 
