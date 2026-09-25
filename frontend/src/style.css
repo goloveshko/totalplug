@@ -553,6 +553,39 @@ dialog h2 {
 .card-info code.path {
     word-break: break-all;
 }
+/* Source glyph beside the catalog version: the tooltip names the provider, so
+   no text row is spent on it. */
+.src-icon {
+    display: inline-flex;
+    vertical-align: -2px;
+    margin-left: 8px;
+    color: var(--text-muted);
+}
+.src-icon svg {
+    width: 14px;
+    height: 14px;
+}
+/* Raw source key and on-disk path: long, rarely read, same disclosure as the
+   error dialog. .k/.v rules from .card-info apply as descendants. */
+.card-tech {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.card-tech summary {
+    cursor: pointer;
+    user-select: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.card-tech-body {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 14px;
+    align-items: baseline;
+    margin-top: 6px;
+}
 .card-edit-title {
     font-size: 0.7rem;
     font-weight: 700;

@@ -249,6 +249,26 @@ function renderTable() {
 const cardRow = (label, valueHtml) =>
     `<div class="k">${label}</div><div class="v">${valueHtml}</div>`;
 
+// "https://" is noise in a narrow dialog and costs a line wrap; the href keeps it.
+const shortUrl = (url) => url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+
+// Which provider resolved the latest version, shown as a glyph beside it. It
+// replaces a whole "Update source" row: for a GitHub plugin that row duplicated
+// the homepage, and the raw keys ("totalcmd", "github:Owner/Repo") are only
+// interesting to a user debugging something, so they moved to the details block.
+// Each glyph paints itself: a CSS `fill` would override the markup attribute.
+function sourceIcon(source) {
+    if (!source) return '';
+    const github = /^github:/i.test(source);
+    const label = github ? 'GitHub' : t('card.source.catalog');
+    const glyph = github
+        // octicons/mark-github-16 (MIT, (c) GitHub Inc.)
+        ? '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>'
+        // Stand-in until the catalog ships its own mark.
+        : '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></g></svg>';
+    return `<span class="src-icon" role="img" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${glyph}</span>`;
+}
+
 function openCard(index) {
     const plugin = currentPlugins[index];
     if (!plugin) return;
@@ -256,18 +276,20 @@ function openCard(index) {
     editingPlugin = plugin;
     cardNameEl.textContent = plugin.name;
     cardSubEl.textContent = plugin.type + (plugin.arch ? ' · ' + plugin.arch : '');
-    const source = displaySource(plugin.source);
-    const sourceHtml = !source ? '—'
-        : /^https?:\/\//i.test(source)
-            ? `<a href="${escapeHtml(source)}" class="dlg-link">${escapeHtml(source)}</a>`
-            : `<code class="path">${escapeHtml(source)}</code>`;
+    const latest = plugin.latest_version
+        ? `<code>${escapeHtml(plugin.latest_version)}</code>${sourceIcon(plugin.source)}`
+        : '—';
+    const site = plugin.web_url
+        ? `<a href="${escapeHtml(plugin.web_url)}" class="dlg-link">${escapeHtml(shortUrl(plugin.web_url))}</a>`
+        : '';
+    const tech = (plugin.source ? cardRow(t('card.source'), `<code>${escapeHtml(plugin.source)}</code>`) : '') +
+        cardRow(t('card.path'), `<code class="path">${escapeHtml(plugin.path)}</code>`);
     cardInfoEl.innerHTML =
         cardRow(t('col.installed'), `<code>${escapeHtml(plugin.installed_version)}</code> <small class="muted">${escapeHtml(plugin.confidence)}</small>`) +
-        cardRow(t('col.latest'), plugin.latest_version ? `<code>${escapeHtml(plugin.latest_version)}</code>` : '—') +
+        cardRow(t('col.latest'), latest) +
         cardRow(t('col.status'), getStatusBadge(plugin.status)) +
-        cardRow(t('editor.source'), sourceHtml) +
-        (plugin.web_url ? cardRow(t('card.home'), `<a href="${escapeHtml(plugin.web_url)}" class="dlg-link">${escapeHtml(plugin.web_url)}</a>`) : '') +
-        cardRow(t('card.path'), `<code class="path">${escapeHtml(plugin.path)}</code>`);
+        (site ? cardRow(t('card.site'), site) : '') +
+        `<details class="card-tech"><summary>${t('card.details')}</summary><div class="card-tech-body">${tech}</div></details>`;
 
     const auto = plugin.installed_version || '';
     editorVersionEl.value = /^(unknown|n\/a)/i.test(auto) ? '' : auto;
