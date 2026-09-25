@@ -151,6 +151,11 @@ and accepted debt we deliberately postponed.
     pass replays the last known version/URLs instead of flickering
     «N/A (Not in catalog)», and the background network pass refreshes both
     the UI and the cache. Best-effort file, same pattern as the catalog cache.
+11. **Demo mock backend for design work** — done (`02515f1`): `src/mock.js`
+    fakes the Wails bridge (sample plugins, background refresh, update
+    progress incl. an always-locked plugin, overrides, history) only under
+    `npm run dev`; the full GUI runs in a plain browser with no Go/Wails.
+    Workflow documented in `frontend/README.md`.
 
 ## Backlog / accepted debt
 
