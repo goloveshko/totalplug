@@ -104,6 +104,13 @@ and accepted debt we deliberately postponed.
    dropdown, `html[data-effect]` styling and i18n keys are removed. `window_effect.go`
    and the Get/SetWindowEffect bindings stay as dormant plumbing for a future
    full effects/theme pass. See backlog.
+4. **Update progress dialog** — done (`981efbb`): «Обновить» now opens a dialog right
+   after the confirm that streams `update:progress` events from the updater
+   (download percent via a counting reader over the response body, then extract and
+   install phases, indeterminate bar when ContentLength is unknown) and shows the
+   download source URL; the final result (success + backup path, locked warning, or
+   friendly error with technical details) replaces the progress in the same dialog.
+   Not dismissable while running (Esc blocked, OK/✕ hidden until the end).
 
 ## Backlog / accepted debt
 
