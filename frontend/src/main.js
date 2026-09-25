@@ -35,11 +35,22 @@ function setStatus(message) {
 }
 
 // In-app replacement for native confirm()/alert(): those render with the
-// "wails.localhost" origin header and cannot be styled.
+// "wails" origin header and cannot be styled.
+const escapeHtml = (s) => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// Turn http(s) URLs in already-escaped text into clickable links. Plain anchors
+// would navigate the webview, so clicks are intercepted and routed to the
+// system browser (see the appDialogMsg listener in buildDom).
+const linkify = (escaped) => escaped.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" class="dlg-link">$1</a>',
+);
+
 function openAppDialog(message, isConfirm) {
     return new Promise((resolve) => {
         dialogResolve = resolve;
-        appDialogMsg.textContent = message;
+        appDialogMsg.innerHTML = linkify(escapeHtml(message));
         appDialogCancel.style.display = isConfirm ? '' : 'none';
         appDialog.showModal();
     });
@@ -400,7 +411,9 @@ function buildDom() {
       </dialog>
 
       <dialog id="app-dialog">
-        <div class="dlg-header" id="app-dialog-header">TotalPlug</div>
+        <button type="button" class="dlg-close" id="app-dialog-close" title="${t('dialog.close')}" aria-label="${t('dialog.close')}">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
         <div class="dlg-message" id="app-dialog-msg"></div>
         <div class="editor-actions">
           <button type="button" class="btn-save" id="app-dialog-ok">${t('dialog.ok')}</button>
@@ -462,6 +475,15 @@ function buildDom() {
 
     appDialogOk.addEventListener('click', () => { settleAppDialog(true); appDialog.close(); });
     appDialogCancel.addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
+    document.getElementById('app-dialog-close').addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
+    // Links in dialog messages open in the system browser, never in the webview.
+    appDialogMsg.addEventListener('click', (e) => {
+        const a = e.target.closest('a.dlg-link');
+        if (a) {
+            e.preventDefault();
+            BrowserOpenURL(a.href);
+        }
+    });
     // Esc or any other dismissal path must resolve a pending confirm as "no".
     appDialog.addEventListener('close', () => settleAppDialog(false));
 
