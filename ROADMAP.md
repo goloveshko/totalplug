@@ -29,6 +29,12 @@ and accepted debt we deliberately postponed.
 - Windows file-lock detection (error codes 5/32/33) with a
   "close Total Commander and run again" hint.
 - Downloads restricted to https (loopback http allowed for tests) and capped at 256 MiB.
+- Mirror fallback (`7c6b18d`): the checker collects ordered download URLs per plugin from
+  the catalog's `available_sources` (resolved first, then same-version mirrors, stable
+  order); the updater tries each until one delivers a usable archive, so a dead
+  totalcmd.net link can fall through to a wincmd.ru mirror. The catalog currently lists
+  only the `totalcmd` source per entry — mirrors become effective once added to the
+  totalplug-catalog repo.
 - Zip-slip guarded extraction.
 
 ### CLI (`bin/totalplug.exe`)
