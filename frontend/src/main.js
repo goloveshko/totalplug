@@ -246,12 +246,25 @@ function openCard(index) {
     cardDialog.showModal();
 }
 
+// The only scheme the checker understands is "github:Owner/Repo", but nobody
+// remembers that format — accept what users actually paste (a GitHub page URL,
+// with or without .git/trailing slash, or a bare owner/repo) and canonicalize.
+// Anything else is stored as typed.
+function normalizeSource(raw) {
+    let s = raw.trim()
+        .replace(/^https?:\/\/(?:www\.)?github\.com\//i, '')
+        .replace(/^github:/i, '')
+        .replace(/\.git$/i, '')
+        .replace(/\/+$/, '');
+    return /^[\w.-]+\/[\w.-]+$/.test(s) ? `github:${s}` : raw.trim();
+}
+
 async function saveOverrideFromEditor() {
     if (!editingPlugin) return;
 
     const override = {
         custom_version: editorVersionEl.value.trim(),
-        custom_source: editorSourceEl.value.trim(),
+        custom_source: normalizeSource(editorSourceEl.value),
     };
 
     editorSaveGuard(true);
@@ -499,7 +512,7 @@ function buildDom() {
           </label>
           <label>
             ${t('editor.source')}
-            <input type="text" id="editor-source" placeholder="github:Owner/Repo" autocomplete="off">
+            <input type="text" id="editor-source" placeholder="${t('editor.source.ph')}" autocomplete="off">
           </label>
           <p class="editor-hint">${t('editor.hint')}</p>
           <div class="editor-actions">
