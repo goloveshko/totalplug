@@ -197,10 +197,29 @@ and accepted debt we deliberately postponed.
       resolves theme + language before the module graph loads (no light flash on a
       dark start) and an inline first-paint background color; unused Wails template
       `src/app.css` deleted.
-    Deliberately not done: CSP meta tag (see backlog — a strict `script-src` can
-    break the Wails-injected runtime and is only checkable on a live `wails build`);
+    Deliberately not done: the CSP meta tag (done later, see stage 13);
     `SetWindowEffect` sync from `setTheme` (moot while the window effect is
     reverted, and it needs a window recreation anyway); column sorting.
+13. **Strict CSP for the packaged GUI** — done (`ab10d64`, `28484d3`): `index.html`
+    declares `default-src 'self'; script-src 'self'; style-src 'self'; img-src
+    'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri
+    'self'; form-action 'self'` — no `'unsafe-inline'`, no `'unsafe-eval'`. To make
+    that possible the pre-paint theme/lang script and the first-paint background
+    moved to `frontend/public/boot.{js,css}` (Vite copies `public/` verbatim, so
+    they load as classic same-origin resources instead of inline tags, and a
+    parser-blocking `<script src>` still runs before first paint). The policy ships
+    in the production bundle only: the new `vite.config.js` strips the meta tag for
+    `npm run dev`, where Vite injects imported CSS as inline `<style>` elements
+    (the same config pins the dev port to 5199, which `frontend/README.md` always
+    claimed). Wails v2.14 is compatible by construction — it injects
+    `/wails/runtime.js` and `/wails/ipc.js` into `<head>` as `<script src>` only,
+    uses no `eval`/`new Function`, and delivers Go→JS callbacks through WebView2
+    `ExecuteScript`, which a page CSP does not gate. Verified: `wails build`
+    succeeds and the binary embeds `boot.*` + the meta tag; under `vite preview`
+    (policy active) all four resources load with no violation and both stylesheets
+    parse; the dev harness is unchanged. Still to confirm on a live
+    `build/bin/totalplug.exe`: the GUI renders and bindings answer under WebView2 —
+    the browser harness cannot host the Wails bridge.
 
 ## Backlog / accepted debt
 
@@ -226,12 +245,12 @@ and accepted debt we deliberately postponed.
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
   user-menu button to the CLI.
-- **CSP meta tag for WebView2** — recommended by the review; the frontend side is
+- ~~**CSP meta tag for WebView2** — recommended by the review; the frontend side is
   ready (no inline `onclick`, one delegated click handler), but the pre-paint
   theme/lang script in `index.html` must move to its own file (a static page cannot
   carry a nonce) and a strict `script-src` has to be verified against the
-  Wails-injected runtime on a live `wails build`. Not checkable from the browser
-  harness — do it with a manual run of `build/bin/totalplug.exe`.
+  Wails-injected runtime on a live `wails build`.~~ Shipped in `28484d3` (stage 13);
+  only the live `build/bin/totalplug.exe` run is left.
 - **Column sorting** (at least status and name) — deferred by the review; needs a
   sort state in `main.js` and stable ordering with the search filter.
 - **`domain.Config`** struct is dead code (TCPath/IniPath/Language/AutoCheck unwired);
