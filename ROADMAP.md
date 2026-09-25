@@ -50,7 +50,9 @@ and accepted debt we deliberately postponed.
   (commit `54aa8f4`); pre-existing Russian UI text.
 
 ### Engineering
-- GitHub Actions CI on Windows: `go mod verify`, vet, `go test -race -cover ./...`, CLI build.
+- GitHub Actions CI: Windows job (`go mod verify`, vet, `go test -race -cover ./...`,
+  CLI build) plus an ubuntu job that runs `npm ci` and `npm run build`, so the
+  frontend bundle is actually compiled on every push (`f6702e3`).
 - Hermetic unit tests for checker, config, CLI arg/prompt logic, pipeline ini resolution,
   storage and updater (httptest + in-memory zips).
 - Corrupt storage JSON is quarantined to `<file>.corrupt` and reported, not silently dropped.
@@ -156,6 +158,49 @@ and accepted debt we deliberately postponed.
     progress incl. an always-locked plugin, overrides, history) only under
     `npm run dev`; the full GUI runs in a plain browser with no Go/Wails.
     Workflow documented in `frontend/README.md`.
+12. **External review pass (REVIEW.md)** — done: behavior, i18n and theme fixes
+    from the design review, verified in the browser harness.
+    - i18n (`b35e0d2`): CLDR plurals through `Intl.PluralRules` (`tp('count.plugins', n)` →
+      «2 плагина», «5 плагинов»); `setLang` syncs `document.documentElement.lang`
+      (was permanently `ru`); `{name}` substitution is `$&`-safe; emoji
+      (🔍 🔄 🕘 ⚙ ⚠️) removed from locale strings — icons are SVG in markup,
+      tooltips/screen-reader labels are text; «обновлен» → «обновлён»,
+      «общественным каталогом» → «каталогом сообщества».
+    - Table (`b35e0d2`, `6cec710`): the «Источник» column showed `confidence`, not a source — the column
+      is gone (6 columns), detection stays in the plugin card; every cell
+      (`name`, `type`, versions, `path`) is escaped; the type cell became a muted
+      label (`.cell-type`) instead of `<strong>`; badges use monochrome glyphs
+      (`✓ ↑ ✗ ?`); placeholder rows share `.table-empty`; sticky `thead` with the
+      scroll container moved to `.table-container` (inset shadow instead of a
+      collapsed border); startup state is «Сканирую wincmd.ini…», a failed scan
+      shows its own row instead of pretending the table is empty.
+    - Behavior (`b35e0d2`): `onclick="handleUpdate(i)"` replaced by the delegated `data-update`
+      click (no `window.` global — a future `script-src` CSP stays possible) plus a
+      `progressRunning` guard so a second click cannot start a parallel update;
+      titlebar double-click ignores inputs/buttons (it used to maximise from the
+      search box); history dates format in the UI locale (`ru-RU`/`en-GB`), its
+      button reads «Закрыть»; dialogs focus the safe button (Cancel on confirm) and
+      return focus on close; theme cards are real `<button>`s with `aria-pressed`
+      instead of `div[role=button]` (Enter/Space now work); icon/caption buttons got
+      `aria-label`; catalog-state dot text is mirrored into `aria-label`.
+    - CSS (`6cec710`): `color-scheme` per theme (native scrollbars, `<select>`, range,
+      search-clear), visible progress track (`--track-bg`), hover for dialog ghost
+      buttons, `dialog { max-height: 85vh; overflow-y: auto }`, `--badge-err` for
+      dark, `.btn-update:hover` via a themed `--badge-avail-strong` token, light
+      badges darkened for AA (`--badge-up #15803d`, `--badge-avail #c05621`) with
+      `color-mix` tints replacing per-theme rgba, `[hidden] { display: none
+      !important }` (the three element-specific patches removed), tabular numerals
+      + `user-select: text` for versions/paths, `prefers-reduced-motion`, titlebar
+      and button widths in rem so the font-scale setting scales them, Windows-only
+      font stack.
+    - Shell (`cd81f89`, `1152dce`): `index.html` defaults to `lang="en"` with a pre-paint script that
+      resolves theme + language before the module graph loads (no light flash on a
+      dark start) and an inline first-paint background color; unused Wails template
+      `src/app.css` deleted.
+    Deliberately not done: CSP meta tag (see backlog — a strict `script-src` can
+    break the Wails-injected runtime and is only checkable on a live `wails build`);
+    `SetWindowEffect` sync from `setTheme` (moot while the window effect is
+    reverted, and it needs a window recreation anyway); column sorting.
 
 ## Backlog / accepted debt
 
@@ -181,6 +226,14 @@ and accepted debt we deliberately postponed.
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
   user-menu button to the CLI.
+- **CSP meta tag for WebView2** — recommended by the review; the frontend side is
+  ready (no inline `onclick`, one delegated click handler), but the pre-paint
+  theme/lang script in `index.html` must move to its own file (a static page cannot
+  carry a nonce) and a strict `script-src` has to be verified against the
+  Wails-injected runtime on a live `wails build`. Not checkable from the browser
+  harness — do it with a manual run of `build/bin/totalplug.exe`.
+- **Column sorting** (at least status and name) — deferred by the review; needs a
+  sort state in `main.js` and stable ordering with the search filter.
 - **`domain.Config`** struct is dead code (TCPath/IniPath/Language/AutoCheck unwired);
   either wire it into persistence or delete it.
 - **Minor `internal/config` debt** — `%COMMANDER_PATH%` expands only the first occurrence;
