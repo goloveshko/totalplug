@@ -67,6 +67,18 @@ type Config struct {
 	AutoCheck bool   `json:"auto_check"`
 }
 
+// UpdateProgress is one event emitted while an update runs, so the GUI can
+// show what is happening and from where.
+type UpdateProgress struct {
+	// Phase is "download", "extract" or "install".
+	Phase string `json:"phase"`
+	// Percent is 0..100 for the download phase, or -1 when the total size is
+	// unknown (indeterminate progress).
+	Percent float64 `json:"percent"`
+	// URL is the download source, set during the download phase.
+	URL string `json:"url,omitempty"`
+}
+
 // UpdateResult reports the outcome of a GUI-initiated plugin update.
 type UpdateResult struct {
 	// Locked is true when the update was aborted because plugin files are

@@ -15,9 +15,14 @@ let cardDialog, cardNameEl, cardSubEl, cardInfoEl;
 let editorForm, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
 let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
+let progressDialog, progressTitle, progressLive, progressTrack, progressFill;
+let progressPhase, progressUrl, progressResult, progressOk, progressClose;
 let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl;
 let titlebarActionsEl;
 let dialogResolve = null;
+// Progress dialog state: while an update runs, the dialog cannot be dismissed.
+let progressResolve = null;
+let progressRunning = false;
 
 // Case-insensitive name filter from the toolbar search box; survives the DOM
 // rebuild on language switch, like the settings state below.
@@ -57,7 +62,6 @@ function openAppDialog(html, isConfirm) {
 }
 const textToDialogHtml = (message) => linkify(escapeHtml(message));
 const showConfirm = (message) => openAppDialog(textToDialogHtml(message), true);
-const showAlert = (message) => openAppDialog(textToDialogHtml(message), false);
 
 // Raw Go errors are technical English; show the localized friendly sentence
 // with a named plugin-page link and hide the exact error behind a disclosure.
@@ -78,6 +82,36 @@ function settleAppDialog(result) {
     if (dialogResolve) {
         dialogResolve(result);
         dialogResolve = null;
+    }
+}
+
+function settleProgress() {
+    if (progressResolve) {
+        progressResolve();
+        progressResolve = null;
+    }
+}
+
+// renderUpdateProgress maps one updater event onto the dialog. Events arriving
+// outside a running update (stale listener, closed dialog) are ignored.
+function renderUpdateProgress(p) {
+    if (!progressDialog || !progressDialog.open || !progressRunning) return;
+
+    const percent = Number(p?.percent ?? -1);
+    const phase = p?.phase || 'download';
+    if (phase === 'download' && percent >= 0) {
+        progressPhase.textContent = `${t('update.progress.download')} — ${Math.min(100, Math.round(percent))}%`;
+        progressTrack.classList.remove('indeterminate');
+        progressFill.style.width = `${Math.min(100, percent)}%`;
+    } else {
+        progressPhase.textContent = `${t('update.progress.' + phase) || phase}…`;
+        progressTrack.classList.add('indeterminate');
+    }
+    const url = String(p?.url || '');
+    // Sticky: extract/install events carry no URL, keep showing the download source.
+    if (url) {
+        progressUrl.textContent = `${t('update.progress.source')}: ${url}`;
+        progressUrl.title = url;
     }
 }
 
@@ -203,23 +237,50 @@ window.handleUpdate = async function(index) {
         return;
     }
 
+    // One dialog shows progress, then the final result in the same place.
+    progressTitle.textContent = t('update.progress.title', { name: plugin.name });
+    progressPhase.textContent = `${t('update.progress.download')}…`;
+    progressUrl.textContent = '';
+    progressFill.style.width = '0%';
+    progressTrack.classList.add('indeterminate');
+    progressLive.hidden = false;
+    progressResult.hidden = true;
+    progressResult.innerHTML = '';
+    progressOk.hidden = true;
+    progressClose.hidden = true;
+    progressRunning = true;
+    progressDialog.showModal();
+    setStatus(t('update.running', { name: plugin.name }));
+
+    const finishProgress = (html) => {
+        progressRunning = false;
+        progressLive.hidden = true;
+        progressResult.innerHTML = html;
+        progressResult.hidden = false;
+        progressOk.hidden = false;
+        progressClose.hidden = false;
+    };
+
+    let succeeded = false;
     try {
-        setStatus(t('update.running', { name: plugin.name }));
         const result = await UpdatePlugin(plugin);
 
         if (result && result.locked) {
+            finishProgress(escapeHtml(t('update.locked', { name: plugin.name })));
             setStatus(t('update.locked', { name: plugin.name }));
-            return;
+        } else {
+            finishProgress(escapeHtml(result && result.backup_path
+                ? t('update.done_backup', { name: plugin.name, path: result.backup_path })
+                : t('update.done', { name: plugin.name })));
+            succeeded = true;
         }
-
-        await showAlert(result && result.backup_path
-            ? t('update.done_backup', { name: plugin.name, path: result.backup_path })
-            : t('update.done', { name: plugin.name }));
-        runScan(false);
     } catch (err) {
-        await openAppDialog(errorDialogHtml(err, t('update.error_friendly')), false);
+        finishProgress(errorDialogHtml(err, t('update.error_friendly')));
         setStatus(t('update.error_status', { name: plugin.name }));
     }
+
+    await new Promise((resolve) => { progressResolve = resolve; });
+    if (succeeded) runScan(false);
 };
 
 async function openHistory() {
@@ -434,6 +495,22 @@ function buildDom() {
           <button type="button" id="app-dialog-cancel">${t('dialog.cancel')}</button>
         </div>
       </dialog>
+
+      <dialog id="update-progress">
+        <button type="button" class="dlg-close" id="progress-close" title="${t('dialog.close')}" aria-label="${t('dialog.close')}" hidden>
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h2 id="progress-title"></h2>
+        <div id="progress-live">
+          <div class="progress-track" id="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+          <div class="progress-phase" id="progress-phase"></div>
+          <div class="progress-url" id="progress-url"></div>
+        </div>
+        <div class="dlg-message" id="progress-result" hidden></div>
+        <div class="editor-actions">
+          <button type="button" class="btn-save" id="progress-ok" hidden>${t('dialog.ok')}</button>
+        </div>
+      </dialog>
     `;
 
     statusEl = document.getElementById('status');
@@ -456,6 +533,16 @@ function buildDom() {
     appDialogMsg = document.getElementById('app-dialog-msg');
     appDialogOk = document.getElementById('app-dialog-ok');
     appDialogCancel = document.getElementById('app-dialog-cancel');
+    progressDialog = document.getElementById('update-progress');
+    progressTitle = document.getElementById('progress-title');
+    progressLive = document.getElementById('progress-live');
+    progressTrack = document.getElementById('progress-track');
+    progressFill = document.getElementById('progress-fill');
+    progressPhase = document.getElementById('progress-phase');
+    progressUrl = document.getElementById('progress-url');
+    progressResult = document.getElementById('progress-result');
+    progressOk = document.getElementById('progress-ok');
+    progressClose = document.getElementById('progress-close');
     mainView = document.getElementById('view-main');
     settingsView = document.getElementById('view-settings');
     titlebarActionsEl = document.getElementById('titlebar-actions');
@@ -500,6 +587,20 @@ function buildDom() {
     });
     // Esc or any other dismissal path must resolve a pending confirm as "no".
     appDialog.addEventListener('close', () => settleAppDialog(false));
+
+    // Update progress dialog: not dismissable while the update is running;
+    // afterwards OK or the cross closes it and handleUpdate continues.
+    progressOk.addEventListener('click', () => { settleProgress(); progressDialog.close(); });
+    progressClose.addEventListener('click', () => { settleProgress(); progressDialog.close(); });
+    progressDialog.addEventListener('cancel', (e) => { if (progressRunning) e.preventDefault(); });
+    progressDialog.addEventListener('close', () => settleProgress());
+    progressResult.addEventListener('click', (e) => {
+        const a = e.target.closest('a.dlg-link');
+        if (a) {
+            e.preventDefault();
+            BrowserOpenURL(a.href);
+        }
+    });
 
     document.getElementById('settings-back').addEventListener('click', closeSettings);
     settingsView.querySelectorAll('.settings-nav button').forEach((btn) => {
@@ -558,6 +659,11 @@ EventsOn('plugins:refreshed', (plugins) => {
 
 EventsOn('plugins:refresh:failed', (msg) => {
     setStatus(t('events.refresh_failed', { msg }));
+});
+
+// Update progress stream (pushed by the updater through a progress listener).
+EventsOn('update:progress', (p) => {
+    renderUpdateProgress(p);
 });
 
 buildDom();

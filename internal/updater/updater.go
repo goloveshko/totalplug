@@ -138,6 +138,44 @@ func isLockedErr(err error) bool {
 type Updater struct {
 	client           *http.Client
 	maxDownloadBytes int64
+	// progress, when set, receives UpdateProgress events during UpdatePlugin.
+	// Only one update is expected at a time, so no locking is needed.
+	progress func(domain.UpdateProgress)
+}
+
+// SetProgressListener installs a callback for update progress events, or
+// removes the current one with nil.
+func (u *Updater) SetProgressListener(fn func(domain.UpdateProgress)) {
+	u.progress = fn
+}
+
+func (u *Updater) emit(p domain.UpdateProgress) {
+	if u.progress != nil {
+		u.progress(p)
+	}
+}
+
+// countingReader tracks downloaded bytes and invokes report each time the
+// integer percentage advances. total <= 0 means the size is unknown, so no
+// incremental reports are emitted.
+type countingReader struct {
+	src    io.Reader
+	total  int64
+	read   int64
+	last   int
+	report func(percent float64)
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.src.Read(p)
+	c.read += int64(n)
+	if c.total > 0 && c.report != nil {
+		if pct := int(float64(c.read) / float64(c.total) * 100); pct != c.last {
+			c.last = pct
+			c.report(float64(pct))
+		}
+	}
+	return n, err
 }
 
 // NewUpdater initializes an Updater with reasonable HTTP timeouts.
@@ -185,6 +223,16 @@ func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error 
 	var src io.Reader = resp.Body
 	if u.maxDownloadBytes > 0 {
 		src = io.LimitReader(resp.Body, u.maxDownloadBytes+1)
+	}
+	percent := -1.0
+	if resp.ContentLength > 0 {
+		percent = 0
+	}
+	u.emit(domain.UpdateProgress{Phase: "download", Percent: percent, URL: url})
+	src = &countingReader{
+		src:    src,
+		total:  resp.ContentLength,
+		report: func(p float64) { u.emit(domain.UpdateProgress{Phase: "download", Percent: p, URL: url}) },
 	}
 	written, err := io.Copy(out, src)
 	if err != nil {
@@ -547,6 +595,7 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	}
 
 	extractedDir := filepath.Join(tmpDir, "extracted")
+	u.emit(domain.UpdateProgress{Phase: "extract", Percent: -1})
 	switch format {
 	case "zip":
 		err = u.ExtractZip(archiveFile, extractedDir)
@@ -569,6 +618,7 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 		return "", fmt.Errorf("backup failed: %w", err)
 	}
 
+	u.emit(domain.UpdateProgress{Phase: "install", Percent: -1})
 	applied, err := applyTree(extractedDir, pluginDir)
 	if err != nil {
 		locked := isLockedErr(err)

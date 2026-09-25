@@ -20,6 +20,8 @@ const (
 	// pluginsRefreshedEvent delivers background scan results to the frontend.
 	pluginsRefreshed     = "plugins:refreshed"
 	pluginsRefreshFailed = "plugins:refresh:failed"
+	// updateProgressEvent streams updater phase/percent events to the progress dialog.
+	updateProgressEvent = "update:progress"
 )
 
 // App struct manages application state and UI bindings
@@ -129,6 +131,11 @@ func (a *App) SetWindowEffect(effect string) error {
 // target (Total Commander still running) is reported through the structured
 // result instead of an error so the frontend can show recovery guidance.
 func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
+	a.updater.SetProgressListener(func(p domain.UpdateProgress) {
+		runtime.EventsEmit(a.ctx, updateProgressEvent, p)
+	})
+	defer a.updater.SetProgressListener(nil)
+
 	backupDir, err := a.updater.UpdatePlugin(a.ctx, plugin)
 	if err != nil {
 		if errors.Is(err, updater.ErrFileLocked) {
