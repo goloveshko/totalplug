@@ -10,6 +10,25 @@
 
 ---
 
+## 📥 Download
+
+Prebuilt Windows x64 binaries are on the [Releases page](https://github.com/goloveshko/totalplug/releases):
+
+| File | What it is |
+| --- | --- |
+| `totalplug.exe` | Desktop GUI (Wails window, no installer — run it from any folder) |
+| `totalplug-cli.exe` | Command-line scanner and updater |
+
+Both need Windows 10 or 11; the GUI renders through the WebView2 runtime that
+already ships with Windows 11 and with current Windows 10 updates.
+
+The binaries are not code-signed, so SmartScreen shows "Windows protected your
+PC" on the first run — pick **More info → Run anyway**. TotalPlug writes nothing
+outside your Total Commander `plugins` directory and `%APPDATA%\TotalPlug`, and
+every folder it changes is backed up next to it.
+
+---
+
 ## ✨ Key Features
 
 * 🔍 **Zero-Config Total Commander Detection:**  
@@ -23,10 +42,36 @@
   4. **Tier 4 (Confidence Tags):** Transparently labels confidence (`[PE Binary]`, `[Readme/INF]`, `[Manual DB]`, `[Unknown]`).
 * 🌐 **Powered by TotalPlug Community Catalog:**  
   Checks updates against the open [totalplug-catalog](https://github.com/goloveshko/totalplug-catalog) database with 24-hour offline-resilient disk caching.
+* 🗜️ **Archive-Format Aware Updater:**  
+  Plugin packages are dispatched by their magic bytes, so ZIP, RAR and 7z all
+  install, while an unsupported container is refused with a clear message
+  instead of a half-extracted folder.
 * 💾 **User Overrides & Database:**  
   Persist custom names, versions, and update sources in `%APPDATA%\TotalPlug\user_overrides.json`.
 * 🖥️ **Dual Interface:**  
   High-speed command-line interface (CLI) and hybrid desktop GUI powered by **Wails v2**.
+
+---
+
+## 🖥️ Desktop GUI
+
+`totalplug.exe` shows the same audit the CLI prints as a table you can act on:
+
+* **Update all** — a bar above the table appears whenever updates are available
+  and applies the whole list in one pass, one plugin at a time. Plugins whose
+  installed version could not be determined stay out of the batch, exactly like
+  `--update-all` on the command line.
+* **Per-plugin update** — the button in the row, for the cases a batch skips.
+* **Plugin card** — click a row for the description, update source, homepage and
+  install path, plus an editor for a manual version/source override when
+  auto-detection got it wrong.
+* **History** — the updates TotalPlug applied, with version and timestamp.
+* **Settings** — light/dark/system theme, English/Russian interface, font size.
+* **About** — the running version, where your data lives, and a check for a newer
+  release. TotalPlug never replaces its own files: it opens the release page.
+
+Close Total Commander before applying updates — its process holds the plugin
+files, so the first locked file stops the queue and the rest is skipped.
 
 ---
 
@@ -66,29 +111,53 @@ go run cmd/totalplug/main.go --ini D:\TC\wincmd.ini
 
 ```text
 ================================================================================
-                     TotalPlug - Total Commander Updater                        
+                     TotalPlug - Total Commander Updater
 ================================================================================
+[+] Scanning Total Commander plugins...
 [+] Total Commander Dir: C:\totalcmd
 [+] Found wincmd.ini:    C:\totalcmd\wincmd.ini
-[+] Extracting version information...
-[+] Checking updates against TotalPlug community catalog...
 [+] Fetched fresh catalog from GitHub CDN!
 
 Discovered 14 installed plugins:
 
---- [WLX] Lister / Viewer Plugins (WLX) (5) ---
- 1. CudaLister         ✓  | Ver: 1.8.6.1    | [PE Binary]    ➔ Latest: 1.8.6.1
- 2. MDView             🚀 | Ver: 1.2.0      | [PE Binary]    ➔ Latest: 1.2.5
- 3. EdgeViewer         ✓  | Ver: 1.4.0      | [PE Binary]    ➔ Latest: 1.4.0
-
 --- [WCX] Packer / Archiver Plugins (WCX) (4) ---
- 4. Total7zip          ✓  | Ver: 1.3.5      | [PE Binary]    ➔ Latest: 1.3.5
- 5. PAXZ Archiver      ✓  | Ver: 1.0.0      | [Readme/INF]   ➔ Latest: 1.0.0
+ 1. Total7zip          ✓  | Ver: 1.3.5      | [PE Binary]    ➔ Latest: 1.3.5
+ 2. PAXZ Archiver      ⚠️ | Ver: 1.0.0      | [Readme/INF]   ➔ Latest: 1.0.0
+
+--- [WLX] Lister / Viewer Plugins (WLX) (5) ---
+ 3. CudaLister         ✓  | Ver: 1.8.6.1    | [PE Binary]    ➔ Latest: 1.8.6.1
+ 4. MDView             🚀 | Ver: 1.2.0      | [PE Binary]    ➔ Latest: 1.2.5
 
 ================================================================================
 SUMMARY: Total 14 | 13 Valid ✓ | 1 Updates 🚀 | 0 Missing ✗ | 1 Uncertain ⚠️
 ================================================================================
+--------------------------------------------------------------------------------
+LEGEND:
+  ✓  - Up to date
+  🚀 - Update available
+  ⚠️ - Uncertain version (check manually or force update)
+  ✗  - Plugin file missing on disk
+
+[🚀] SUCCESS: Found 1 plugin update(s) available!
 ```
+
+---
+
+## 🔨 Build from source
+
+Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
+(`go install github.com/wailsapp/wails/v2/cmd/wails@v2.14.0`).
+
+| Command | Result |
+| --- | --- |
+| `scripts\build.cmd` | `bin\totalplug-cli.exe`, development build |
+| `scripts\build-gui.cmd` | `bin\totalplug.exe` (also accepts extra `wails` flags, e.g. `-devtools`) |
+| `scripts\release.cmd`, `scripts\release-gui.cmd` | Same, with `-trimpath` and stripped symbols |
+| `scripts\test.cmd`, `scripts\lint.cmd` | `go vet` + `go test -race -cover ./...`, and the linter |
+
+Tagged builds are stamped with `git describe --tags --dirty` through `-ldflags
+-X`, which is the version the About panel shows and the release check compares
+against; an untagged tree builds as `dev` and is never told an update exists.
 
 ---
 
@@ -96,25 +165,20 @@ SUMMARY: Total 14 | 13 Valid ✓ | 1 Updates 🚀 | 0 Missing ✗ | 1 Uncertain 
 
 ```text
 totalplug/
-├── cmd/
-│   └── totalplug/
-│       └── main.go           # CLI entry point, terminal report & update runner
+├── cmd/totalplug/main.go     # CLI entry point: report, --update / --update-all prompts
 ├── internal/
-│   ├── domain/
-│   │   └── plugin.go         # Core domain models (Plugin, Status, Confidence)
-│   ├── config/
-│   │   └── ini.go            # Windows Registry & wincmd.ini parser
-│   ├── scanner/
-│   │   └── version.go        # Windows PE & Document version extractor
-│   ├── checker/
-│   │   ├── catalog.go        # Community catalog client & 24h cache
-│   │   ├── checker.go        # Semantic version comparator & smart matcher
-│   │   └── github.go         # GitHub Releases fallback client
-│   └── storage/
-│       └── db.go             # Local overrides & update history storage
-├── frontend/                 # Wails desktop GUI (HTML/CSS/JS)
-├── app.go                    # Wails application backend bridge
-├── go.mod
+│   ├── buildinfo/            # Version stamped at build time, release location
+│   ├── checker/              # Catalog client + 24h cache, version compare, GitHub releases
+│   ├── config/               # Windows registry & wincmd.ini resolution
+│   ├── domain/               # Shared models (Plugin, Status, Confidence, AppInfo)
+│   ├── pipeline/             # Scan orchestration: detect → read → compare
+│   ├── scanner/              # Plugin discovery, PE / INF version extraction
+│   ├── storage/              # installed_plugins.json, user overrides, update history
+│   └── updater/              # Download, archive extract, backup, lock-aware install
+├── frontend/                 # Wails GUI: plain HTML/CSS/JS built by Vite (no framework)
+├── app.go, main.go           # Wails bridge — the Go methods the frontend may call
+├── window_effect.go          # Window backdrop, resolved from window_effect.txt at startup
+├── scripts/                  # build.ps1 plus the .cmd wrappers listed above
 └── wails.json
 ```
 
