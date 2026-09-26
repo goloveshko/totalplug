@@ -257,12 +257,15 @@ and accepted debt we deliberately postponed.
 1. **Version baked into the binary** — done (`af81b2e`): `internal/buildinfo.Version`
    is stamped by `scripts/build.ps1` from `git describe --tags --dirty` through
    `-ldflags -X` in all four build paths (dev/release × CLI/GUI), so a plain
-   `go build` keeps `"dev"`. `wails.json` → `info.productVersion` is the
-   Windows-properties copy and must be bumped with the tag — an accepted second
-   source. The stock `build/windows/info.json` never declared a `FileVersion`
-   string, so that copy did not merely lag: `FileVersionInfo` read empty for
-   every field. Adding the string made the resource readable; the value is now
-   `1.0.0`, which a pre-tag build will claim about itself.
+   `go build` keeps `"dev"`. The Windows-properties copy is stamped from the same
+   value: `wails build` renders VERSIONINFO only from `wails.json` →
+   `info.productVersion` and has no alternate-config flag, so the GUI profiles
+   write the stamped version into that file, build, and put the file back
+   whichever way the build ends — the tracked `1.0.0` is only the fallback for a
+   bare `wails dev`. The stock `build/windows/info.json` never declared a
+   `FileVersion` string, so that copy did not merely lag: `FileVersionInfo` read
+   empty for every field. Adding the string made the resource readable, and an
+   unstamped build now reports `dev` about itself instead of claiming `1.0.0`.
 2. **Self-update check, no self-replacement** — done (`ee9a617`):
    `checker.CheckAppRelease` reuses the plugin release client
    (`FetchLatestGitHubRelease`, now also returning `html_url`) behind a

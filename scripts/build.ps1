@@ -20,6 +20,10 @@ $guiPath = "$binDir/totalplug.exe"
 # user needs.
 $wailsDir = "build/bin"
 $wailsExe = "$wailsDir/totalplug.exe"
+$wailsConfig = "wails.json"
+# Read/written through .NET because Windows PowerShell decodes a BOM-less UTF-8
+# file as ANSI (mangling the © in the copyright) and writes a BOM back out.
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 # Published builds are stamped from the latest reachable tag so the About panel,
 # the release artifact name and the GitHub release all agree. Before the first
@@ -118,46 +122,69 @@ function Test-WailsCli {
     }
 }
 
+# Wails has no flag for an alternate config file, and the VERSIONINFO resource it
+# embeds is rendered from wails.json -> info.productVersion, so that is the only
+# place the stamped version can go. Invoke-GuiBuild writes it, builds, and puts the
+# file back whichever way the build ends, so the tracked value stays a fallback for
+# a bare `wails dev` instead of becoming a second version someone must remember.
+function Set-WailsProductVersion {
+    param([string]$Version)
+
+    $content = [System.IO.File]::ReadAllText($wailsConfig)
+    $pattern = '("productVersion"\s*:\s*")[^"]*(")'
+    if ($content -notmatch $pattern) {
+        Write-Host "❌ No productVersion field to stamp in $wailsConfig" -ForegroundColor Red
+        exit 1
+    }
+    [System.IO.File]::WriteAllText(
+        $wailsConfig,
+        ($content -replace $pattern, ('${1}' + $Version + '${2}')),
+        $utf8NoBom)
+}
+
 # Neither GUI profile passes wails' "-clean": it deletes build/bin as its very first
 # step, and a handle on that directory (IDE/Defender watcher, a TC or Explorer tab,
 # a shell cwd) makes the build fail AFTER the previous exe is already gone. File
 # deletes still work, so the release profile clears the old binary by name instead.
-function Invoke-Gui {
+function Invoke-GuiBuild {
+    param(
+        [string]$Kind,
+        [string[]]$WailsArgs
+    )
+
     Test-WailsCli
 
     Write-Host "======================================" -ForegroundColor Cyan
-    Write-Host "     Building TotalPlug (GUI, dev)    " -ForegroundColor Cyan
+    Write-Host ("     Building TotalPlug (GUI, {0})" -f $Kind.PadRight(7)) -ForegroundColor Cyan
     Write-Host "======================================" -ForegroundColor Cyan
 
-    Write-Host "Building $guiPath (version $buildVersion, dev profile)..." -ForegroundColor Yellow
-    wails build -platform windows/amd64 -ldflags "$versionLdflags" @ArgsList
+    if ($Kind -eq "release" -and (Test-Path $wailsExe)) { Remove-Item $wailsExe -Force }
+
+    Write-Host "Building $guiPath (version $buildVersion, $Kind profile)..." -ForegroundColor Yellow
+    $originalConfig = [System.IO.File]::ReadAllText($wailsConfig)
+    $allArgs = $WailsArgs + $ArgsList
+    try {
+        Set-WailsProductVersion $buildVersion
+        wails build @allArgs
+    } finally {
+        [System.IO.File]::WriteAllText($wailsConfig, $originalConfig, $utf8NoBom)
+    }
 
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "`n❌ Wails build failed!" -ForegroundColor Red
+        Write-Host "`n❌ Wails $Kind build failed!" -ForegroundColor Red
         exit $LASTEXITCODE
     }
     Copy-GuiArtifact
 }
 
+function Invoke-Gui {
+    Invoke-GuiBuild "dev" @("-platform", "windows/amd64", "-ldflags", "$versionLdflags")
+}
+
 function Invoke-ReleaseGui {
-    Test-WailsCli
-
-    Write-Host "======================================" -ForegroundColor Cyan
-    Write-Host "   Building TotalPlug (GUI, release)  " -ForegroundColor Cyan
-    Write-Host "======================================" -ForegroundColor Cyan
-
-    if (Test-Path $wailsExe) { Remove-Item $wailsExe -Force }
-
     # -trimpath only: wails' production build already passes "-s -w" to the compiler
     # and merges it with our -ldflags, so the stamped version survives stripping.
-    Write-Host "Building $guiPath (version $buildVersion, release profile)..." -ForegroundColor Yellow
-    wails build -platform windows/amd64 -trimpath -ldflags "$versionLdflags" @ArgsList
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "`n❌ Wails release build failed!" -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
-    Copy-GuiArtifact
+    Invoke-GuiBuild "release" @("-platform", "windows/amd64", "-trimpath", "-ldflags", "$versionLdflags")
 }
 
 function Invoke-Run {
