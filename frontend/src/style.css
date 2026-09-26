@@ -833,3 +833,60 @@ dialog input:focus {
     display: flex;
     gap: 10px;
 }
+/* Version rides next to the name as a quiet chip, not as a heading. */
+.about-version {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    vertical-align: 2px;
+}
+.about-update {
+    margin: 12px 0;
+    font-size: 0.85rem;
+}
+.about-update-row {
+    margin-bottom: 6px;
+}
+.about-status {
+    color: var(--text-muted);
+}
+.about-status.accent {
+    color: var(--accent);
+    font-weight: 600;
+}
+.about-checked {
+    margin-left: 8px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.about-privacy {
+    margin-top: 14px;
+}
+/* Same disclosure shape as the plugin card: technical values stay out of the way. */
+.about-details {
+    margin-top: 10px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.about-details summary {
+    cursor: pointer;
+    user-select: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.about-tech {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 14px;
+    align-items: baseline;
+    margin-top: 8px;
+}
+.about-tech .v {
+    user-select: text;
+    overflow-wrap: anywhere;
+}

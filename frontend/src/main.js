@@ -1,6 +1,6 @@
 import './style.css';
 import './mock.js'; // dev-only fake backend; compiles away in production builds
-import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory } from '../wailsjs/go/main/App';
+import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory, AppInfo, CheckForAppUpdate } from '../wailsjs/go/main/App';
 import { EventsOn, BrowserOpenURL, WindowMinimise, WindowToggleMaximise, Quit } from '../wailsjs/runtime';
 import { t, tp, currentLang, setLang } from './i18n.js';
 import { currentTheme, setTheme, currentScale, setScale } from './theme.js';
@@ -425,8 +425,68 @@ async function openHistory() {
     }
 }
 
-function refreshSettingsState() {
-    settingsView.querySelectorAll('[data-theme-choice]').forEach((el) => {
+// About panel state. The Go bridge owns the version and the data paths; the
+// release check only runs when the user presses the button, so `appUpdate`
+// stays null until then. Both survive the language-switch DOM rebuild.
+let appInfo = null;
+let appUpdate = null;
+let appUpdateBusy = false;
+
+function renderAbout() {
+    const nameEl = document.getElementById('about-version');
+    if (!nameEl) return;
+    nameEl.textContent = appInfo?.version ?? '';
+    const dataDirEl = document.getElementById('about-data-dir');
+    dataDirEl.textContent = appInfo?.data_dir ?? '';
+    document.getElementById('about-build').textContent = appInfo?.go_version ?? '';
+    renderAboutUpdate();
+}
+
+// One status line plus the button that produced it. The available case carries
+// the release link too, because that is the whole point of the check.
+function renderAboutUpdate() {
+    const host = document.getElementById('about-update');
+    if (!host) return;
+
+    let status = '';
+    if (appUpdateBusy) {
+        status = `<span class="about-status">${t('about.checking')}</span>`;
+    } else if (appUpdate) {
+        const fmt = new Intl.DateTimeFormat(currentLang() === 'ru' ? 'ru-RU' : 'en-GB', { timeStyle: 'short' });
+        const when = `<span class="about-checked">${escapeHtml(t('about.checked_at', { time: fmt.format(new Date(appUpdate.checked_at)) }))}</span>`;
+        if (!appUpdate.comparable) {
+            status = `<span class="about-status">${escapeHtml(t('about.dev_build'))}</span>${when}`;
+        } else if (appUpdate.available) {
+            status = `<span class="about-status accent">${escapeHtml(t('about.available', { latest: appUpdate.latest }))}</span>
+                <a href="${escapeHtml(appUpdate.release_url || '')}" class="dlg-link">${escapeHtml(t('about.open_release'))}</a>${when}`;
+        } else {
+            status = `<span class="about-status">${escapeHtml(t('about.up_to_date'))}</span>${when}`;
+        }
+    }
+
+    // The label stays put while a check runs: the status line already says
+    // "checking", and a disabled button only has to stop a second request.
+    const button = `<button type="button" class="btn-secondary" id="btn-app-update" ${appUpdateBusy ? 'disabled' : ''}>${escapeHtml(t('about.check'))}</button>`;
+    host.innerHTML = `<div class="about-update-row">${button}</div>${status}`;
+}
+
+async function checkForAppUpdate() {
+    if (appUpdateBusy) return;
+    appUpdateBusy = true;
+    renderAboutUpdate();
+    try {
+        appUpdate = await CheckForAppUpdate();
+    } catch (err) {
+        // Same shape as every other failure in the app: a friendly line, with
+        // the raw reason available underneath.
+        openAppDialog(errorDialogHtml(err, t('about.check.error')));
+    } finally {
+        appUpdateBusy = false;
+        renderAboutUpdate();
+    }
+}
+
+function refreshSettingsState() {    settingsView.querySelectorAll('[data-theme-choice]').forEach((el) => {
         const selected = el.dataset.themeChoice === currentTheme();
         el.classList.toggle('selected', selected);
         el.setAttribute('aria-pressed', String(selected));
@@ -561,13 +621,23 @@ function buildDom() {
             </select>
           </div>
           <div class="settings-panel" id="panel-about">
-            <h3>${t('settings.nav.about')}</h3>
-            <div class="about-name">TotalPlug</div>
+            <div class="about-name">TotalPlug <span class="about-version" id="about-version"></span></div>
             <p class="about-desc">${t('about.desc')}</p>
+            <div class="about-update" id="about-update"></div>
             <div class="about-links">
               <button type="button" class="btn-secondary" id="link-catalog">${t('about.catalog')}</button>
+              <button type="button" class="btn-secondary" id="link-releases">${t('about.releases')}</button>
             </div>
-            <p class="editor-hint">${t('about.records')}</p>
+            <p class="editor-hint about-privacy">${t('about.privacy')}</p>
+            <details class="about-details">
+              <summary>${t('about.details')}</summary>
+              <div class="about-tech">
+                <div class="k">${t('about.data_dir')}</div>
+                <div class="v"><code class="path" id="about-data-dir"></code></div>
+                <div class="k">${t('about.build')}</div>
+                <div class="v" id="about-build"></div>
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -781,6 +851,23 @@ function buildDom() {
     document.getElementById('link-catalog').addEventListener('click', () => {
         BrowserOpenURL('https://sergey.is-a.dev/totalplug-catalog/');
     });
+    // The update row is re-rendered as HTML, so its button and release link are
+    // reached through one delegated listener instead of per-render bindings.
+    const aboutUpdateEl = document.getElementById('about-update');
+    aboutUpdateEl.addEventListener('click', (e) => {
+        const link = e.target.closest('a.dlg-link');
+        if (link) {
+            e.preventDefault();
+            BrowserOpenURL(link.href);
+            return;
+        }
+        if (e.target.closest('#btn-app-update')) checkForAppUpdate();
+    });
+    document.getElementById('link-releases').addEventListener('click', () => {
+        if (appInfo) BrowserOpenURL(appInfo.releases_url);
+    });
+    // Re-render the state-backed parts of the panel after the DOM rebuild.
+    renderAbout();
 
     // Restore the visible view after a rebuild (language switch happens inside
     // settings, which must stay open).
@@ -821,6 +908,13 @@ EventsOn('update:progress', (p) => {
 });
 
 buildDom();
+
+// The About panel needs only local values, so ask for them once up front
+// instead of when the panel opens.
+AppInfo().then((info) => {
+    appInfo = info;
+    renderAbout();
+});
 
 // Startup: cache-only scan, no network wait before the window is useful
 runScan(false);

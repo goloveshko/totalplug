@@ -88,6 +88,29 @@ function installMockBackend() {
 
         GetWindowEffect() { return Promise.resolve('none'); },
         SetWindowEffect(effect) { console.log('[mock] SetWindowEffect', effect); return Promise.resolve(null); },
+
+        AppInfo() {
+            return Promise.resolve({
+                version: '1.1.0',
+                releases_url: 'https://github.com/goloveshko/totalplug/releases',
+                data_dir: 'C:\\Users\\demo\\AppData\\Roaming\\TotalPlug',
+                go_version: 'go1.25.0',
+            });
+        },
+
+        // Pretend a newer release exists, so the About panel's available state
+        // and its release link are demoable without publishing anything.
+        async CheckForAppUpdate() {
+            await sleep(900);
+            return {
+                current: '1.1.0',
+                latest: '1.2.0',
+                available: true,
+                comparable: true,
+                release_url: 'https://github.com/goloveshko/totalplug/releases/tag/v1.2.0',
+                checked_at: new Date().toISOString(),
+            };
+        },
     };
 
     window.go = { main: { App: app } };
