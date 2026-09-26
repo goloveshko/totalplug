@@ -40,7 +40,7 @@ and accepted debt we deliberately postponed.
 ### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
 - Scan report with update summary table.
 - `--refresh-cache / -r`, `--ini <path> / -c` (portable installs),
-  `--update / -u`, `--update-all`.
+  `--update / -u`, `--update-all`, `--version / -v` (the stamped build version).
 - Interactive confirmed updates; per-item `y/N/a` prompts for "blind" updates
   (installed version unknown); `--update-all` never touches blind updates.
 - Non-zero exit code when any update fails.
@@ -48,6 +48,9 @@ and accepted debt we deliberately postponed.
 ### GUI (Wails, `bin/totalplug.exe`, built by `scripts/build-gui.cmd`)
 - Interactive plugin dashboard with scan, filter and per-plugin update
   (commit `54aa8f4`); pre-existing Russian UI text.
+- Since then: light/dark/system themes, EN/RU interface, plugin card with the
+  override editor, update history, batch «Update all», an About panel and the
+  self-update check — see the redesign and v1 sections below.
 
 ### Engineering
 - GitHub Actions CI: Windows job (`go mod verify`, vet, `go test -race -cover ./...`,
@@ -315,7 +318,8 @@ and accepted debt we deliberately postponed.
   confirmed on a live `totalplug.exe` (stage 13) — closed.
 - **Column sorting** (at least status and name) — deferred by the review; needs a
   sort state in `main.js` and stable ordering with the search filter.
-- **`domain.Config`** struct is dead code (TCPath/IniPath/Language/AutoCheck unwired);
-  either wire it into persistence or delete it.
+- ~~**`domain.Config`** struct is dead code (TCPath/IniPath/Language/AutoCheck unwired);
+  either wire it into persistence or delete it.~~ Deleted in `58306b6`: nothing ever read
+  it, and two of its fields describe behaviour that was explicitly rejected.
 - **Minor `internal/config` debt** — `%COMMANDER_PATH%` expands only the first occurrence;
   no-op `existing` branch in dedup.
