@@ -210,17 +210,25 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 			ghRepo := strings.TrimPrefix(p.CustomSource, "github:")
 			var version, downloadURL string
 			found := false
-			if c.cacheOnly {
+			if !c.cacheOnly {
+				if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil && ghRelease.TagName != "" {
+					version = ghRelease.TagName
+					if len(ghRelease.Assets) > 0 {
+						downloadURL = ghRelease.Assets[0].BrowserDownloadURL
+					}
+					found = true
+					saveGitHubRelease(ghRepo, version, downloadURL)
+				}
+			}
+			if !found {
+				// Either the offline paint or a live lookup that failed (rate
+				// limit, timeout, a release that was deleted). Falling back to
+				// the remembered release keeps the row honest: the alternative
+				// is "N/A (Not in catalog)", which throws away what we know and
+				// drops the plugin out of the update queue.
 				if cached := loadGitHubRelease(ghRepo); cached != nil {
 					version, downloadURL, found = cached.TagName, cached.DownloadURL, true
 				}
-			} else if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil && ghRelease.TagName != "" {
-				version = ghRelease.TagName
-				if len(ghRelease.Assets) > 0 {
-					downloadURL = ghRelease.Assets[0].BrowserDownloadURL
-				}
-				found = true
-				saveGitHubRelease(ghRepo, version, downloadURL)
 			}
 			if found {
 				p.LatestVersion = version

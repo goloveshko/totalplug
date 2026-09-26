@@ -3,6 +3,9 @@ package checker
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"totalplug/internal/domain"
@@ -181,6 +184,49 @@ func TestCheckUpdatesCacheOnlyUsesGitHubCache(t *testing.T) {
 		p.WebURL != "https://github.com/rg-software/wlx-edge-viewer" ||
 		p.Source != "github:rg-software/wlx-edge-viewer" {
 		t.Errorf("remembered github release not applied on cache-only paint: %+v", p)
+	}
+}
+
+// A failed live lookup (the unauthenticated GitHub API gives 403 once the
+// 60 req/h quota is spent) must not erase what the last successful check
+// remembered.
+func TestCheckUpdatesKeepsRememberedReleaseWhenLookupFails(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+
+	attempts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/repos/") {
+			attempts++
+			w.WriteHeader(http.StatusForbidden) // what GitHub returns on a spent quota
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"version":1,"plugins":[]}`))
+	}))
+	defer srv.Close()
+
+	oldBase, oldCatalog := GitHubAPIBase, CommunityCatalogURL
+	GitHubAPIBase, CommunityCatalogURL = srv.URL, srv.URL+"/catalog.json"
+	t.Cleanup(func() { GitHubAPIBase, CommunityCatalogURL = oldBase, oldCatalog })
+
+	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip")
+
+	plugins := []domain.Plugin{{ID: "wlx_EdgeView", Name: "EdgeView",
+		Path: `C:\tc\plugins\edgeview\edgeview.wlx`,
+		InstalledVersion: "1.2.5", Confidence: domain.ConfidenceExact,
+		Status: domain.StatusUpToDate, CustomSource: "github:rg-software/wlx-edge-viewer"}}
+
+	got, _, err := NewChecker(true, false).CheckUpdates(context.Background(), plugins)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attempts == 0 {
+		t.Error("a network scan must still attempt the live lookup")
+	}
+	p := got[0]
+	if p.LatestVersion != "1.2.6" || p.Status != domain.StatusUpdateAvail ||
+		p.DownloadURL != "https://example.invalid/edgeview.zip" {
+		t.Errorf("live failure erased the remembered release: %+v", p)
 	}
 }
 
