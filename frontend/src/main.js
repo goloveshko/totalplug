@@ -20,6 +20,7 @@ let progressDialog, progressTitle, progressLive, progressTrack, progressFill;
 let progressPhase, progressUrl, progressResult, progressOk, progressClose;
 let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl;
 let titlebarActionsEl, pluginCountEl;
+let updateAllEl, updateAllCountEl, btnUpdateAll;
 let dialogResolve = null;
 // Element that opened the current dialog; focus goes back to it on close so
 // keyboard users do not land at the top of the document.
@@ -216,12 +217,24 @@ async function runScan(forceRefresh = false) {
     }
 }
 
+// The batch bar is contextual: it exists only while an update is actually
+// offerable, and it counts every offer, not just the rows the search filter
+// shows. The number keeps a label («Доступно 3 обновления»), like the count chip.
+function renderUpdateAllBar() {
+    if (!updateAllEl) return;
+    const count = currentPlugins.filter(isUpdatable).length;
+    updateAllEl.hidden = count === 0;
+    updateAllCountEl.textContent = tp('update_all.count', count);
+    btnUpdateAll.disabled = progressRunning;
+}
+
 function renderTable() {
     const q = searchQuery.trim().toLowerCase();
     const rows = currentPlugins
         .map((p, idx) => ({ p, idx }))
         .filter(({ p }) => !q || p.name.toLowerCase().includes(q));
     setPluginCount(rows.length, currentPlugins.length);
+    renderUpdateAllBar();
     if (rows.length === 0) {
         tbody.innerHTML = emptyRow(t('table.noresults'));
         return;
@@ -230,7 +243,7 @@ function renderTable() {
     // breaks the markup unless it is escaped. The detection confidence is not a
     // column any more — it lives in the plugin card.
     tbody.innerHTML = rows.map(({ p, idx }) => {
-        const canUpdate = p.status === 'update_avail' && p.download_url;
+        const canUpdate = isUpdatable(p);
         return `
             <tr data-idx="${idx}">
                 <td class="cell-type">${escapeHtml(p.type)}</td>
@@ -342,6 +355,53 @@ function editorSaveGuard(busy) {
     document.getElementById('editor-save').disabled = busy;
 }
 
+// Progress dialog plumbing shared by the single update and the "update all"
+// queue. beginProgress opens the dialog and arms the event stream; beginProgressItem
+// only rewinds the bar, so a queue reuses the same open dialog.
+function beginProgress(titleText) {
+    progressTitle.textContent = titleText;
+    progressResult.innerHTML = '';
+    progressResult.hidden = true;
+    progressOk.hidden = true;
+    progressClose.hidden = true;
+    progressLive.hidden = false;
+    progressRunning = true;
+    renderUpdateAllBar();
+    if (!progressDialog.open) progressDialog.showModal();
+    beginProgressItem();
+}
+
+function beginProgressItem() {
+    progressPhase.textContent = `${t('update.progress.download')}…`;
+    progressUrl.textContent = '';
+    progressFill.style.width = '0%';
+    progressTrack.classList.add('indeterminate');
+}
+
+function finishProgress(html) {
+    progressRunning = false;
+    progressLive.hidden = true;
+    progressResult.innerHTML = html;
+    progressResult.hidden = false;
+    progressOk.hidden = false;
+    progressClose.hidden = false;
+    progressOk.focus();
+    renderUpdateAllBar();
+}
+
+// One updater call mapped onto the three outcomes the UI has to tell apart:
+// success, a file lock (systemic: Total Commander holds every plugin file),
+// and a per-plugin error.
+async function updateOnePlugin(plugin) {
+    try {
+        const result = await UpdatePlugin(plugin);
+        if (result && result.locked) return { kind: 'locked' };
+        return { kind: 'ok', backupPath: result && result.backup_path };
+    } catch (err) {
+        return { kind: 'error', err };
+    }
+}
+
 // Reached only through the delegated tbody click handler (no inline onclick, so
 // a future script-src CSP stays possible).
 async function handleUpdate(index) {
@@ -357,48 +417,97 @@ async function handleUpdate(index) {
     }
 
     // One dialog shows progress, then the final result in the same place.
-    progressTitle.textContent = t('update.progress.title', { name: plugin.name });
-    progressPhase.textContent = `${t('update.progress.download')}…`;
-    progressUrl.textContent = '';
-    progressFill.style.width = '0%';
-    progressTrack.classList.add('indeterminate');
-    progressLive.hidden = false;
-    progressResult.hidden = true;
-    progressResult.innerHTML = '';
-    progressOk.hidden = true;
-    progressClose.hidden = true;
-    progressRunning = true;
-    progressDialog.showModal();
+    beginProgress(t('update.progress.title', { name: plugin.name }));
+    const outcome = await updateOnePlugin(plugin);
 
-    const finishProgress = (html) => {
-        progressRunning = false;
-        progressLive.hidden = true;
-        progressResult.innerHTML = html;
-        progressResult.hidden = false;
-        progressOk.hidden = false;
-        progressClose.hidden = false;
-        progressOk.focus();
-    };
-
-    let succeeded = false;
-    try {
-        const result = await UpdatePlugin(plugin);
-
-        if (result && result.locked) {
-            finishProgress(escapeHtml(t('update.locked', { name: plugin.name })));
-        } else {
-            finishProgress(escapeHtml(result && result.backup_path
-                ? t('update.done_backup', { name: plugin.name, path: result.backup_path })
-                : t('update.done', { name: plugin.name })));
-            succeeded = true;
-        }
-    } catch (err) {
-        finishProgress(errorDialogHtml(err, t('update.error_friendly')));
+    if (outcome.kind === 'locked') {
+        finishProgress(escapeHtml(t('update.locked', { name: plugin.name })));
+    } else if (outcome.kind === 'error') {
+        finishProgress(errorDialogHtml(outcome.err, t('update.error_friendly')));
+    } else {
+        finishProgress(escapeHtml(outcome.backupPath
+            ? t('update.done_backup', { name: plugin.name, path: outcome.backupPath })
+            : t('update.done', { name: plugin.name })));
     }
 
     await new Promise((resolve) => { progressResolve = resolve; });
-    if (succeeded) runScan(false);
+    if (outcome.kind === 'ok') runScan(false);
 };
+
+// A row offers the update button only when a download source is resolved, and
+// the same rule defines the queue: "blind" updates (installed version unknown,
+// hence StatusUncertain) stay a per-plugin decision, exactly like --update-all
+// in the CLI.
+const isUpdatable = (p) => p.status === 'update_avail' && !!p.download_url;
+
+const summaryRow = (glyph, className, text) =>
+    `<div class="ua-row ${className}"><span class="ua-glyph" aria-hidden="true">${glyph}</span><span>${escapeHtml(text)}</span></div>`;
+
+async function handleUpdateAll() {
+    if (progressRunning) return;
+
+    const queue = currentPlugins.filter(isUpdatable);
+    if (queue.length === 0) return;
+
+    // The count is the whole queue, not the visible rows: the search filter is a
+    // way to find a plugin, not a way to scope a batch, so the confirm has to
+    // spell out what is actually about to happen.
+    if (!await showConfirm(t('update_all.confirm', { count: tp('count.plugins', queue.length) }))) {
+        return;
+    }
+
+    const done = [];
+    const failed = [];
+    const rawErrors = [];
+    let lockedAt = -1;
+
+    beginProgress(t('update_all.title'));
+    for (let i = 0; i < queue.length; i++) {
+        const plugin = queue[i];
+        progressTitle.textContent = t('update_all.item', {
+            current: i + 1, total: queue.length, name: plugin.name,
+        });
+        beginProgressItem();
+
+        const outcome = await updateOnePlugin(plugin);
+        if (outcome.kind === 'ok') {
+            done.push(plugin);
+        } else if (outcome.kind === 'error') {
+            failed.push(plugin);
+            rawErrors.push(`${plugin.name}: ${String(outcome.err?.message ?? outcome.err)}`);
+        } else {
+            // One locked file means Total Commander is running, so every
+            // remaining plugin would fail the same way. Stop and say so.
+            lockedAt = i;
+            break;
+        }
+    }
+
+    const skipped = lockedAt >= 0 ? queue.slice(lockedAt + 1) : [];
+    const rows = [
+        ...done.map((p) => summaryRow('✓', 'ua-ok', `${p.name} — ${p.latest_version}`)),
+        ...failed.map((p) => summaryRow('✗', 'ua-err', p.name)),
+        ...skipped.map((p) => summaryRow('—', 'ua-skip', p.name)),
+    ];
+    // Head line first, then one line per plugin: the count is what the user
+    // scans for, the rows are what they act on.
+    let html = `<p class="ua-head">${escapeHtml(done.length
+        ? tp('update_all.updated', done.length)
+        : t('update_all.none'))}</p>`;
+    html += `<div class="ua-summary">${rows.join('')}</div>`;
+    if (lockedAt >= 0) {
+        html += `<p class="ua-note">${escapeHtml(t('update_all.locked_stop', { name: queue[lockedAt].name }))}</p>`;
+    }
+    if (rawErrors.length) {
+        html += '<details class="dlg-tech"><summary>' + escapeHtml(t('dialog.tech_details')) +
+            '</summary><div class="dlg-tech-body">' + linkify(escapeHtml(rawErrors.join('\n'))) +
+            '</div></details>';
+    }
+    finishProgress(html);
+
+    await new Promise((resolve) => { progressResolve = resolve; });
+    if (done.length) runScan(false);
+}
 
 async function openHistory() {
     try {
@@ -554,6 +663,10 @@ function buildDom() {
         </div>
       </div>
       <div id="view-main">
+        <div class="update-all" id="update-all" hidden>
+          <span class="update-all-count" id="update-all-count"></span>
+          <button type="button" class="btn-save" id="btn-update-all">${t('update_all.btn')}</button>
+        </div>
         <div class="table-container">
           <table>
             <thead>
@@ -744,6 +857,9 @@ function buildDom() {
     progressOk = document.getElementById('progress-ok');
     progressClose = document.getElementById('progress-close');
     mainView = document.getElementById('view-main');
+    updateAllEl = document.getElementById('update-all');
+    updateAllCountEl = document.getElementById('update-all-count');
+    btnUpdateAll = document.getElementById('btn-update-all');
     settingsView = document.getElementById('view-settings');
     titlebarActionsEl = document.getElementById('titlebar-actions');
     langSelect = document.getElementById('lang-select');
@@ -762,6 +878,7 @@ function buildDom() {
 
     btnScan.addEventListener('click', () => runScan(false));
     btnRefresh.addEventListener('click', () => runScan(true));
+    btnUpdateAll.addEventListener('click', handleUpdateAll);
     document.getElementById('btn-history').addEventListener('click', openHistory);
     document.getElementById('btn-settings').addEventListener('click', openSettings);
 

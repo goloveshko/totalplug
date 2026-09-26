@@ -71,9 +71,10 @@ function installMockBackend() {
             await sleep(400);
             emit('update:progress', { phase: 'install', percent: -1, url });
             await sleep(300);
-            // Locked plugin keeps the lock dialog demoable.
-            if (p.id.includes('Locked')) return { locked: true, backup_path: '' };
-            p.installed_version = p.latest_version;
+            // Scripted failures keep the single-plugin and queue error paths demoable:
+            // wdx_BrokenMirror always fails, wfx_DeviceLocker always reports a lock.
+            if (p.id === 'wdx_BrokenMirror') throw new Error('mock: every mirror returned 404 for ' + p.id);
+            if (p.id === 'wfx_DeviceLocker') return { locked: true, backup_path: '' };            p.installed_version = p.latest_version;
             reclassify(p);
             return { locked: false, backup_path: 'C:\\TC\\plugins\\' + p.id + '.bak_' + Date.now() };
         },
@@ -200,6 +201,12 @@ function makePlugins() {
             description: 'Диск-плагин: список установленных программ с быстрым удалением.',
         }),
         base({
+            id: 'wdx_BrokenMirror', name: 'Broken Mirror', type: 'wdx',
+            installed_version: '3.1', latest_version: '3.2', status: 'update_avail',
+            source: 'totalcmd', download_url: 'https://example.invalid/broken-mirror-3.2.zip',
+            description: 'Stub: every UpdatePlugin call on it throws, to demo a failed queue item.',
+        }),
+        base({
             id: 'wfx_DeviceLocker', name: 'DeviceLocker', type: 'wfx',
             installed_version: '0.9.3', latest_version: '1.0.0', status: 'update_avail',
             source: 'totalcmd', download_url: 'https://example.invalid/devicelocker-1.0.0.zip',
@@ -227,6 +234,12 @@ function makePlugins() {
             installed_version: '2.3', latest_version: '2.3',
             confidence: 'Readme/INF', status: 'uncertain', source: 'totalcmd',
             description: 'Content plugin: system and file properties, CPU/RAM temperature widgets.',
+        }),
+        base({
+            id: 'wlx_PreviewPlus', name: 'PreviewPlus', type: 'wlx',
+            installed_version: '1.0', latest_version: '1.1', status: 'update_avail',
+            source: 'totalcmd', download_url: 'https://example.invalid/previewplus-1.1.zip',
+            description: 'Stub placed after the locked plugin, to demo queue rows that were skipped.',
         }),
     ];
 }
