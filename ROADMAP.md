@@ -259,7 +259,10 @@ and accepted debt we deliberately postponed.
    `-ldflags -X` in all four build paths (dev/release × CLI/GUI), so a plain
    `go build` keeps `"dev"`. `wails.json` → `info.productVersion` is the
    Windows-properties copy and must be bumped with the tag — an accepted second
-   source, since generating it would need a build/windows/info.json rewrite.
+   source. The stock `build/windows/info.json` never declared a `FileVersion`
+   string, so that copy did not merely lag: `FileVersionInfo` read empty for
+   every field. Adding the string made the resource readable; the value is now
+   `1.0.0`, which a pre-tag build will claim about itself.
 2. **Self-update check, no self-replacement** — done (`ee9a617`):
    `checker.CheckAppRelease` reuses the plugin release client
    (`FetchLatestGitHubRelease`, now also returning `html_url`) behind a
