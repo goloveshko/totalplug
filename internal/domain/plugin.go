@@ -65,14 +65,6 @@ type Plugin struct {
 	LastChecked time.Time    `json:"last_checked,omitempty"`
 }
 
-// Config represents app-level settings.
-type Config struct {
-	TCPath    string `json:"tc_path"`
-	IniPath   string `json:"ini_path"`
-	Language  string `json:"language"`
-	AutoCheck bool   `json:"auto_check"`
-}
-
 // UpdateProgress is one event emitted while an update runs, so the GUI can
 // show what is happening and from where.
 type UpdateProgress struct {
