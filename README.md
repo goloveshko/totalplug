@@ -107,6 +107,13 @@ go run cmd/totalplug/main.go --update-all
 go run cmd/totalplug/main.go --ini D:\TC\wincmd.ini
 ```
 
+### Check Which Build You Have
+```bash
+go run cmd/totalplug/main.go --version
+```
+Prints the `git describe` version stamped at build time (`dev` for an untagged
+tree) — the same value the GUI shows on its About panel.
+
 ### Example Output
 
 ```text

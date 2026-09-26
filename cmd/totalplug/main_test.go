@@ -20,6 +20,8 @@ func TestParseArgs(t *testing.T) {
 		{"update short", []string{"-u"}, cliOptions{update: true}},
 		{"update long", []string{"--update"}, cliOptions{update: true}},
 		{"update all", []string{"--update-all"}, cliOptions{updateAll: true}},
+		{"version long", []string{"--version"}, cliOptions{showVersion: true}},
+		{"version short", []string{"-v"}, cliOptions{showVersion: true}},
 		{"combined", []string{"-r", "--update", "--ini", "x.ini"}, cliOptions{forceRefresh: true, update: true, iniPath: "x.ini"}},
 	}
 

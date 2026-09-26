@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"totalplug/internal/buildinfo"
 	"totalplug/internal/domain"
 	"totalplug/internal/pipeline"
 	"totalplug/internal/storage"
@@ -20,9 +21,10 @@ type cliOptions struct {
 	iniPath      string
 	update       bool
 	updateAll    bool
+	showVersion  bool
 }
 
-const usageLine = "Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>] [-u|--update | --update-all]"
+const usageLine = "Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>] [-u|--update | --update-all] [-v|--version]"
 
 func parseArgs(args []string) (cliOptions, error) {
 	var opts cliOptions
@@ -42,6 +44,8 @@ func parseArgs(args []string) (cliOptions, error) {
 			opts.update = true
 		case arg == "--update-all":
 			opts.updateAll = true
+		case arg == "--version" || arg == "-v":
+			opts.showVersion = true
 		default:
 			return opts, fmt.Errorf("unknown option %q", arg)
 		}
@@ -151,16 +155,22 @@ func promptBlindUpdates(reader io.Reader, candidates []domain.Plugin) []domain.P
 }
 
 func main() {
-	fmt.Println("================================================================================")
-	fmt.Println("                     TotalPlug - Total Commander Updater                        ")
-	fmt.Println("================================================================================")
-
+	// Parsed before the banner so `totalplug --version` and a mistyped flag both
+	// answer with exactly one line.
 	opts, err := parseArgs(os.Args[1:])
 	if err != nil {
 		fmt.Printf("[!] %v\n", err)
 		fmt.Println(usageLine)
 		os.Exit(1)
 	}
+	if opts.showVersion {
+		fmt.Printf("totalplug %s\n", buildinfo.Version)
+		return
+	}
+
+	fmt.Println("================================================================================")
+	fmt.Println("                     TotalPlug - Total Commander Updater                        ")
+	fmt.Println("================================================================================")
 
 	db, dbErr := storage.NewDatabase("")
 	if dbErr != nil {
