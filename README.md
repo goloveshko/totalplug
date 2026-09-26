@@ -165,6 +165,8 @@ Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
 Tagged builds are stamped with `git describe --tags --dirty` through `-ldflags
 -X`, which is the version the About panel shows and the release check compares
 against; an untagged tree builds as `dev` and is never told an update exists.
+Publishing a version (tag → build → release assets) is a documented procedure:
+see [docs/release.md](docs/release.md).
 
 ---
 
