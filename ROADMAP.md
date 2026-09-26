@@ -249,6 +249,40 @@ and accepted debt we deliberately postponed.
     details closed by default and overflow-free open or closed, RU and EN labels
     both fitting the dialog.
 
+## Before the first public release (v1) — shipped
+
+1. **Version baked into the binary** — done (`af81b2e`): `internal/buildinfo.Version`
+   is stamped by `scripts/build.ps1` from `git describe --tags --dirty` through
+   `-ldflags -X` in all four build paths (dev/release × CLI/GUI), so a plain
+   `go build` keeps `"dev"`. `wails.json` → `info.productVersion` is the
+   Windows-properties copy and must be bumped with the tag — an accepted second
+   source, since generating it would need a build/windows/info.json rewrite.
+2. **Self-update check, no self-replacement** — done (`ee9a617`):
+   `checker.CheckAppRelease` reuses the plugin release client
+   (`FetchLatestGitHubRelease`, now also returning `html_url`) behind a
+   `GitHubAPIBase` test seam, and compares with `CompareVersions`. A `"dev"`
+   build reports `comparable: false` and can never claim an update. TotalPlug
+   does not swap its own executable: the GUI hands the user the release page URL
+   from the API instead of guessing a tag slug.
+3. **About panel** — done (`e7344c0`): the place the app talks about itself —
+   version chip, the %APPDATA% data directory and the Go version behind a
+   collapsed disclosure, catalog/releases links, a privacy line, plus the update
+   row (button label never changes; it only disables while checking, and the
+   checked-at time follows the UI language). Errors land in the app dialog with
+   the raw message collapsed, like everywhere else.
+4. **«Update all» queue** — done (`f961320`): a strip above the table that exists
+   only while updates are offerable, one confirm naming the whole queue, then one
+   progress dialog walking it strictly sequentially (parallel `UpdatePlugin` calls
+   would race on `.bak_*` names and the bar would lie). Rows without a resolved
+   download source stay a per-plugin decision, matching CLI `--update-all`; the
+   first locked result ends the run, because a lock means Total Commander is
+   running. The summary is honest about a partial batch: N updated plus one row
+   per success, failure and skip, raw errors collapsed, rescan after any success.
+   Verified in the dev harness with always-failing and always-locked mock stubs.
+5. Deliberately not in v1: installing plugins from the catalog (next release), an
+   NSIS installer or embedded WebView2 runtime, a startup update banner (the check
+   stays manual, from the About panel), and a web landing page.
+
 ## Backlog / accepted debt
 
 - **Mica/Acrylic window effect** — temporarily disabled (see stage 3). Re-enabling needs
