@@ -21,6 +21,25 @@ $guiPath = "$binDir/totalplug.exe"
 $wailsDir = "build/bin"
 $wailsExe = "$wailsDir/totalplug.exe"
 
+# Published builds are stamped from the latest reachable tag so the About panel,
+# the release artifact name and the GitHub release all agree. Before the first
+# tag exists `git describe` fails (and writes to stderr, which ErrorActionPreference
+# would escalate), so the query runs in a quiet scope and the version stays the
+# literal "dev": an unstamped build has no comparable version and must not claim one.
+function Get-BuildVersion {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    $describe = & git describe --tags --dirty 2>$null
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+
+    if ($exitCode -ne 0 -or -not $describe) { return "dev" }
+    return ($describe -replace '^v', '')
+}
+
+$buildVersion = Get-BuildVersion
+$versionLdflags = "-X totalplug/internal/buildinfo.Version=$buildVersion"
+
 function Ensure-BinDir {
     if (!(Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir | Out-Null }
 }
@@ -51,8 +70,8 @@ function Invoke-Build {
 
     Ensure-BinDir
 
-    Write-Host "Compiling development CLI binary..." -ForegroundColor Yellow
-    go build -o $cliPath ./cmd/totalplug
+    Write-Host "Compiling development CLI binary (version $buildVersion)..." -ForegroundColor Yellow
+    go build -ldflags="-X totalplug/internal/buildinfo.Version=$buildVersion" -o $cliPath ./cmd/totalplug
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✔ CLI build successful!" -ForegroundColor Green
@@ -74,7 +93,7 @@ function Invoke-Release {
     $env:CGO_ENABLED = "0"
 
     Write-Host "Compiling optimized release binary (-trimpath -ldflags='-s -w')..." -ForegroundColor Yellow
-    go build -trimpath -ldflags="-s -w" -o $cliPath ./cmd/totalplug
+    go build -trimpath -ldflags="-s -w $versionLdflags" -o $cliPath ./cmd/totalplug
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✔ Release CLI build ready!" -ForegroundColor Green
@@ -110,7 +129,8 @@ function Invoke-Gui {
     Write-Host "     Building TotalPlug (GUI, dev)    " -ForegroundColor Cyan
     Write-Host "======================================" -ForegroundColor Cyan
 
-    wails build -platform windows/amd64 @ArgsList
+    Write-Host "Building $guiPath (version $buildVersion, dev profile)..." -ForegroundColor Yellow
+    wails build -platform windows/amd64 -ldflags "$versionLdflags" @ArgsList
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n❌ Wails build failed!" -ForegroundColor Red
@@ -128,8 +148,10 @@ function Invoke-ReleaseGui {
 
     if (Test-Path $wailsExe) { Remove-Item $wailsExe -Force }
 
-    # -trimpath only: wails' production build already passes "-s -w" to the compiler.
-    wails build -platform windows/amd64 -trimpath @ArgsList
+    # -trimpath only: wails' production build already passes "-s -w" to the compiler
+    # and merges it with our -ldflags, so the stamped version survives stripping.
+    Write-Host "Building $guiPath (version $buildVersion, release profile)..." -ForegroundColor Yellow
+    wails build -platform windows/amd64 -trimpath -ldflags "$versionLdflags" @ArgsList
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n❌ Wails release build failed!" -ForegroundColor Red
