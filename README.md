@@ -160,7 +160,8 @@ Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
 | `scripts\build.cmd` | `bin\totalplug-cli.exe`, development build |
 | `scripts\build-gui.cmd` | `bin\totalplug.exe` (also accepts extra `wails` flags, e.g. `-devtools`) |
 | `scripts\release.cmd`, `scripts\release-gui.cmd` | Same, with `-trimpath` and stripped symbols |
-| `scripts\test.cmd`, `scripts\lint.cmd` | `go vet` + `go test -race -cover ./...`, and the linter |
+| `scripts\test.cmd` | `go test -v ./...`, extra arguments pass through to `go test` |
+| `scripts\lint.cmd` | `go vet ./...`, plus `golangci-lint` when it is installed |
 
 Tagged builds are stamped with `git describe --tags --dirty` through `-ldflags
 -X`, which is the version the About panel shows and the release check compares
