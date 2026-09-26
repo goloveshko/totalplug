@@ -5,9 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"time"
 
+	"totalplug/internal/buildinfo"
+	"totalplug/internal/checker"
 	"totalplug/internal/domain"
 	"totalplug/internal/pipeline"
 	"totalplug/internal/storage"
@@ -112,6 +116,26 @@ func (a *App) GetUpdateHistory() ([]domain.UpdateEntry, error) {
 		return nil, fmt.Errorf("database not initialized")
 	}
 	return a.db.UpdateHistory(), nil
+}
+
+// AppInfo returns what the About panel shows without touching the network:
+// the stamped build version and where published releases live.
+func (a *App) AppInfo() domain.AppInfo {
+	return domain.AppInfo{
+		Version:     buildinfo.Version,
+		ReleasesURL: buildinfo.ReleasesURL,
+		DataDir:     filepath.Dir(storage.GetDefaultDbPath()),
+		GoVersion:   goruntime.Version(),
+	}
+}
+
+// CheckForAppUpdate compares the running build with the latest published
+// release. Nothing calls it automatically — it runs when the user presses
+// "check for updates" in the About panel.
+func (a *App) CheckForAppUpdate() (domain.AppUpdate, error) {
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	return checker.CheckAppRelease(ctx, buildinfo.Version)
 }
 
 // GetWindowEffect returns the backdrop applied at startup ("none", "mica"

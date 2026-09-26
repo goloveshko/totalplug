@@ -8,12 +8,15 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"totalplug/internal/buildinfo"
 )
 
 // GitHubRelease represents official response from GitHub Releases API
 type GitHubRelease struct {
 	TagName     string        `json:"tag_name"`
 	Name        string        `json:"name"`
+	HTMLURL     string        `json:"html_url"`
 	PublishedAt time.Time     `json:"published_at"`
 	Assets      []GitHubAsset `json:"assets"`
 }
@@ -24,18 +27,22 @@ type GitHubAsset struct {
 	Size               int64  `json:"size"`
 }
 
+// GitHubAPIBase is the API root; tests point it at a local server, the same way
+// catalog.go exposes CommunityCatalogURL.
+var GitHubAPIBase = "https://api.github.com"
+
 // FetchLatestGitHubRelease retrieves latest release info from a GitHub repository (e.g., "Alexey-T/CudaLister")
 func FetchLatestGitHubRelease(ctx context.Context, repo string) (*GitHubRelease, error) {
 	repo = strings.TrimPrefix(repo, "https://github.com/")
 	repo = strings.TrimSuffix(repo, "/")
 
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	url := fmt.Sprintf("%s/repos/%s/releases/latest", GitHubAPIBase, repo)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "TotalPlug/1.0 (Total Commander Plugin Manager)")
+	req.Header.Set("User-Agent", "TotalPlug/"+buildinfo.Version+" (Total Commander Plugin Manager)")
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	client := &http.Client{Timeout: 8 * time.Second}

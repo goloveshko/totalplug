@@ -54,8 +54,8 @@ type Plugin struct {
 	DownloadURL      string            `json:"download_url,omitempty"`
 	// DownloadURLs lists ordered candidate sources (primary first, then
 	// catalog mirrors); empty means only DownloadURL is known.
-	DownloadURLs []string     `json:"download_urls,omitempty"`
-	WebURL       string       `json:"web_url,omitempty"`
+	DownloadURLs []string `json:"download_urls,omitempty"`
+	WebURL       string   `json:"web_url,omitempty"`
 	// Source names where LatestVersion actually came from: a catalog source
 	// key (e.g. "totalcmd") or the custom override ("github:Owner/Repo").
 	Source      string       `json:"source,omitempty"`
@@ -100,4 +100,29 @@ type UpdateEntry struct {
 	PluginName string    `json:"plugin_name"`
 	Version    string    `json:"version"`
 	AppliedAt  time.Time `json:"applied_at"`
+}
+
+// AppInfo is what the About panel can show without a network round trip.
+type AppInfo struct {
+	Version     string `json:"version"`
+	ReleasesURL string `json:"releases_url"`
+	// DataDir is %APPDATA%\TotalPlug, named in support requests and bug reports.
+	DataDir string `json:"data_dir"`
+	// GoVersion is the runtime toolchain, e.g. "go1.25.0".
+	GoVersion string `json:"go_version"`
+}
+
+// AppUpdate is the outcome of checking the running build against the latest
+// published release.
+type AppUpdate struct {
+	Current string `json:"current"`
+	Latest  string `json:"latest,omitempty"`
+	// Available is only true when the running version can be compared at all.
+	Available bool `json:"available"`
+	// Comparable is false for an unstamped development build, whose version
+	// carries no digits to compare, so Latest is informative rather than an
+	// update claim.
+	Comparable bool      `json:"comparable"`
+	ReleaseURL string    `json:"release_url,omitempty"`
+	CheckedAt  time.Time `json:"checked_at,omitempty"`
 }
