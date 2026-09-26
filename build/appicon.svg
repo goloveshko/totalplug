@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Master for build/appicon.png. Wails only regenerates build/windows/icon.ico
+     when that file is missing, so replacing the icon means: re-render the PNG
+     here, delete the .ico, then `scripts/build.ps1 gui`.
+       magick -background none -o build/appicon.png build/appicon.svg
+     All geometry is explicit paths (cubics, no arcs/rx/strokes) because
+     ImageMagick's built-in SVG renderer supports neither. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Tile: 64..960, corner radius 200 -->
+  <path fill="#4c8bf5" d="M264 64 H760 C870.5 64 960 153.5 960 264 V760 C960 870.5 870.5 960 760 960 H264 C153.5 960 64 870.5 64 760 V264 C64 153.5 153.5 64 264 64 Z"/>
+  <!-- T and P sharing one stem: 112 stroke, crossbar 208 long, bowl radius 168 -->
+  <path fill="#ffffff" d="M192 224 H664 C756.8 224 832 299.2 832 392 C832 484.8 756.8 560 664 560 H512 V800 H400 V336 H192 Z"/>
+  <!-- The bowl's counter is painted in tile colour rather than cut out with
+       fill-rule, which the same renderer ignores. -->
+  <path fill="#4c8bf5" d="M624 336 H664 C694.9 336 720 361.1 720 392 C720 422.9 694.9 448 664 448 H624 Z"/>
+</svg>
