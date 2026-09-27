@@ -10,8 +10,6 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-
-	"totalplug/internal/domain"
 )
 
 type VS_FIXEDFILEINFO struct {
@@ -244,43 +242,4 @@ func GetVersionFromReadme(pluginPath string) string {
 	}
 
 	return ""
-}
-
-// EnrichPluginVersions applies fallback to determine plugin version.
-func EnrichPluginVersions(plugins []domain.Plugin) []domain.Plugin {
-	for i := range plugins {
-		if plugins[i].Status == domain.StatusNotFound {
-			plugins[i].InstalledVersion = "N/A"
-			plugins[i].Confidence = domain.ConfidenceFallback
-			continue
-		}
-
-		// Tier 1: Try PE Version Info on main file
-		if ver, err := GetFileVersion(plugins[i].Path); err == nil && ver != "" {
-			plugins[i].InstalledVersion = ver
-			plugins[i].Confidence = domain.ConfidenceExact
-			continue
-		}
-
-		// Tier 2: Try PE Version Info on companion DLLs
-		if dllVer := GetFileVersionFromCompanionDLLs(plugins[i].Path); dllVer != "" {
-			plugins[i].InstalledVersion = dllVer
-			plugins[i].Confidence = domain.ConfidenceExact
-			continue
-		}
-
-		// Tier 3: Try Readme / INF / History files
-		if txtVer := GetVersionFromReadme(plugins[i].Path); txtVer != "" {
-			plugins[i].InstalledVersion = txtVer
-			plugins[i].Confidence = domain.ConfidenceText
-			plugins[i].Status = domain.StatusUncertain
-			continue
-		}
-
-		// Tier 4: Unknown
-		plugins[i].InstalledVersion = "Unknown"
-		plugins[i].Confidence = domain.ConfidenceFallback
-		plugins[i].Status = domain.StatusUncertain
-	}
-	return plugins
 }
