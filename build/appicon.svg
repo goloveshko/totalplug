@@ -1,16 +1,56 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Master for build/appicon.png. Wails only regenerates build/windows/icon.ico
-     when that file is missing, so replacing the icon means: re-render the PNG
-     here, delete the .ico, then `scripts/build.ps1 gui`.
-       magick -background none -o build/appicon.png build/appicon.svg
-     All geometry is explicit paths (cubics, no arcs/rx/strokes) because
-     ImageMagick's built-in SVG renderer supports neither. -->
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- Tile: 64..960, corner radius 200 -->
-  <path fill="#4c8bf5" d="M264 64 H760 C870.5 64 960 153.5 960 264 V760 C960 870.5 870.5 960 760 960 H264 C153.5 960 64 870.5 64 760 V264 C64 153.5 153.5 64 264 64 Z"/>
-  <!-- T and P sharing one stem: 112 stroke, crossbar 208 long, bowl radius 168 -->
-  <path fill="#ffffff" d="M192 224 H664 C756.8 224 832 299.2 832 392 C832 484.8 756.8 560 664 560 H512 V800 H400 V336 H192 Z"/>
-  <!-- The bowl's counter is painted in tile colour rather than cut out with
-       fill-rule, which the same renderer ignores. -->
-  <path fill="#4c8bf5" d="M624 336 H664 C694.9 336 720 361.1 720 392 C720 422.9 694.9 448 664 448 H624 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Floppy disk primary body (classic Total Commander sapphire blue) -->
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+
+    <!-- Metal shutter (anodized aluminum) -->
+    <linearGradient id="shutterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="45%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+
+    <!-- Plugin connector gold pins -->
+    <linearGradient id="pinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 1. Geometric shadow -->
+  <path d="M 64,36 L 400,36 L 484,120 L 484,472 A 28,28 0 0,1 456,500 L 80,500 A 28,28 0 0,1 52,472 L 52,68 A 32,32 0 0,1 64,36 Z" fill="#000000" opacity="0.32"/>
+
+  <!-- 2. Floppy disk main body -->
+  <path d="M 56,24 L 392,24 L 472,104 L 472,456 A 28,28 0 0,1 444,484 L 72,484 A 28,28 0 0,1 44,456 L 44,56 A 32,32 0 0,1 56,24 Z" 
+        fill="url(#bodyGrad)" 
+        stroke="#1d4ed8" 
+        stroke-width="8"/>
+
+  <!-- Chamfer inner stroke for 3D depth -->
+  <path d="M 68,36 L 386,36 L 460,110 L 460,450" fill="none" stroke="#60a5fa" stroke-width="4" opacity="0.45"/>
+
+  <!-- 3. Top metal shutter -->
+  <rect x="128" y="24" width="224" height="176" rx="8" fill="url(#shutterGrad)" stroke="#475569" stroke-width="4"/>
+  <!-- Shutter oval read window -->
+  <rect x="156" y="52" width="60" height="114" rx="8" fill="#0f172a"/>
+
+  <!-- Plugin connector gold pins (Modular hardware motif) -->
+  <rect x="238" y="36" width="18" height="58" rx="4" fill="url(#pinGrad)"/>
+  <rect x="268" y="36" width="18" height="58" rx="4" fill="url(#pinGrad)"/>
+  <rect x="298" y="36" width="18" height="58" rx="4" fill="url(#pinGrad)"/>
+  <rect x="328" y="36" width="18" height="58" rx="4" fill="url(#pinGrad)"/>
+
+  <!-- 4. Clean centered floppy label -->
+  <rect x="88" y="246" width="336" height="216" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="4"/>
+  
+  <!-- Blue title bar on label -->
+  <rect x="120" y="280" width="180" height="34" rx="8" fill="#2563eb"/>
+  
+  <!-- Balanced label metadata stripes -->
+  <rect x="120" y="336" width="272" height="18" rx="6" fill="#94a3b8"/>
+  <rect x="120" y="374" width="210" height="18" rx="6" fill="#cbd5e1"/>
+  <rect x="120" y="412" width="140" height="16" rx="6" fill="#e2e8f0"/>
 </svg>
