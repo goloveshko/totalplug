@@ -19,21 +19,21 @@ func EnrichPluginVersions(plugins []domain.Plugin) []domain.Plugin {
 		}
 
 		// Tier 1: Try PE Version Info on main file
-		if ver, err := GetFileVersion(plugins[i].Path); err == nil && ver != "" {
+		if ver, err := getFileVersion(plugins[i].Path); err == nil && ver != "" {
 			plugins[i].InstalledVersion = ver
 			plugins[i].Confidence = domain.ConfidenceExact
 			continue
 		}
 
 		// Tier 2: Try PE Version Info on companion DLLs
-		if dllVer := GetFileVersionFromCompanionDLLs(plugins[i].Path); dllVer != "" {
+		if dllVer := getFileVersionFromCompanionDLLs(plugins[i].Path); dllVer != "" {
 			plugins[i].InstalledVersion = dllVer
 			plugins[i].Confidence = domain.ConfidenceExact
 			continue
 		}
 
 		// Tier 3: Try Readme / INF / History files
-		if txtVer := GetVersionFromReadme(plugins[i].Path); txtVer != "" {
+		if txtVer := getVersionFromReadme(plugins[i].Path); txtVer != "" {
 			plugins[i].InstalledVersion = txtVer
 			plugins[i].Confidence = domain.ConfidenceText
 			plugins[i].Status = domain.StatusUncertain

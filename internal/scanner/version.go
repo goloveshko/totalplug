@@ -101,7 +101,7 @@ func getVersionFromStrings(buf []byte) string {
 	return ""
 }
 
-func GetFileVersion(filePath string) (string, error) {
+func getFileVersion(filePath string) (string, error) {
 	pathPtr, err := windows.UTF16PtrFromString(filePath)
 	if err != nil {
 		return "", err
@@ -159,7 +159,7 @@ func GetFileVersion(filePath string) (string, error) {
 	return "", fmt.Errorf("no PE version found")
 }
 
-func GetFileVersionFromCompanionDLLs(pluginPath string) string {
+func getFileVersionFromCompanionDLLs(pluginPath string) string {
 	dir := filepath.Dir(pluginPath)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -173,7 +173,7 @@ func GetFileVersionFromCompanionDLLs(pluginPath string) string {
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
 		if ext == ".dll" {
 			dllPath := filepath.Join(dir, entry.Name())
-			if ver, err := GetFileVersion(dllPath); err == nil && ver != "" {
+			if ver, err := getFileVersion(dllPath); err == nil && ver != "" {
 				return ver
 			}
 		}
@@ -203,7 +203,7 @@ func scanFileForVersion(filePath string) string {
 	return ""
 }
 
-func GetVersionFromReadme(pluginPath string) string {
+func getVersionFromReadme(pluginPath string) string {
 	baseDir := filepath.Dir(pluginPath)
 	searchDirs := []string{
 		baseDir,
