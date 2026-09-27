@@ -8,13 +8,13 @@
   "frontend:dev:serverUrl": "auto",
   "author": {
     "name": "Sergey Goloveshko",
-    "email": "8836169+goloveshko@users.noreply.github.com"
+    "email": "goloveshko@proton.me"
   },
   "info": {
     "productName": "TotalPlug",
-    "companyName": "goloveshko",
-    "productVersion": "1.0.0",
+    "companyName": "Sergey Goloveshko",
+    "productVersion": "1.0.0.0",
     "copyright": "Copyright © 2026 Sergey Goloveshko",
-    "comments": "Total Commander plugin updater"
+    "comments": "Total Commander Plugin Manager & Updater"
   }
 }

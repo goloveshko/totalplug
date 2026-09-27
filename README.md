@@ -111,8 +111,9 @@ go run cmd/totalplug/main.go --ini D:\TC\wincmd.ini
 ```bash
 go run cmd/totalplug/main.go --version
 ```
-Prints the `git describe` version stamped at build time (`dev` for an untagged
-tree) — the same value the GUI shows on its About panel.
+Prints the version stamped at build time — the same value the GUI shows on its
+About panel. `go run` passes no `-ldflags`, so this command reports the unstamped
+`dev` even in a tagged tree; use `scripts\build.cmd` for a numbered binary.
 
 ### Example Output
 
@@ -165,7 +166,9 @@ Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
 
 Tagged builds are stamped with `git describe --tags --dirty` through `-ldflags
 -X`, which is the version the About panel shows and the release check compares
-against; an untagged tree builds as `dev` and is never told an update exists.
+against; before the first tag exists the build scripts fall back to the version
+tracked in `wails.json`, so an untagged tree compares too. Only a binary built by
+hand carries no stamp (`dev`) and is never told an update exists.
 Publishing a version (tag → build → release assets) is a documented procedure:
 see [docs/release.md](docs/release.md).
 

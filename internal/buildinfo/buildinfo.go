@@ -2,8 +2,9 @@
 package buildinfo
 
 // Version is set by scripts/build.ps1 through -ldflags -X from `git describe
-// --tags --dirty`. It stays "dev" for a plain `go build` and for a tree with no
-// reachable tag, which is what tells the update check not to compare at all.
+// --tags --dirty`, which before the first tag falls back to the version tracked in
+// wails.json. Only a build made without that script carries no stamp at all and so
+// keeps the literal "dev", which is what tells the update check not to compare.
 var Version = "dev"
 
 // ReleaseRepo is the GitHub repository published builds come from.

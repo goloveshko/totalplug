@@ -32,10 +32,22 @@ $wailsConfig = "wails.json"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 # Published builds are stamped from the latest reachable tag so the About panel,
-# the release artifact name and the GitHub release all agree. Before the first
-# tag exists `git describe` fails (and writes to stderr, which ErrorActionPreference
-# would escalate), so the query runs in a quiet scope and the version stays the
-# literal "dev": an unstamped build has no comparable version and must not claim one.
+# the release artifact name and the GitHub release all agree. Before the first tag
+# exists `git describe` fails (and writes to stderr, which ErrorActionPreference
+# would escalate), so the query runs in a quiet scope and the version comes from the
+# value tracked in wails.json instead: an untagged tree reads as its upcoming
+# release. The price of that is that such a build can report "update available" once
+# the release it is guessing at actually gets published.
+function Get-ConfigFallbackVersion {
+    if (Test-Path $wailsConfig) {
+        $content = [System.IO.File]::ReadAllText($wailsConfig)
+        if ($content -match '"productVersion"\s*:\s*"([^"]+)"') {
+            return $matches[1]
+        }
+    }
+    return "1.0.0"
+}
+
 function Get-BuildVersion {
     $previous = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
@@ -43,8 +55,10 @@ function Get-BuildVersion {
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = $previous
 
-    if ($exitCode -ne 0 -or -not $describe) { return "dev" }
-    return ($describe -replace '^v', '')
+    if ($exitCode -eq 0 -and $describe) {
+        return ($describe -replace '^v', '')
+    }
+    return (Get-ConfigFallbackVersion)
 }
 
 $buildVersion = Get-BuildVersion
@@ -81,7 +95,7 @@ function Invoke-Build {
     Ensure-BinDir
 
     Write-Host "Compiling development CLI binary (version $buildVersion)..." -ForegroundColor Yellow
-    go build -ldflags="-X totalplug/internal/buildinfo.Version=$buildVersion" -o $cliPath ./cmd/totalplug
+    go build -ldflags="$versionLdflags" -o $cliPath ./cmd/totalplug
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✔ CLI build successful!" -ForegroundColor Green
@@ -99,7 +113,6 @@ function Invoke-Release {
 
     Ensure-BinDir
 
-    # Pure Go release build (no CGO, stripped symbols, trimmed paths)
     $env:CGO_ENABLED = "0"
 
     Write-Host "Compiling optimized release binary (-trimpath -ldflags='-s -w')..." -ForegroundColor Yellow
@@ -109,7 +122,6 @@ function Invoke-Release {
         Write-Host "`n✔ Release CLI build ready!" -ForegroundColor Green
         Show-BinarySize
 
-        # Optional UPX compression if available
         if (Get-Command upx -ErrorAction SilentlyContinue) {
             Write-Host "`nCompressing binary with UPX..." -ForegroundColor Yellow
             upx --best --lzma $cliPath
@@ -131,8 +143,9 @@ function Test-WailsCli {
 # Wails has no flag for an alternate config file, and the VERSIONINFO resource it
 # embeds is rendered from wails.json -> info.productVersion, so that is the only
 # place the stamped version can go. Invoke-GuiBuild writes it, builds, and puts the
-# file back whichever way the build ends, so the tracked value stays a fallback for
-# a bare `wails dev` instead of becoming a second version someone must remember.
+# file back whichever way the build ends, so the tracked value stays the pre-tag
+# fallback Get-ConfigFallbackVersion reads rather than a second number someone has
+# to keep in step with the tag.
 function Set-WailsProductVersion {
     param([string]$Version)
 
@@ -142,10 +155,15 @@ function Set-WailsProductVersion {
         Write-Host "❌ No productVersion field to stamp in $wailsConfig" -ForegroundColor Red
         exit 1
     }
-    [System.IO.File]::WriteAllText(
-        $wailsConfig,
-        ($content -replace $pattern, ('${1}' + $Version + '${2}')),
-        $utf8NoBom)
+
+    # A VERSIONINFO resource takes only dotted numbers, so a describe string such as
+    # 1.0.0-1-gdeadbeef-dirty is reduced to its numeric head for the PE block. The
+    # ldflags copy in $versionLdflags keeps the full string, so the About panel and
+    # the file properties deliberately differ on an off-tag build.
+    $cleanVersion = ($Version -split '-')[0]
+
+    $updated = $content -replace $pattern, ('${1}' + $cleanVersion + '${2}')
+    [System.IO.File]::WriteAllText($wailsConfig, $updated, $utf8NoBom)
 }
 
 # Neither GUI profile passes wails' "-clean": it deletes build/bin as its very first
@@ -164,7 +182,9 @@ function Invoke-GuiBuild {
     Write-Host ("     Building TotalPlug (GUI, {0})" -f $Kind.PadRight(7)) -ForegroundColor Cyan
     Write-Host "======================================" -ForegroundColor Cyan
 
-    if ($Kind -eq "release" -and (Test-Path $wailsExe)) { Remove-Item $wailsExe -Force }
+    if ($Kind -eq "release" -and (Test-Path $wailsExe)) {
+        Remove-Item $wailsExe -Force -ErrorAction SilentlyContinue
+    }
 
     Write-Host "Building $guiPath (version $buildVersion, $Kind profile)..." -ForegroundColor Yellow
     $originalConfig = [System.IO.File]::ReadAllText($wailsConfig)
@@ -184,13 +204,13 @@ function Invoke-GuiBuild {
 }
 
 function Invoke-Gui {
-    Invoke-GuiBuild "dev" @("-platform", "windows/amd64", "-ldflags", "$versionLdflags")
+    Invoke-GuiBuild "dev" @("-platform", "windows/amd64", "-ldflags=$versionLdflags")
 }
 
 function Invoke-ReleaseGui {
     # -trimpath only: wails' production build already passes "-s -w" to the compiler
     # and merges it with our -ldflags, so the stamped version survives stripping.
-    Invoke-GuiBuild "release" @("-platform", "windows/amd64", "-trimpath", "-ldflags", "$versionLdflags")
+    Invoke-GuiBuild "release" @("-platform", "windows/amd64", "-trimpath", "-ldflags=$versionLdflags")
 }
 
 function Invoke-Run {
@@ -219,7 +239,6 @@ function Invoke-Lint {
         }
     } else {
         Write-Host "ℹ golangci-lint not found in PATH." -ForegroundColor DarkGray
-        Write-Host "  Install via: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest" -ForegroundColor DarkGray
     }
 }
 

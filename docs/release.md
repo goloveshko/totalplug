@@ -6,25 +6,30 @@ tagging, and `bin\totalplug*.exe` is produced only by the scripts below.
 
 ## Where the version comes from
 
-`scripts/build.ps1` runs `git describe --tags --dirty` and strips the leading `v`:
+`scripts/build.ps1` runs `git describe --tags --dirty` and strips the leading `v`,
+or reads `wails.json → info.productVersion` when no tag is reachable:
 
 | Consumer | How it gets the value |
 | --- | --- |
 | CLI `--version`, the About panel, the app's own release check | `-ldflags -X totalplug/internal/buildinfo.Version=…` |
-| Windows file properties of the GUI exe (`FileVersion`, `ProductVersion`) | the same string written into `wails.json → info.productVersion` for the duration of `wails build`, then put back |
+| Windows file properties of the GUI exe (`FileVersion`, `ProductVersion`) | the numeric head of that string written into `wails.json → info.productVersion` for the duration of `wails build`, then put back |
 
 Three consequences worth knowing:
 
-- With no reachable tag the version is the literal `dev`: the release check
-  reports `comparable: false` and never claims an update. A hand-run `go build`
-  produces the same `dev`.
+- With no reachable tag the version is the one tracked in `wails.json`, so an
+  untagged build compares like any other and will offer an update as soon as one is
+  published. Only a binary built by hand with `go build` carries no stamp, reports
+  `dev`, and leaves the comparison off.
 - Commits after a tag produce `1.0.0-3-g2c1f9ab`, plus `-dirty` for uncommitted
-  work. Comparison strips a `v` prefix and any `(...)` suffix before parsing the
-  numbers, so a build ahead of the published release is never told it is
+  work. The About panel shows that whole string; the file properties cannot, because
+  a `VERSIONINFO` resource takes only dotted numbers, so there it is stamped as its
+  numeric head `1.0.0`. Comparison strips a `v` prefix and any `(...)` suffix before
+  parsing the numbers, so a build ahead of the published release is never told it is
   outdated and a build behind it is.
-- The tracked `1.0.0` in `wails.json` is only what a bare `wails dev` embeds.
-  A scripted build overwrites that field and restores it whichever way the build
-  ends, so leaving it behind the tag is harmless.
+- The tracked `1.0.0.0` in `wails.json` is a placeholder, not a version to
+  maintain: a scripted build overwrites that field and restores it whichever way the
+  build ends. Its fourth digit exists because a `VERSIONINFO` wants numbers, and the
+  About panel drops a trailing `.0` so the placeholder reads as `1.0.0`.
 
 ## 1. Pre-flight
 
@@ -63,9 +68,16 @@ bin\totalplug-cli.exe --version
 (Get-Item bin\totalplug.exe).VersionInfo.FileVersion   # also Properties → Details
 ```
 
-Both must print `X.Y.Z` — not `dev`, not `…-dirty`. If they do not, delete the
-tag (`git tag -d vX.Y.Z`), fix the tree and start again: an artifact and its tag
-must never disagree.
+Both must print `X.Y.Z`, not `…-dirty`. Since the untagged fallback now carries the
+same number as the tag, that check alone no longer proves where the stamp came from:
+confirm it with
+
+```powershell
+git describe --tags --exact-match HEAD   # must print vX.Y.Z, not vX.Y.(Z-1)-N-g…
+```
+
+If either says otherwise, delete the tag (`git tag -d vX.Y.Z`), fix the tree and
+start again: an artifact and its tag must never disagree.
 
 ## 4. Publish
 
