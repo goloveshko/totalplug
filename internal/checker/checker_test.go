@@ -172,7 +172,7 @@ func TestCheckUpdatesCacheOnlyUsesGitHubCache(t *testing.T) {
 	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip")
 
 	plugins := []domain.Plugin{{ID: "wlx_EdgeView", Name: "EdgeView",
-		Path: `C:\tc\plugins\edgeview\edgeview.wlx`,
+		Path:             `C:\tc\plugins\edgeview\edgeview.wlx`,
 		InstalledVersion: "1.2.5", Confidence: domain.ConfidenceExact,
 		Status: domain.StatusUpToDate, CustomSource: "github:rg-software/wlx-edge-viewer"}}
 
@@ -214,7 +214,7 @@ func TestCheckUpdatesKeepsRememberedReleaseWhenLookupFails(t *testing.T) {
 	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip")
 
 	plugins := []domain.Plugin{{ID: "wlx_EdgeView", Name: "EdgeView",
-		Path: `C:\tc\plugins\edgeview\edgeview.wlx`,
+		Path:             `C:\tc\plugins\edgeview\edgeview.wlx`,
 		InstalledVersion: "1.2.5", Confidence: domain.ConfidenceExact,
 		Status: domain.StatusUpToDate, CustomSource: "github:rg-software/wlx-edge-viewer"}}
 
