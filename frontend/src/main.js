@@ -541,10 +541,19 @@ let appInfo = null;
 let appUpdate = null;
 let appUpdateBusy = false;
 
+// The build stamps a four-part version because the Windows PE version resource
+// demands a number; the trailing ".0" carries no meaning for a person reading
+// the About panel, so it is dropped here and nowhere else.
+function formatDisplayVersion(v) {
+    if (!v) return '';
+    const m = v.match(/^(\d+\.\d+\.\d+)\.0$/);
+    return m ? m[1] : v;
+}
+
 function renderAbout() {
     const nameEl = document.getElementById('about-version');
     if (!nameEl) return;
-    nameEl.textContent = appInfo?.version ?? '';
+    nameEl.textContent = formatDisplayVersion(appInfo?.version);
     const dataDirEl = document.getElementById('about-data-dir');
     dataDirEl.textContent = appInfo?.data_dir ?? '';
     document.getElementById('about-build').textContent = appInfo?.go_version ?? '';
