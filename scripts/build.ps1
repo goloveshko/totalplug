@@ -11,6 +11,12 @@ param (
 
 $ErrorActionPreference = "Stop"
 Set-Location "$PSScriptRoot\.."
+# .NET's File APIs resolve a relative path against the process current directory,
+# which Set-Location does NOT update, so it stays wherever powershell was launched
+# (e.g. scripts/) and a bare "wails.json" below reads the wrong folder. Sync it to
+# the project root so the relative paths this script relies on mean the same thing
+# to cmdlets and to [System.IO.File] alike.
+[Environment]::CurrentDirectory = (Get-Location).Path
 
 $binDir = "bin"
 $cliPath = "$binDir/totalplug-cli.exe"
