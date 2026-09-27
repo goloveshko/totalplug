@@ -23,7 +23,7 @@ const STRINGS = {
         'badge.avail': 'Update!',
         'badge.missing': 'Missing',
         'badge.unknown': 'Unknown',
-        'scan.error_friendly': 'Couldn\'t scan plugins.',
+        'scan.error_friendly': "Couldn't scan plugins.",
         'btn.update': 'Update',
         'editor.title': 'Plugin version',
         'editor.version': 'Installed version',
@@ -43,7 +43,8 @@ const STRINGS = {
         'update.locked': 'Files of {name} are locked. Close Total Commander and retry the update.',
         'update.done_backup': '{name} updated! Backup: {path}',
         'update.done': '{name} updated successfully!',
-        'update.error_friendly': 'Couldn\'t install the update. The plugin page may be outdated or the file is temporarily unavailable. Try again later or install manually from the plugin page.',
+        'update.error_friendly':
+            "Couldn't install the update. The plugin page may be outdated or the file is temporarily unavailable. Try again later or install manually from the plugin page.",
         'update.progress.title': 'Updating {name}',
         'update.progress.download': 'Downloading',
         'update.progress.extract': 'Extracting archive',
@@ -52,13 +53,15 @@ const STRINGS = {
         'update_all.btn': 'Update all',
         'update_all.count.one': '{n} plugin update is available',
         'update_all.count.other': '{n} plugin updates are available',
-        'update_all.confirm': 'Update {count} one after another. Each plugin is backed up before it changes. Plugins whose installed version is unknown stay untouched.',
+        'update_all.confirm':
+            'Update {count} one after another. Each plugin is backed up before it changes. Plugins whose installed version is unknown stay untouched.',
         'update_all.title': 'Updating plugins',
         'update_all.item': '{current} of {total} — {name}',
         'update_all.updated.one': '{n} plugin updated',
         'update_all.updated.other': '{n} plugins updated',
         'update_all.none': 'No plugin was updated.',
-        'update_all.locked_stop': 'Total Commander is holding {name}, so the rest of the queue was skipped. Close it and press «Update all» again.',
+        'update_all.locked_stop':
+            'Total Commander is holding {name}, so the rest of the queue was skipped. Close it and press «Update all» again.',
         'btn.history': 'History',
         'history.title': 'Applied updates',
         'history.col.plugin': 'Plugin',
@@ -89,7 +92,8 @@ const STRINGS = {
         'settings.font': 'Font size',
         'settings.language': 'Interface language',
         'settings.about': 'About TotalPlug',
-        'about.desc': 'TotalPlug keeps your Total Commander plugins up to date: it finds what is installed, compares it with the community catalog and updates safely, with a backup and rollback behind every change.',
+        'about.desc':
+            'TotalPlug keeps your Total Commander plugins up to date: it finds what is installed, compares it with the community catalog and updates safely, with a backup and rollback behind every change.',
         'about.catalog': 'Plugin catalog',
         'about.releases': 'Releases',
         'about.version': 'Version',
@@ -101,7 +105,8 @@ const STRINGS = {
         'about.checked_at': 'Checked at {time}',
         'about.dev_build': 'Development build: there is no released version to compare it with.',
         'about.check.error': 'Could not reach GitHub to check for updates.',
-        'about.privacy': 'TotalPlug only contacts the plugin catalog and GitHub, and only to look up updates. Nothing about you leaves this machine.',
+        'about.privacy':
+            'TotalPlug only contacts the plugin catalog and GitHub, and only to look up updates. Nothing about you leaves this machine.',
         'about.details': 'Details',
         'about.data_dir': 'Settings and history',
         'about.build': 'Built with',
@@ -146,7 +151,8 @@ const STRINGS = {
         'card.site': 'Сайт',
         'card.details': 'Подробности',
         'card.source.catalog': 'Каталог',
-        'editor.hint': 'Поля по умолчанию берутся из авто-определения. Пустые значения сбрасывают ручное переопределение.',
+        'editor.hint':
+            'Поля по умолчанию берутся из авто-определения. Пустые значения сбрасывают ручное переопределение.',
         'editor.save': 'Сохранить',
         'editor.cancel': 'Отмена',
         'editor.save_friendly': 'Не удалось сохранить переопределение.',
@@ -154,7 +160,8 @@ const STRINGS = {
         'update.locked': 'Файлы плагина {name} заняты. Закройте Total Commander и повторите обновление.',
         'update.done_backup': 'Плагин {name} обновлён! Резервная копия: {path}',
         'update.done': 'Плагин {name} успешно обновлён!',
-        'update.error_friendly': 'Не удалось установить обновление. Возможно, страница плагина устарела или файл временно недоступен. Попробуйте позже или установите вручную со страницы плагина.',
+        'update.error_friendly':
+            'Не удалось установить обновление. Возможно, страница плагина устарела или файл временно недоступен. Попробуйте позже или установите вручную со страницы плагина.',
         'update.progress.title': 'Обновление {name}',
         'update.progress.download': 'Загрузка',
         'update.progress.extract': 'Распаковка архива',
@@ -165,7 +172,8 @@ const STRINGS = {
         'update_all.count.few': 'Доступно {n} обновления',
         'update_all.count.many': 'Доступно {n} обновлений',
         'update_all.count.other': 'Доступно {n} обновлений',
-        'update_all.confirm': 'Обновить по очереди: {count}. Перед изменением каждого плагина будет создана резервная копия. Плагины с неизвестной установленной версией останутся нетронутыми.',
+        'update_all.confirm':
+            'Обновить по очереди: {count}. Перед изменением каждого плагина будет создана резервная копия. Плагины с неизвестной установленной версией останутся нетронутыми.',
         'update_all.title': 'Обновление плагинов',
         'update_all.item': '{current} из {total} — {name}',
         'update_all.updated.one': '{n} плагин обновлён',
@@ -173,7 +181,8 @@ const STRINGS = {
         'update_all.updated.many': '{n} плагинов обновлено',
         'update_all.updated.other': '{n} плагинов обновлено',
         'update_all.none': 'Не обновлено ни одного плагина.',
-        'update_all.locked_stop': 'Total Commander держит файлы плагина {name}, поэтому остальная очередь пропущена. Закройте его и нажмите «Обновить все» снова.',
+        'update_all.locked_stop':
+            'Total Commander держит файлы плагина {name}, поэтому остальная очередь пропущена. Закройте его и нажмите «Обновить все» снова.',
         'btn.history': 'История',
         'history.title': 'Применённые обновления',
         'history.col.plugin': 'Плагин',
@@ -204,7 +213,8 @@ const STRINGS = {
         'settings.font': 'Размер шрифта',
         'settings.language': 'Язык интерфейса',
         'settings.about': 'О TotalPlug',
-        'about.desc': 'TotalPlug держит плагины Total Commander в актуальном состоянии: находит установленные, сверяет их с каталогом сообщества и обновляет безопасно — с резервной копией и откатом.',
+        'about.desc':
+            'TotalPlug держит плагины Total Commander в актуальном состоянии: находит установленные, сверяет их с каталогом сообщества и обновляет безопасно — с резервной копией и откатом.',
         'about.catalog': 'Каталог плагинов',
         'about.releases': 'Релизы',
         'about.version': 'Версия',
@@ -216,7 +226,8 @@ const STRINGS = {
         'about.checked_at': 'Проверено в {time}',
         'about.dev_build': 'Разработочная сборка: сравнивать её не с чем, релиза с таким номером нет.',
         'about.check.error': 'Не удалось заглянуть на GitHub и проверить обновления.',
-        'about.privacy': 'TotalPlug обращается только к каталогу плагинов и к GitHub — и только чтобы проверить обновления. Ничего о вас с этой машины не уходит.',
+        'about.privacy':
+            'TotalPlug обращается только к каталогу плагинов и к GitHub — и только чтобы проверить обновления. Ничего о вас с этой машины не уходит.',
         'about.details': 'Подробности',
         'about.data_dir': 'Настройки и история',
         'about.build': 'Собрано',
@@ -269,8 +280,12 @@ export function t(key, vars) {
 export function tp(key, n, vars) {
     const category = pluralRules[lang].select(n);
     const table = STRINGS[lang];
-    const s = table[`${key}.${category}`] ?? STRINGS.en[`${key}.${category}`]
-        ?? table[`${key}.other`] ?? STRINGS.en[`${key}.other`] ?? key;
+    const s =
+        table[`${key}.${category}`] ??
+        STRINGS.en[`${key}.${category}`] ??
+        table[`${key}.other`] ??
+        STRINGS.en[`${key}.other`] ??
+        key;
     return interpolate(s, { ...vars, n });
 }
 

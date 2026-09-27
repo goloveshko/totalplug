@@ -1,0 +1,7 @@
+# Wails rewrites the JS bindings on every build, so formatting them only makes
+# the next build dirty.
+frontend/wailsjs/
+# Build output, regenerated.
+frontend/dist/
+# Written by npm.
+frontend/package-lock.json

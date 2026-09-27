@@ -1,6 +1,13 @@
 import './style.css';
 import './mock.js'; // dev-only fake backend; compiles away in production builds
-import { ScanPlugins, UpdatePlugin, SaveOverride, GetUpdateHistory, AppInfo, CheckForAppUpdate } from '../wailsjs/go/main/App';
+import {
+    ScanPlugins,
+    UpdatePlugin,
+    SaveOverride,
+    GetUpdateHistory,
+    AppInfo,
+    CheckForAppUpdate,
+} from '../wailsjs/go/main/App';
 import { EventsOn, BrowserOpenURL, WindowMinimise, WindowToggleMaximise, Quit } from '../wailsjs/runtime';
 import { t, tp, currentLang, setLang } from './i18n.js';
 import { currentTheme, setTheme, currentScale, setScale } from './theme.js';
@@ -87,20 +94,16 @@ let settingsSection = 'appearance';
 
 // In-app replacement for native confirm()/alert(): those render with the
 // "wails" origin header and cannot be styled.
-const escapeHtml = (s) => String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const escapeHtml = (s) =>
+    String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // Placeholder row for the plugin table (scanning / empty / no search hits).
-const emptyRow = (message) =>
-    `<tr class="table-empty"><td colspan="6">${message}</td></tr>`;
+const emptyRow = (message) => `<tr class="table-empty"><td colspan="6">${message}</td></tr>`;
 
 // Turn http(s) URLs in already-escaped text into clickable links. Plain anchors
 // would navigate the webview, so clicks are intercepted and routed to the
 // system browser (see the appDialogMsg listener in buildDom).
-const linkify = (escaped) => escaped.replace(
-    /(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" class="dlg-link">$1</a>',
-);
+const linkify = (escaped) => escaped.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" class="dlg-link">$1</a>');
 
 function openAppDialog(html, isConfirm) {
     return new Promise((resolve) => {
@@ -127,11 +130,19 @@ function errorDialogHtml(err, friendlyMessage, linkLabel) {
         // Go quotes URLs in errors: Get "https://host/x": EOF — the closing
         // quote and trailing punctuation are not part of the address.
         const url = urlMatch[0].replace(/[.,;:!?)\]»"']+$/, '');
-        html += '\n<a href="' + escapeHtml(url) + '" class="dlg-link">' +
-            escapeHtml(linkLabel || t('dialog.plugin_page')) + '</a>';
+        html +=
+            '\n<a href="' +
+            escapeHtml(url) +
+            '" class="dlg-link">' +
+            escapeHtml(linkLabel || t('dialog.plugin_page')) +
+            '</a>';
     }
-    html += '<details class="dlg-tech"><summary>' + escapeHtml(t('dialog.tech_details')) +
-        '</summary><div class="dlg-tech-body">' + linkify(escapeHtml(raw)) + '</div></details>';
+    html +=
+        '<details class="dlg-tech"><summary>' +
+        escapeHtml(t('dialog.tech_details')) +
+        '</summary><div class="dlg-tech-body">' +
+        linkify(escapeHtml(raw)) +
+        '</div></details>';
     return html;
 }
 
@@ -230,9 +241,7 @@ function renderUpdateAllBar() {
 
 function renderTable() {
     const q = searchQuery.trim().toLowerCase();
-    const rows = currentPlugins
-        .map((p, idx) => ({ p, idx }))
-        .filter(({ p }) => !q || p.name.toLowerCase().includes(q));
+    const rows = currentPlugins.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || p.name.toLowerCase().includes(q));
     setPluginCount(rows.length, currentPlugins.length);
     renderUpdateAllBar();
     if (rows.length === 0) {
@@ -242,9 +251,10 @@ function renderTable() {
     // Every cell is built from wincmd.ini / catalog data: a name with "<" or "&"
     // breaks the markup unless it is escaped. The detection confidence is not a
     // column any more — it lives in the plugin card.
-    tbody.innerHTML = rows.map(({ p, idx }) => {
-        const canUpdate = isUpdatable(p);
-        return `
+    tbody.innerHTML = rows
+        .map(({ p, idx }) => {
+            const canUpdate = isUpdatable(p);
+            return `
             <tr data-idx="${idx}">
                 <td class="cell-type">${escapeHtml(p.type)}</td>
                 <td>${escapeHtml(p.name)}</td>
@@ -256,11 +266,11 @@ function renderTable() {
                 </td>
             </tr>
         `;
-    }).join('');
+        })
+        .join('');
 }
 
-const cardRow = (label, valueHtml) =>
-    `<div class="k">${label}</div><div class="v">${valueHtml}</div>`;
+const cardRow = (label, valueHtml) => `<div class="k">${label}</div><div class="v">${valueHtml}</div>`;
 
 // "https://" is noise in a narrow dialog and costs a line wrap; the href keeps it.
 const shortUrl = (url) => url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
@@ -275,10 +285,10 @@ function sourceIcon(source) {
     const github = /^github:/i.test(source);
     const label = github ? 'GitHub' : t('card.source.catalog');
     const glyph = github
-        // octicons/mark-github-16 (MIT, (c) GitHub Inc.)
-        ? '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>'
-        // Stand-in until the catalog ships its own mark.
-        : '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></g></svg>';
+        ? // octicons/mark-github-16 (MIT, (c) GitHub Inc.)
+          '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>'
+        : // Stand-in until the catalog ships its own mark.
+          '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></g></svg>';
     return `<span class="src-icon" role="img" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${glyph}</span>`;
 }
 
@@ -295,10 +305,14 @@ function openCard(index) {
     const site = plugin.web_url
         ? `<a href="${escapeHtml(plugin.web_url)}" class="dlg-link">${escapeHtml(shortUrl(plugin.web_url))}</a>`
         : '';
-    const tech = (plugin.source ? cardRow(t('card.source'), `<code>${escapeHtml(plugin.source)}</code>`) : '') +
+    const tech =
+        (plugin.source ? cardRow(t('card.source'), `<code>${escapeHtml(plugin.source)}</code>`) : '') +
         cardRow(t('card.path'), `<code class="path">${escapeHtml(plugin.path)}</code>`);
     cardInfoEl.innerHTML =
-        cardRow(t('col.installed'), `<code>${escapeHtml(plugin.installed_version)}</code> <small class="muted">${escapeHtml(plugin.confidence)}</small>`) +
+        cardRow(
+            t('col.installed'),
+            `<code>${escapeHtml(plugin.installed_version)}</code> <small class="muted">${escapeHtml(plugin.confidence)}</small>`,
+        ) +
         cardRow(t('col.latest'), latest) +
         cardRow(t('col.status'), getStatusBadge(plugin.status)) +
         (site ? cardRow(t('card.site'), site) : '') +
@@ -316,7 +330,8 @@ function openCard(index) {
 // with or without .git/trailing slash, or a bare owner/repo) and canonicalize.
 // Anything else is stored as typed.
 function normalizeSource(raw) {
-    let s = raw.trim()
+    let s = raw
+        .trim()
         .replace(/^https?:\/\/(?:www\.)?github\.com\//i, '')
         .replace(/^github:/i, '')
         .replace(/\.git$/i, '')
@@ -328,7 +343,7 @@ function normalizeSource(raw) {
 // the UI shows the page URL it came from (and re-folds it on save).
 function displaySource(source) {
     const match = /^github:([\w.-]+\/[\w.-]+)\/?$/i.exec(source || '');
-    return match ? `https://github.com/${match[1]}` : (source || '');
+    return match ? `https://github.com/${match[1]}` : source || '';
 }
 
 async function saveOverrideFromEditor() {
@@ -412,7 +427,7 @@ async function handleUpdate(index) {
     const plugin = currentPlugins[index];
     if (!plugin) return;
 
-    if (!await showConfirm(t('update.confirm', { name: plugin.name, version: plugin.latest_version }))) {
+    if (!(await showConfirm(t('update.confirm', { name: plugin.name, version: plugin.latest_version })))) {
         return;
     }
 
@@ -425,14 +440,20 @@ async function handleUpdate(index) {
     } else if (outcome.kind === 'error') {
         finishProgress(errorDialogHtml(outcome.err, t('update.error_friendly')));
     } else {
-        finishProgress(escapeHtml(outcome.backupPath
-            ? t('update.done_backup', { name: plugin.name, path: outcome.backupPath })
-            : t('update.done', { name: plugin.name })));
+        finishProgress(
+            escapeHtml(
+                outcome.backupPath
+                    ? t('update.done_backup', { name: plugin.name, path: outcome.backupPath })
+                    : t('update.done', { name: plugin.name }),
+            ),
+        );
     }
 
-    await new Promise((resolve) => { progressResolve = resolve; });
+    await new Promise((resolve) => {
+        progressResolve = resolve;
+    });
     if (outcome.kind === 'ok') runScan(false);
-};
+}
 
 // A row offers the update button only when a download source is resolved, and
 // the same rule defines the queue: "blind" updates (installed version unknown,
@@ -452,7 +473,7 @@ async function handleUpdateAll() {
     // The count is the whole queue, not the visible rows: the search filter is a
     // way to find a plugin, not a way to scope a batch, so the confirm has to
     // spell out what is actually about to happen.
-    if (!await showConfirm(t('update_all.confirm', { count: tp('count.plugins', queue.length) }))) {
+    if (!(await showConfirm(t('update_all.confirm', { count: tp('count.plugins', queue.length) })))) {
         return;
     }
 
@@ -465,7 +486,9 @@ async function handleUpdateAll() {
     for (let i = 0; i < queue.length; i++) {
         const plugin = queue[i];
         progressTitle.textContent = t('update_all.item', {
-            current: i + 1, total: queue.length, name: plugin.name,
+            current: i + 1,
+            total: queue.length,
+            name: plugin.name,
         });
         beginProgressItem();
 
@@ -491,21 +514,26 @@ async function handleUpdateAll() {
     ];
     // Head line first, then one line per plugin: the count is what the user
     // scans for, the rows are what they act on.
-    let html = `<p class="ua-head">${escapeHtml(done.length
-        ? tp('update_all.updated', done.length)
-        : t('update_all.none'))}</p>`;
+    let html = `<p class="ua-head">${escapeHtml(
+        done.length ? tp('update_all.updated', done.length) : t('update_all.none'),
+    )}</p>`;
     html += `<div class="ua-summary">${rows.join('')}</div>`;
     if (lockedAt >= 0) {
         html += `<p class="ua-note">${escapeHtml(t('update_all.locked_stop', { name: queue[lockedAt].name }))}</p>`;
     }
     if (rawErrors.length) {
-        html += '<details class="dlg-tech"><summary>' + escapeHtml(t('dialog.tech_details')) +
-            '</summary><div class="dlg-tech-body">' + linkify(escapeHtml(rawErrors.join('\n'))) +
+        html +=
+            '<details class="dlg-tech"><summary>' +
+            escapeHtml(t('dialog.tech_details')) +
+            '</summary><div class="dlg-tech-body">' +
+            linkify(escapeHtml(rawErrors.join('\n'))) +
             '</div></details>';
     }
     finishProgress(html);
 
-    await new Promise((resolve) => { progressResolve = resolve; });
+    await new Promise((resolve) => {
+        progressResolve = resolve;
+    });
     if (done.length) runScan(false);
 }
 
@@ -516,16 +544,21 @@ async function openHistory() {
             historyBody.innerHTML = `<tr class="table-empty"><td colspan="3">${t('history.empty')}</td></tr>`;
         } else {
             // Dates follow the UI language, not the OS locale.
-            const fmt = new Intl.DateTimeFormat(
-                currentLang() === 'ru' ? 'ru-RU' : 'en-GB',
-                { dateStyle: 'medium', timeStyle: 'short' });
-            historyBody.innerHTML = entries.map((e) => `
+            const fmt = new Intl.DateTimeFormat(currentLang() === 'ru' ? 'ru-RU' : 'en-GB', {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            });
+            historyBody.innerHTML = entries
+                .map(
+                    (e) => `
                 <tr>
                     <td>${escapeHtml(e.plugin_name || e.plugin_id)}</td>
                     <td><code>${escapeHtml(e.version)}</code></td>
                     <td>${fmt.format(new Date(e.applied_at))}</td>
                 </tr>
-            `).join('');
+            `,
+                )
+                .join('');
         }
         historyDialog.showModal();
         document.getElementById('history-close').focus();
@@ -604,7 +637,8 @@ async function checkForAppUpdate() {
     }
 }
 
-function refreshSettingsState() {    settingsView.querySelectorAll('[data-theme-choice]').forEach((el) => {
+function refreshSettingsState() {
+    settingsView.querySelectorAll('[data-theme-choice]').forEach((el) => {
         const selected = el.dataset.themeChoice === currentTheme();
         el.classList.toggle('selected', selected);
         el.setAttribute('aria-pressed', String(selected));
@@ -909,9 +943,18 @@ function buildDom() {
         if (tr) openCard(Number(tr.dataset.idx));
     });
 
-    appDialogOk.addEventListener('click', () => { settleAppDialog(true); appDialog.close(); });
-    appDialogCancel.addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
-    document.getElementById('app-dialog-close').addEventListener('click', () => { settleAppDialog(false); appDialog.close(); });
+    appDialogOk.addEventListener('click', () => {
+        settleAppDialog(true);
+        appDialog.close();
+    });
+    appDialogCancel.addEventListener('click', () => {
+        settleAppDialog(false);
+        appDialog.close();
+    });
+    document.getElementById('app-dialog-close').addEventListener('click', () => {
+        settleAppDialog(false);
+        appDialog.close();
+    });
     // Links in dialog messages open in the system browser, never in the webview.
     appDialogMsg.addEventListener('click', (e) => {
         const a = e.target.closest('a.dlg-link');
@@ -939,9 +982,17 @@ function buildDom() {
 
     // Update progress dialog: not dismissable while the update is running;
     // afterwards OK or the cross closes it and handleUpdate continues.
-    progressOk.addEventListener('click', () => { settleProgress(); progressDialog.close(); });
-    progressClose.addEventListener('click', () => { settleProgress(); progressDialog.close(); });
-    progressDialog.addEventListener('cancel', (e) => { if (progressRunning) e.preventDefault(); });
+    progressOk.addEventListener('click', () => {
+        settleProgress();
+        progressDialog.close();
+    });
+    progressClose.addEventListener('click', () => {
+        settleProgress();
+        progressDialog.close();
+    });
+    progressDialog.addEventListener('cancel', (e) => {
+        if (progressRunning) e.preventDefault();
+    });
     progressDialog.addEventListener('close', () => settleProgress());
     progressResult.addEventListener('click', (e) => {
         const a = e.target.closest('a.dlg-link');
