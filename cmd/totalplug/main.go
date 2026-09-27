@@ -194,7 +194,7 @@ func main() {
 	if res.CatalogErr != nil {
 		fmt.Printf("[!] Catalog fetch warning: %v\n", res.CatalogErr)
 	} else if res.FromCache {
-		fmt.Println("[i] Using local 24h catalog cache. (Use --refresh-cache to force update)")
+		fmt.Println("[i] Using cached catalog (revalidated with the CDN, or served offline). Use --refresh-cache to force a re-download.")
 	} else {
 		fmt.Println("[+] Fetched fresh catalog from GitHub CDN!")
 	}

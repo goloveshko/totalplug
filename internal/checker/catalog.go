@@ -11,9 +11,6 @@ import (
 )
 
 const (
-	// CacheTTL is how long a cached catalog snapshot is served without
-	// touching the network.
-	CacheTTL    = 24 * time.Hour
 	HTTPTimeout = 12 * time.Second
 )
 
@@ -149,32 +146,32 @@ func saveCacheAtomically(cache *CatalogCache) error {
 	return os.Rename(tmpFile, cacheFile)
 }
 
-// FetchCatalog retrieves the catalog from GitHub Pages CDN or returns 24h disk cache.
-// Once the TTL expires the CDN is revalidated with If-None-Match, so unchanged
-// catalogs cost a small 304 instead of a full ~700 KB download.
+// FetchCatalog always revalidates the catalog against the CDN with
+// If-None-Match, so an unchanged catalog costs a small 304 instead of the full
+// ~700 KB download, and a newly published plugin shows up on the next launch
+// rather than hiding behind a 24h window. The on-disk cache still answers the
+// instant offline paint (checker's cache-only path) and this function's offline
+// fallback; forceRefresh skips revalidation and re-downloads outright.
 func FetchCatalog(ctx context.Context, forceRefresh bool) ([]CatalogEntry, bool, error) {
 	cache, cacheErr := LoadCatalogFromCache()
 	haveCache := cacheErr == nil && len(cache.Snapshot.Plugins) > 0
 
-	// 1. Serve fresh cache without touching the network.
-	if !forceRefresh && haveCache && time.Since(cache.UpdatedAt) < CacheTTL {
-		return cache.Snapshot.Plugins, true, nil
-	}
-
-	// 2. HTTP GET to our GitHub Pages endpoint, revalidating when possible.
+	// 1. HTTP GET to our GitHub Pages endpoint, revalidating when possible. A
+	// forced refresh drops the ETag so the CDN cannot answer 304 and hand back
+	// the very snapshot the user is trying to replace.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, CommunityCatalogURL, nil)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "TotalPlug/1.0 (Total Commander Plugin Manager)")
-	if haveCache && cache.ETag != "" {
+	if !forceRefresh && haveCache && cache.ETag != "" {
 		req.Header.Set("If-None-Match", cache.ETag)
 	}
 
 	client := &http.Client{Timeout: HTTPTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		// Offline fallback: try to use expired cache if network is unavailable
+		// 2. Offline fallback: serve the cache when the network is unavailable.
 		if haveCache {
 			return cache.Snapshot.Plugins, true, nil
 		}
