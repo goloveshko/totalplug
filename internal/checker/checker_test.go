@@ -145,8 +145,10 @@ func TestCheckUpdatesCacheOnly(t *testing.T) {
 	if demo.LatestVersion != "2.0" || demo.Status != domain.StatusUpdateAvail || demo.DownloadURL == "" {
 		t.Errorf("cached catalog entry not applied: %+v", demo)
 	}
-	if ghost.LatestVersion != "N/A (Not in catalog)" || ghost.Status != domain.StatusUpToDate {
-		t.Errorf("github custom source should be skipped offline, got: %+v", ghost)
+	// A github source is skipped offline and the plugin matches no catalog
+	// entry, so it cannot be claimed up to date: an unresolved row is uncertain.
+	if ghost.LatestVersion != "N/A (Not in catalog)" || ghost.Status != domain.StatusUncertain {
+		t.Errorf("unresolved plugin must be uncertain, got: %+v", ghost)
 	}
 }
 

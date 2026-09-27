@@ -264,6 +264,11 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 			p.Status = classifyUpdate(p.InstalledVersion, matchedEntry.Resolved.Version, p.Confidence)
 		} else {
 			p.LatestVersion = "N/A (Not in catalog)"
+			// An unmatched (or matched-but-unresolved) plugin was never compared
+			// against a newer release, so the ini default of "up to date" is a
+			// claim we cannot support: report it uncertain so the row shows "?"
+			// instead of a green check that hides a catalog miss.
+			p.Status = domain.StatusUncertain
 		}
 	}
 
