@@ -37,10 +37,11 @@ type App struct {
 	refreshMu  sync.Mutex
 	refreshing bool
 
-	// winState mirrors the live window geometry so a teardown can persist it
-	// without querying the window that is already closing.
-	windowMu sync.Mutex
-	winState windowGeometry
+	// state mirrors the persisted settings: the window geometry is sampled while
+	// the app runs so a teardown can save it without querying the window that is
+	// already closing, and the backdrop choice changes while it runs too.
+	settingsMu sync.Mutex
+	state      settings
 }
 
 // NewApp creates a new App application struct
@@ -148,13 +149,16 @@ func (a *App) CheckForAppUpdate() (domain.AppUpdate, error) {
 // or "acrylic"); the frontend mirrors it in the settings select and decides
 // whether to render a transparent body.
 func (a *App) GetWindowEffect() string {
-	return loadWindowEffect()
+	return normalizeWindowEffect(a.snapshotSettings().WindowEffect)
 }
 
 // SetWindowEffect persists the backdrop choice; it is read once before the
 // window is created, so a restart is required to apply it.
 func (a *App) SetWindowEffect(effect string) error {
-	return saveWindowEffect(effect)
+	if !validWindowEffect(effect) {
+		return fmt.Errorf("unknown window effect %q", effect)
+	}
+	return a.setWindowEffect(effect)
 }
 
 // UpdatePlugin installs the latest version for the specified plugin. A locked

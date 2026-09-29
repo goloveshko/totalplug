@@ -208,8 +208,8 @@ totalplug/
 ├── cmd/totalplug/main.go     # CLI entry point: report, --update / --update-all prompts
 ├── internal/
 │   ├── buildinfo/            # Version stamped at build time, release location
-│   ├── checker/              # Catalog client + 24h cache, version compare, GitHub releases
-│   ├── config/               # Windows registry & wincmd.ini resolution
+│   ├── checker/              # Catalog client + disk cache, version compare, GitHub releases
+│   ├── config/               # Registry & wincmd.ini resolution, data folder layout
 │   ├── domain/               # Shared models (Plugin, Status, Confidence, AppInfo)
 │   ├── pipeline/             # Scan orchestration: detect → read → compare
 │   ├── scanner/              # Plugin discovery, PE / INF version extraction
@@ -217,7 +217,8 @@ totalplug/
 │   └── updater/              # Download, archive extract, backup, lock-aware install
 ├── frontend/                 # Wails GUI: plain HTML/CSS/JS built by Vite (no framework)
 ├── app.go, main.go           # Wails bridge — the Go methods the frontend may call
-├── window_effect.go          # Window backdrop, resolved from window_effect.txt at startup
+├── settings.go               # settings.json: window geometry and backdrop, read before the window exists
+├── window_effect.go          # The backdrop vocabulary: none / mica / acrylic
 ├── scripts/                  # build.ps1 plus the .cmd wrappers listed above
 └── wails.json
 ```

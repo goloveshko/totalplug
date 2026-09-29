@@ -50,7 +50,7 @@ func TestImportPerUserDataCopiesOnce(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(legacy, "subdir"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"user_overrides.json", "window_effect.txt"} {
+	for _, name := range []string{"user_overrides.json", "settings.json"} {
 		if err := os.WriteFile(filepath.Join(legacy, name), []byte(name), 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -62,7 +62,7 @@ func TestImportPerUserDataCopiesOnce(t *testing.T) {
 	}
 	importPerUserData(dir)
 
-	for _, name := range []string{"user_overrides.json", "window_effect.txt"} {
+	for _, name := range []string{"user_overrides.json", "settings.json"} {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			t.Fatalf("%s not imported: %v", name, err)

@@ -296,7 +296,8 @@ and accepted debt we deliberately postponed.
 
 - **Mica/Acrylic window effect** — temporarily disabled (see stage 3). Re-enabling needs
   a proper theme pass: panels readable over any desktop backdrop, opaque titlebar,
-  solid fallback — with `window_effect.txt` + Get/SetWindowEffect bindings already in place.
+  solid fallback — with the `window_effect` value in settings.json + the
+  Get/SetWindowEffect bindings already in place.
 - ~~**Unstable plugin IDs** — IDs are derived as `<type>_<folder-name>` and break when a
   plugin moves or is renamed; needs a stable identity scheme before update history
   and overrides can be fully trusted.~~ Shipped in `d32a2a1`: IDs are now

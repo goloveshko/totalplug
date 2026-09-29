@@ -21,14 +21,15 @@ func main() {
 	app := NewApp()
 
 	// Restore the last size, position and maximised state; a first run gets the
-	// compiled-in defaults.
+	// compiled-in defaults. The whole loaded state is mirrored in the app, so the
+	// save on close cannot drop the backdrop choice.
 	loaded, hasSettings := loadSettings()
 	saved := loaded.Window
 	width, height := defaultWidth, defaultHeight
 	if hasSettings && saved.Width > 0 && saved.Height > 0 {
 		width, height = saved.Width, saved.Height
 	}
-	app.seedWindowState(saved)
+	app.seedSettings(loaded)
 
 	// Frameless window with a frontend-drawn titlebar. The Mica/Acrylic backdrop
 	// is temporarily disabled: a translucent window washes out the themed UI,
@@ -60,7 +61,9 @@ func main() {
 		// Persist from the mirror, not from the window: a closing window answers
 		// size and position queries with zeros.
 		OnBeforeClose: func(context.Context) bool {
-			writeSettings(settings{Window: app.windowSnapshot()})
+			if err := writeSettings(app.snapshotSettings()); err != nil {
+				fmt.Printf("[!] %v\n", err)
+			}
 			return false
 		},
 		Windows: &windows.Options{

@@ -39,11 +39,13 @@ type windowGeometry struct {
 	Maximised bool `json:"maximised"`
 }
 
-// settings is the persisted state. Window geometry is the first member; the
-// theme, language and font scale stay in the frontend's localStorage until a
-// settings view writes there.
+// settings is the persisted state. Window geometry is what the next launch
+// restores; WindowEffect is the backdrop a future effects pass will apply, kept
+// here because it, like the size, has to be known before the window exists. The
+// theme, language and font scale stay in the frontend's localStorage.
 type settings struct {
-	Window windowGeometry `json:"window"`
+	Window       windowGeometry `json:"window"`
+	WindowEffect string         `json:"window_effect"`
 }
 
 func settingsPath() string {
@@ -68,31 +70,42 @@ func loadSettings() (settings, bool) {
 
 // writeSettings persists the settings. It queries no window, which is what makes
 // it safe to call while the app is tearing down.
-func writeSettings(s settings) {
+func writeSettings(s settings) error {
 	path := settingsPath()
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
-		fmt.Printf("[!] Could not encode settings: %v\n", err)
-		return
+		return fmt.Errorf("encode settings: %w", err)
 	}
 	if err := os.WriteFile(path, data, 0644); err != nil {
-		fmt.Printf("[!] Could not save settings in %s: %v\n", path, err)
+		return fmt.Errorf("write settings to %s: %w", path, err)
 	}
+	return nil
 }
 
-// seedWindowState primes the tracked geometry from the saved state before the
-// window exists, so a close before the first sample keeps the stored size.
-func (a *App) seedWindowState(geometry windowGeometry) {
-	a.windowMu.Lock()
-	defer a.windowMu.Unlock()
-	a.winState = geometry
+// seedSettings primes the mirrored state from the saved file before the window
+// exists, so a close before the first sample keeps the stored geometry and the
+// stored backdrop.
+func (a *App) seedSettings(s settings) {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+	a.state = s
 }
 
-// windowSnapshot returns the most recently tracked geometry.
-func (a *App) windowSnapshot() windowGeometry {
-	a.windowMu.Lock()
-	defer a.windowMu.Unlock()
-	return a.winState
+// snapshotSettings returns the most recently mirrored state.
+func (a *App) snapshotSettings() settings {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+	return a.state
+}
+
+// setWindowEffect replaces the backdrop choice and persists it right away, so
+// the value survives even if the app dies before a close writes the mirror.
+func (a *App) setWindowEffect(effect string) error {
+	a.settingsMu.Lock()
+	a.state.WindowEffect = effect
+	s := a.state
+	a.settingsMu.Unlock()
+	return writeSettings(s)
 }
 
 // trackWindowLoop mirrors the window geometry while the app runs. Bindings and
@@ -113,9 +126,9 @@ func (a *App) trackWindowLoop() {
 
 func (a *App) trackWindow() {
 	if wailsruntime.WindowIsMaximised(a.ctx) {
-		a.windowMu.Lock()
-		a.winState.Maximised = true
-		a.windowMu.Unlock()
+		a.settingsMu.Lock()
+		a.state.Window.Maximised = true
+		a.settingsMu.Unlock()
 		return
 	}
 
@@ -125,9 +138,9 @@ func (a *App) trackWindow() {
 	}
 	x, y := wailsruntime.WindowGetPosition(a.ctx)
 
-	a.windowMu.Lock()
-	a.winState.Width, a.winState.Height = width, height
-	a.winState.X, a.winState.Y = x, y
-	a.winState.Maximised = false
-	a.windowMu.Unlock()
+	a.settingsMu.Lock()
+	a.state.Window.Width, a.state.Window.Height = width, height
+	a.state.Window.X, a.state.Window.Y = x, y
+	a.state.Window.Maximised = false
+	a.settingsMu.Unlock()
 }
