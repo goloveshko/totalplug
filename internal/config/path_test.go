@@ -45,12 +45,16 @@ func TestCacheDirLivesInsideDataDir(t *testing.T) {
 	}
 }
 
-func TestImportPerUserDataCopiesOnce(t *testing.T) {
+func TestImportPerUserDataCopiesKnownFilesOnce(t *testing.T) {
 	legacy := fakePerUserDir(t)
 	if err := os.MkdirAll(filepath.Join(legacy, "subdir"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"user_overrides.json", "settings.json"} {
+	// Files the app no longer reads, written by older versions: a first portable
+	// run must leave them in the per-user folder instead of filling the portable
+	// one with things nobody can explain.
+	junk := []string{"window_effect.txt", "github_release_cache.json", "totalcmd_catalog_cache.json"}
+	for _, name := range append(append([]string{}, importableFiles...), junk...) {
 		if err := os.WriteFile(filepath.Join(legacy, name), []byte(name), 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -62,13 +66,18 @@ func TestImportPerUserDataCopiesOnce(t *testing.T) {
 	}
 	importPerUserData(dir)
 
-	for _, name := range []string{"user_overrides.json", "settings.json"} {
+	for _, name := range importableFiles {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			t.Fatalf("%s not imported: %v", name, err)
 		}
 		if string(data) != name {
 			t.Errorf("%s content = %q, want %q", name, data, name)
+		}
+	}
+	for _, name := range junk {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s must not be copied into a fresh portable folder", name)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(dir, "subdir")); !os.IsNotExist(err) {

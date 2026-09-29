@@ -36,8 +36,10 @@ TotalPlug keeps everything it writes in one folder, picked at every start:
 * **Portable** — a `totalplug` folder next to the `.exe`, whenever that folder
   accepts writes. Copy the app's folder to another machine or a USB stick and the
   whole setup travels with it, WebView2 profile (theme, language, font size)
-  included. On the first portable run the files found in `%APPDATA%\totalplug`
-  are copied in — the originals are left alone, so nothing is lost by trying.
+  included. On the first portable run the database, the overrides, the update
+  history and the settings are copied out of `%APPDATA%\totalplug` — only the
+  files this version reads, so old caches and retired files stay behind. The
+  originals are left alone, so nothing is lost by trying.
 * **Per-user** — `%APPDATA%\totalplug`, when the executable sits somewhere
   read-only: Program Files, a write-protected share, a mounted image.
 

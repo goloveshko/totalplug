@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -147,11 +148,26 @@ func userDir() string {
 	return dir
 }
 
+// importableFiles are the files a first portable run copies out of the per-user
+// folder — exactly the ones this version reads back, and nothing else. A cache,
+// a quarantined `.corrupt` file or something an abandoned feature left behind is
+// not carried into a folder the user will open and try to understand.
+//
+// The names live here rather than with their owners because config cannot import
+// the packages that own them; a renamed file therefore has to be renamed in this
+// list too, or the portable run starts without it.
+var importableFiles = []string{
+	"installed_plugins.json",
+	"user_overrides.json",
+	"update_history.json",
+	"settings.json",
+}
+
 // importPerUserData fills a brand-new portable folder from the per-user one, so
-// the first portable run does not look like a fresh install. It copies files it
-// finds and leaves the originals alone: a run from another location still reads
-// them. An empty folder is what makes this safe to repeat — once the app has
-// written anything here, the folder owns its data.
+// the first portable run does not look like a fresh install. It copies the files
+// it knows and leaves the originals alone: a run from another location still
+// reads them. An empty folder is what makes this safe to repeat — once the app
+// has written anything here, the folder owns its data.
 func importPerUserData(dir string) {
 	legacy := perUserDir()
 	if legacy == "" || legacy == dir {
@@ -165,7 +181,7 @@ func importPerUserData(dir string) {
 		return
 	}
 	for _, entry := range saved {
-		if entry.IsDir() {
+		if entry.IsDir() || !slices.Contains(importableFiles, entry.Name()) {
 			continue
 		}
 		_ = copyFile(filepath.Join(legacy, entry.Name()), filepath.Join(dir, entry.Name()))
