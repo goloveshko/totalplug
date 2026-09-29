@@ -273,14 +273,48 @@ function Invoke-Fmt {
     Write-Host "✔ Done!" -ForegroundColor Green
 }
 
-# Router
-switch ($Action) {
-    { $_ -in "build", "b" }                { Invoke-Build }
-    { $_ -in "release", "rel" }            { Invoke-Release }
-    { $_ -in "gui", "g" }                  { Invoke-Gui }
-    { $_ -in "release-gui", "relg" }       { Invoke-ReleaseGui }
-    { $_ -in "run",   "r" }                { Invoke-Run }
-    { $_ -in "lint",  "l" }                { Invoke-Lint }
-    { $_ -in "test",  "t" }                { Invoke-Test }
-    { $_ -in "fmt" }                       { Invoke-Fmt }
+# A window opened for a double-clicked wrapper closes the moment this script
+# exits, taking the build error with it. Every other way in - a terminal, an IDE,
+# a shell - leaves a prompt behind, so what decides it is the ABSENCE of a shell
+# among the ancestors: Explorer and Total Commander are launchers, not readers.
+# Guessing from %cmdcmdline% cannot work, because a double-click and a shell's own
+# invocation differ only in how the path is quote-nested.
+function Test-WindowClosesOnExit {
+    $shells = @("cmd.exe", "powershell.exe", "pwsh.exe", "pwsh-preview.exe", "bash.exe", "sh.exe", "zsh.exe", "fish.exe")
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction SilentlyContinue
+    for ($i = 0; $i -lt 5 -and $proc; $i++) {
+        if (-not $proc.ParentProcessId) { return $false }
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $($proc.ParentProcessId)" -ErrorAction SilentlyContinue
+        # The first ancestor is always the wrapper .cmd's own cmd.exe, which waits
+        # for us to finish rather than for a keypress.
+        if ($i -gt 0 -and $proc.Name -in $shells) { return $false }
+    }
+    return $true
+}
+
+function Wait-AfterWindowRun {
+    if (Test-WindowClosesOnExit) {
+        Write-Host "`nPress any key to close..." -ForegroundColor DarkGray
+        # Throws when there is no console to read from, which is the signal to leave
+        # the window alone rather than a failure to report.
+        try { [void][Console]::ReadKey($true) } catch { }
+    }
+}
+
+# The wait is a finally, not a line after the router, because every failure in
+# here exits from inside the switch - and a build that failed is precisely the
+# case a double-clicking user needs the window to stay open for.
+try {
+    switch ($Action) {
+        { $_ -in "build", "b" }          { Invoke-Build }
+        { $_ -in "release", "rel" }      { Invoke-Release }
+        { $_ -in "gui", "g" }            { Invoke-Gui }
+        { $_ -in "release-gui", "relg" } { Invoke-ReleaseGui }
+        { $_ -in "run",   "r" }          { Invoke-Run }
+        { $_ -in "lint",  "l" }          { Invoke-Lint }
+        { $_ -in "test",  "t" }          { Invoke-Test }
+        { $_ -in "fmt" }                 { Invoke-Fmt }
+    }
+} finally {
+    Wait-AfterWindowRun
 }
