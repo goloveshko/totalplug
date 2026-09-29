@@ -62,7 +62,11 @@ type Plugin struct {
 	Arch        string       `json:"arch,omitempty"`
 	Description string       `json:"description,omitempty"`
 	Status      PluginStatus `json:"status"`
-	LastChecked time.Time    `json:"last_checked,omitempty"`
+	// ts_type is read by Wails' model generator, not by encoding/json: a struct
+	// field whose type it cannot resolve is emitted as `any` and reported on the
+	// console ("Not found: time.Time") on every build. A timestamp crosses the
+	// bridge as an RFC 3339 string, so that is what the generated model says.
+	LastChecked time.Time `json:"last_checked,omitempty" ts_type:"string"`
 }
 
 // UpdateProgress is one event emitted while an update runs, so the GUI can
@@ -91,7 +95,7 @@ type UpdateEntry struct {
 	PluginID   string    `json:"plugin_id"`
 	PluginName string    `json:"plugin_name"`
 	Version    string    `json:"version"`
-	AppliedAt  time.Time `json:"applied_at"`
+	AppliedAt  time.Time `json:"applied_at" ts_type:"string"`
 }
 
 // AppInfo is what the About panel can show without a network round trip.
@@ -118,5 +122,5 @@ type AppUpdate struct {
 	// update claim.
 	Comparable bool      `json:"comparable"`
 	ReleaseURL string    `json:"release_url,omitempty"`
-	CheckedAt  time.Time `json:"checked_at,omitempty"`
+	CheckedAt  time.Time `json:"checked_at,omitempty" ts_type:"string"`
 }
