@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"totalplug/internal/config"
 )
 
 func testSnapshot(version string) CatalogSnapshot {
@@ -22,6 +24,11 @@ func testSnapshot(version string) CatalogSnapshot {
 }
 
 func TestFetchCatalogRevalidatesWithETag(t *testing.T) {
+	// FetchCatalog writes the disk cache, so it has to land in the test's own
+	// folder rather than the data folder the resolver picks for a test binary —
+	// which for a developer running `go test` is the one the app really uses.
+	t.Setenv(config.DataDirEnv, t.TempDir())
+
 	// Seed a cache that carries an ETag.
 	seeded := &CatalogCache{
 		UpdatedAt: time.Now().Add(-time.Hour),
@@ -65,6 +72,8 @@ func TestFetchCatalogRevalidatesWithETag(t *testing.T) {
 }
 
 func TestFetchCatalogStoresNewETag(t *testing.T) {
+	t.Setenv(config.DataDirEnv, t.TempDir())
+
 	seeded := &CatalogCache{
 		UpdatedAt: time.Now().Add(-time.Hour),
 		ETag:      `W/"old"`,
@@ -106,6 +115,8 @@ func TestFetchCatalogStoresNewETag(t *testing.T) {
 // without any request, so a catalog published after it was cached stayed hidden
 // until a manual refresh. FetchCatalog must revalidate even a fresh cache.
 func TestFetchCatalogRevalidatesFreshCache(t *testing.T) {
+	t.Setenv(config.DataDirEnv, t.TempDir())
+
 	seeded := &CatalogCache{
 		UpdatedAt: time.Now(), // well inside the retired 24h window
 		ETag:      `W/"seed-etag"`,
@@ -142,6 +153,8 @@ func TestFetchCatalogRevalidatesFreshCache(t *testing.T) {
 // A forced refresh is the user saying "this snapshot is wrong" — re-sending its
 // ETag lets the CDN answer 304 and hand the same snapshot straight back.
 func TestFetchCatalogForceSkipsRevalidation(t *testing.T) {
+	t.Setenv(config.DataDirEnv, t.TempDir())
+
 	seeded := &CatalogCache{
 		UpdatedAt: time.Now(),
 		ETag:      `W/"seed-etag"`,
