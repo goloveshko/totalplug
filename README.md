@@ -24,8 +24,26 @@ already ships with Windows 11 and with current Windows 10 updates.
 
 The binaries are not code-signed, so SmartScreen shows "Windows protected your
 PC" on the first run — pick **More info → Run anyway**. TotalPlug writes nothing
-outside your Total Commander `plugins` directory and `%APPDATA%\TotalPlug`, and
-every folder it changes is backed up next to it.
+outside your Total Commander `plugins` directory and its own data folder (see
+**Where Your Files Live**), and every folder it changes is backed up next to it.
+
+---
+
+## 📁 Where Your Files Live
+
+TotalPlug keeps its plugin database, overrides, update history, catalog caches
+and window backdrop choice in one folder, picked at every start:
+
+* **Portable** — a `TotalPlug` folder next to the `.exe`, whenever that folder
+  accepts writes. Copy the app's folder to another machine or a USB stick and the
+  whole setup travels with it, WebView2 profile (theme, language, font size)
+  included. On the first portable run the files found in `%APPDATA%\TotalPlug`
+  are copied in — the originals are left alone, so nothing is lost by trying.
+* **Per-user** — `%APPDATA%\TotalPlug`, when the executable sits somewhere
+  read-only: Program Files, a write-protected share, a mounted image.
+
+The About panel prints the folder in use. `TOTALPLUG_DATA_DIR` pins it to any
+path you choose.
 
 ---
 
@@ -47,7 +65,8 @@ every folder it changes is backed up next to it.
   install, while an unsupported container is refused with a clear message
   instead of a half-extracted folder.
 * 💾 **User Overrides & Database:**  
-  Persist custom names, versions, and update sources in `%APPDATA%\TotalPlug\user_overrides.json`.
+  Persist custom names, versions, and update sources in `user_overrides.json`,
+  inside the data folder TotalPlug picks for you.
 * 🖥️ **Dual Interface:**  
   High-speed command-line interface (CLI) and hybrid desktop GUI powered by **Wails v2**.
 

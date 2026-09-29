@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"totalplug/internal/config"
 )
 
 const (
@@ -84,16 +86,10 @@ func getCachePath() string {
 	return cacheFilePath("community_catalog_cache.json")
 }
 
-// cacheFilePath resolves a file inside the per-user cache directory,
-// creating the directory on demand.
+// cacheFilePath resolves a file inside the data directory (next to the
+// executable for a portable install, %APPDATA%\TotalPlug otherwise).
 func cacheFilePath(name string) string {
-	appData := os.Getenv("APPDATA")
-	if appData == "" {
-		appData = "."
-	}
-	dir := filepath.Join(appData, "TotalPlug")
-	_ = os.MkdirAll(dir, 0755)
-	return filepath.Join(dir, name)
+	return filepath.Join(config.DataDir(), name)
 }
 
 // LoadCatalogFromCache loads cached catalog from local disk.

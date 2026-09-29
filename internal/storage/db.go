@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"totalplug/internal/config"
 	"totalplug/internal/domain"
 )
 
@@ -35,24 +36,14 @@ type Database struct {
 // grow without bound on a long-lived install.
 const MaxHistoryEntries = 200
 
+// GetDefaultDbPath points at the data directory, which is next to the
+// executable for a portable install and %APPDATA%\TotalPlug otherwise.
 func GetDefaultDbPath() string {
-	appData := os.Getenv("APPDATA")
-	if appData == "" {
-		appData = "."
-	}
-	dir := filepath.Join(appData, "TotalPlug")
-	_ = os.MkdirAll(dir, 0755)
-	return filepath.Join(dir, "installed_plugins.json")
+	return filepath.Join(config.DataDir(), "installed_plugins.json")
 }
 
 func GetDefaultOverridesPath() string {
-	appData := os.Getenv("APPDATA")
-	if appData == "" {
-		appData = "."
-	}
-	dir := filepath.Join(appData, "TotalPlug")
-	_ = os.MkdirAll(dir, 0755)
-	return filepath.Join(dir, "user_overrides.json")
+	return filepath.Join(config.DataDir(), "user_overrides.json")
 }
 
 func NewDatabase(dbPath string) (*Database, error) {

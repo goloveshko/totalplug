@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"totalplug/internal/config"
 	"totalplug/internal/domain"
 )
 
@@ -104,7 +105,7 @@ func TestClassifyUpdate(t *testing.T) {
 }
 
 func TestCheckUpdatesCacheOnly(t *testing.T) {
-	t.Setenv("APPDATA", t.TempDir())
+	t.Setenv(config.DataDirEnv, t.TempDir())
 	ctx := context.Background()
 
 	// Seed a disk cache with one resolvable entry.
@@ -153,7 +154,7 @@ func TestCheckUpdatesCacheOnly(t *testing.T) {
 }
 
 func TestCheckUpdatesCacheOnlyWithoutCache(t *testing.T) {
-	t.Setenv("APPDATA", t.TempDir())
+	t.Setenv(config.DataDirEnv, t.TempDir())
 
 	plugins := []domain.Plugin{{ID: "wlx_X", Name: "X", Path: `C:\tc\x.wlx`,
 		InstalledVersion: "1.0", Confidence: domain.ConfidenceExact, Status: domain.StatusUpToDate}}
@@ -168,7 +169,7 @@ func TestCheckUpdatesCacheOnlyWithoutCache(t *testing.T) {
 }
 
 func TestCheckUpdatesCacheOnlyUsesGitHubCache(t *testing.T) {
-	t.Setenv("APPDATA", t.TempDir())
+	t.Setenv(config.DataDirEnv, t.TempDir())
 	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip")
 
 	plugins := []domain.Plugin{{ID: "wlx_EdgeView", Name: "EdgeView",
@@ -193,7 +194,7 @@ func TestCheckUpdatesCacheOnlyUsesGitHubCache(t *testing.T) {
 // 60 req/h quota is spent) must not erase what the last successful check
 // remembered.
 func TestCheckUpdatesKeepsRememberedReleaseWhenLookupFails(t *testing.T) {
-	t.Setenv("APPDATA", t.TempDir())
+	t.Setenv(config.DataDirEnv, t.TempDir())
 
 	attempts := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +234,7 @@ func TestCheckUpdatesKeepsRememberedReleaseWhenLookupFails(t *testing.T) {
 }
 
 func TestGitHubReleaseCacheRoundtrip(t *testing.T) {
-	t.Setenv("APPDATA", t.TempDir())
+	t.Setenv(config.DataDirEnv, t.TempDir())
 
 	if loadGitHubRelease("owner/repo") != nil {
 		t.Fatal("expected empty cache")

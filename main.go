@@ -2,10 +2,14 @@ package main
 
 import (
 	"embed"
+	"fmt"
+
+	"totalplug/internal/config"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed all:frontend/dist
@@ -29,6 +33,9 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 244, G: 244, B: 247, A: 255},
 		OnStartup:        app.startup,
+		Windows: &windows.Options{
+			WebviewUserDataPath: webviewUserDataPath(),
+		},
 		Bind: []interface{}{
 			app,
 		},
@@ -37,4 +44,18 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+}
+
+// webviewUserDataPath keeps the WebView2 profile — and with it the frontend's
+// localStorage: theme, language, font scale — inside the data directory, so a
+// portable folder carries those choices too. An empty answer leaves Wails with
+// its own default (%APPDATA%\totalplug.exe), which is what a run that cannot
+// write anywhere would fall back to anyway.
+func webviewUserDataPath() string {
+	dir, err := config.WebviewDataDir()
+	if err != nil {
+		fmt.Printf("[!] WebView2 data stays in the Wails default location: %v\n", err)
+		return ""
+	}
+	return dir
 }

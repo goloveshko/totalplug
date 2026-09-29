@@ -7,18 +7,17 @@ import (
 	"strings"
 	"testing"
 
+	"totalplug/internal/config"
 	"totalplug/internal/domain"
 )
 
-// newTestDb points APPDATA at a temp dir so default paths stay hermetic.
+// newTestDb pins the data directory to a fresh temp folder through
+// TOTALPLUG_DATA_DIR, so default paths stay hermetic and never touch the
+// install this machine actually uses.
 func newTestDb(t *testing.T) string {
 	t.Helper()
-	appData := t.TempDir()
-	t.Setenv("APPDATA", appData)
-	dir := filepath.Join(appData, "TotalPlug")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Fatal(err)
-	}
+	dir := t.TempDir()
+	t.Setenv(config.DataDirEnv, dir)
 	return dir
 }
 

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"totalplug/internal/config"
 )
 
 // The window backdrop must be known before wails.Run creates the HWND, so the
@@ -25,22 +27,16 @@ func validWindowEffect(effect string) bool {
 	return false
 }
 
-func windowEffectPath() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve config dir: %w", err)
-	}
-	return filepath.Join(dir, "TotalPlug", "window_effect.txt"), nil
+// windowEffectPath lives in the data directory because it is read before the
+// window exists, so the frontend's localStorage is not available yet.
+func windowEffectPath() string {
+	return filepath.Join(config.DataDir(), "window_effect.txt")
 }
 
 // loadWindowEffect returns the configured effect, falling back to the default
 // when the file is missing or holds an unknown value.
 func loadWindowEffect() string {
-	path, err := windowEffectPath()
-	if err != nil {
-		return effectNone
-	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(windowEffectPath())
 	if err != nil {
 		return defaultEffect
 	}
@@ -55,12 +51,5 @@ func saveWindowEffect(effect string) error {
 	if !validWindowEffect(effect) {
 		return fmt.Errorf("unknown window effect %q", effect)
 	}
-	path, err := windowEffectPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-	return os.WriteFile(path, []byte(effect), 0644)
+	return os.WriteFile(windowEffectPath(), []byte(effect), 0644)
 }

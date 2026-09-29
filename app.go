@@ -5,13 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	goruntime "runtime"
 	"sync"
 	"time"
 
 	"totalplug/internal/buildinfo"
 	"totalplug/internal/checker"
+	"totalplug/internal/config"
 	"totalplug/internal/domain"
 	"totalplug/internal/pipeline"
 	"totalplug/internal/storage"
@@ -124,7 +124,7 @@ func (a *App) AppInfo() domain.AppInfo {
 	return domain.AppInfo{
 		Version:     buildinfo.Version,
 		ReleasesURL: buildinfo.ReleasesURL,
-		DataDir:     filepath.Dir(storage.GetDefaultDbPath()),
+		DataDir:     config.DataDir(),
 		GoVersion:   goruntime.Version(),
 	}
 }
