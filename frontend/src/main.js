@@ -7,6 +7,9 @@ import {
     GetUpdateHistory,
     AppInfo,
     CheckForAppUpdate,
+    GetTcConfig,
+    SetTcConfig,
+    BrowseTcIni,
 } from '../wailsjs/go/main/App';
 import { EventsOn, BrowserOpenURL, WindowMinimise, WindowToggleMaximise, Quit } from '../wailsjs/runtime';
 import { t, tp, currentLang, setLang } from './i18n.js';
@@ -643,6 +646,92 @@ async function checkForAppUpdate() {
     }
 }
 
+// Which wincmd.ini a scan opens is the Go side's decision, so the panel shows
+// its answer instead of a path the frontend invented. `tcError` is a rejected
+// edit: while it is set the field keeps the user's own text, because replacing
+// it with the stored value would hide what they need to fix.
+let tcConfig = null;
+let tcError = '';
+
+function renderTcPanel() {
+    const pathEl = document.getElementById('tc-ini');
+    const host = document.getElementById('tc-state');
+    if (!pathEl || !host) return;
+
+    if (!tcError && tcConfig) pathEl.value = tcConfig.effective;
+
+    let line = '';
+    if (tcError) {
+        line = `<span class="tc-warn">${escapeHtml(tcError)}</span>`;
+    } else if (tcConfig) {
+        if (!tcConfig.effective) {
+            line = `<span class="tc-warn">${escapeHtml(t('settings.tc.none'))}</span>`;
+        } else if (!tcConfig.readable) {
+            line = `<span class="tc-warn">${escapeHtml(t('settings.tc.gone'))}</span>`;
+        } else {
+            const key = tcConfig.configured ? 'settings.tc.mode.manual' : 'settings.tc.mode.auto';
+            line = `<span class="tc-mode">${escapeHtml(t(key))}</span>`;
+        }
+    }
+    // The way out of a manual path is offered wherever one is stored, healthy or
+    // not: it is the only control that returns the panel to detection.
+    const back = tcConfig?.configured
+        ? `<button type="button" class="btn-secondary" id="tc-auto">${escapeHtml(t('settings.tc.back_auto'))}</button>`
+        : '';
+    host.innerHTML = line + back;
+}
+
+async function loadTcConfig() {
+    try {
+        tcConfig = await GetTcConfig();
+        tcError = '';
+    } catch (err) {
+        // The panel has no other use for this call, so the reason is all that
+        // can be shown.
+        tcError = String(err?.message ?? err);
+        tcConfig = null;
+    }
+    renderTcPanel();
+}
+
+// Store a path and re-read the plugins, because the table the user is looking
+// at describes the Total Commander that was just replaced.
+async function applyTcPath(path) {
+    const trimmed = String(path ?? '').trim();
+    tcError = '';
+    // Retyping the path that is already in force is not an edit, but it does
+    // retire a rejected one: the field goes back to what is actually stored.
+    if (tcConfig && trimmed === tcConfig.effective) {
+        renderTcPanel();
+        return;
+    }
+    try {
+        await SetTcConfig(trimmed);
+    } catch (err) {
+        // The reason plus the fact that nothing was stored: the field still
+        // shows the rejected text, so the panel has to say it is not in effect.
+        tcError = `${String(err?.message ?? err)} — ${t('settings.tc.not_saved')}`;
+        renderTcPanel();
+        return;
+    }
+    await loadTcConfig();
+    runScan(true);
+}
+
+async function browseTcIni() {
+    try {
+        // An empty result is the user cancelling the picker, not a failure.
+        const picked = await BrowseTcIni(t('settings.tc.browse_title'));
+        if (!picked) return;
+        const pathEl = document.getElementById('tc-ini');
+        if (pathEl) pathEl.value = picked;
+        await applyTcPath(picked);
+    } catch (err) {
+        tcError = String(err?.message ?? err);
+        renderTcPanel();
+    }
+}
+
 function refreshSettingsState() {
     settingsView.querySelectorAll('[data-theme-choice]').forEach((el) => {
         const selected = el.dataset.themeChoice === currentTheme();
@@ -658,6 +747,9 @@ function refreshSettingsState() {
     settingsView.querySelectorAll('.settings-panel').forEach((panel) => {
         panel.classList.toggle('active', panel.id === 'panel-' + settingsSection);
     });
+    // The DOM rebuilds on a language switch, which empties the path field; this
+    // is what puts the stored answer back into it.
+    renderTcPanel();
 }
 
 // The titlebar search box and action icons belong to the plugin view only;
@@ -674,6 +766,7 @@ function openSettings() {
     settingsView.hidden = false;
     setMainChromeVisible(false);
     refreshSettingsState();
+    if (settingsSection === 'tc') loadTcConfig();
 }
 
 function closeSettings() {
@@ -744,6 +837,7 @@ function buildDom() {
         <div class="settings-body">
           <div class="settings-nav">
             <button type="button" data-panel="appearance">${t('settings.nav.appearance')}</button>
+            <button type="button" data-panel="tc">${t('settings.nav.tc')}</button>
             <button type="button" data-panel="language">${t('settings.nav.language')}</button>
             <button type="button" data-panel="about">${t('settings.nav.about')}</button>
           </div>
@@ -773,6 +867,17 @@ function buildDom() {
               <input type="range" id="font-scale" min="80" max="140" step="5">
               <span class="font-value" id="font-scale-value">100%</span>
             </div>
+          </div>
+          <div class="settings-panel" id="panel-tc">
+            <h3>${t('settings.nav.tc')}</h3>
+            <p class="section-desc">${t('settings.tc')}</p>
+            <div class="section-label">${t('settings.tc.ini')}</div>
+            <div class="tc-row">
+              <input type="text" id="tc-ini" aria-label="${t('settings.tc.ini')}" spellcheck="false" autocomplete="off">
+              <button type="button" class="btn-secondary" id="tc-browse">${t('settings.tc.browse')}</button>
+            </div>
+            <div class="tc-state" id="tc-state"></div>
+            <p class="editor-hint">${t('settings.tc.hint')}</p>
           </div>
           <div class="settings-panel" id="panel-language">
             <h3>${t('settings.nav.language')}</h3>
@@ -1012,6 +1117,10 @@ function buildDom() {
     settingsView.querySelectorAll('.settings-nav button').forEach((btn) => {
         btn.addEventListener('click', () => {
             settingsSection = btn.dataset.panel;
+            // Detection can move while the app runs (a portable TC mounted, an
+            // install uninstalled), and asking is two stat calls, so the panel
+            // is refreshed on entry rather than trusted from the last visit.
+            if (settingsSection === 'tc') loadTcConfig();
             refreshSettingsState();
         });
     });
@@ -1033,6 +1142,23 @@ function buildDom() {
     });
     document.getElementById('link-catalog').addEventListener('click', () => {
         BrowserOpenURL('https://sergey.is-a.dev/totalplug-catalog/');
+    });
+    // The path saves on the same trigger the rest of the settings use — leaving
+    // the field — and Enter counts as leaving it, because typing an absolute
+    // Windows path and pressing Enter is how everyone expects that to work.
+    const tcPathEl = document.getElementById('tc-ini');
+    tcPathEl.addEventListener('change', () => applyTcPath(tcPathEl.value));
+    tcPathEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applyTcPath(tcPathEl.value);
+        }
+    });
+    document.getElementById('tc-browse').addEventListener('click', browseTcIni);
+    // The state line is rebuilt as HTML, so its button is reached the way the
+    // About panel reaches its own row.
+    document.getElementById('tc-state').addEventListener('click', (e) => {
+        if (e.target.closest('#tc-auto')) applyTcPath('');
     });
     // The update row is re-rendered as HTML, so its button and release link are
     // reached through one delegated listener instead of per-render bindings.

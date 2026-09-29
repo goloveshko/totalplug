@@ -102,6 +102,24 @@ export namespace domain {
 	        this.last_checked = source["last_checked"];
 	    }
 	}
+	export class TcConfig {
+	    configured: string;
+	    detected: string;
+	    effective: string;
+	    readable: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TcConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.configured = source["configured"];
+	        this.detected = source["detected"];
+	        this.effective = source["effective"];
+	        this.readable = source["readable"];
+	    }
+	}
 	export class UpdateEntry {
 	    plugin_id: string;
 	    plugin_name: string;

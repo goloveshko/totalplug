@@ -119,6 +119,38 @@ function installMockBackend() {
             return Promise.resolve(null);
         },
 
+        // Settings > Total Commander. A folder holding the word "gone" stands in
+        // for a path whose file disappeared, which is the state the panel exists
+        // to show, so it can be demoed by typing it.
+        _tc: { configured: '', detected: 'C:\\Users\\demo\\AppData\\Roaming\\GHISLER\\wincmd.ini' },
+
+        GetTcConfig() {
+            const st = app._tc;
+            const effective = st.configured || st.detected;
+            return Promise.resolve({
+                configured: st.configured,
+                detected: st.detected,
+                effective,
+                readable: effective !== '' && !effective.includes('gone'),
+            });
+        },
+
+        SetTcConfig(path) {
+            const trimmed = String(path || '').trim();
+            if (trimmed && !/wincmd\.ini$/i.test(trimmed)) {
+                return Promise.reject(`wincmd.ini not accessible at ${trimmed}`);
+            }
+            app._tc.configured = trimmed;
+            return Promise.resolve(null);
+        },
+
+        // No native picker exists in a plain browser, so Browse answers with the
+        // path a user would most plausibly have chosen.
+        BrowseTcIni(title) {
+            console.log('[mock] BrowseTcIni', title);
+            return Promise.resolve('D:\\TC-portable\\wincmd.ini');
+        },
+
         AppInfo() {
             return Promise.resolve({
                 version: '1.1.0',

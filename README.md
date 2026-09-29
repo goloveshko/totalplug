@@ -57,7 +57,7 @@ path you choose.
 ## ✨ Key Features
 
 * 🔍 **Zero-Config Total Commander Detection:**  
-  Automatically discovers `wincmd.ini` and installation paths from Windows Registry (`HKCU`/`HKLM` 32-bit & 64-bit) or `%APPDATA%`, resolving `%COMMANDER_PATH%` and `%COMMANDER_DRIVE%` variables.
+  Automatically discovers `wincmd.ini` and installation paths from Windows Registry (`HKCU`/`HKLM` 32-bit & 64-bit) or `%APPDATA%`, resolving `%COMMANDER_PATH%` and `%COMMANDER_DRIVE%` variables. A Total Commander the registry does not know about — a portable one, usually — can be named by hand instead.
 * 📦 **Smart Plugin Parser & Deduplication:**  
   Extracts all Packer (`WCX`), Lister (`WLX`), File System (`WFX`), and Content (`WDX`) plugins, merging duplicate archive extensions into single logical plugins.
 * 🧬 **4-Tier Version Extraction Engine:**
@@ -92,7 +92,9 @@ path you choose.
   install path, plus an editor for a manual version/source override when
   auto-detection got it wrong.
 * **History** — the updates TotalPlug applied, with version and timestamp.
-* **Settings** — light/dark/system theme, English/Russian interface, font size.
+* **Settings** — light/dark/system theme, English/Russian interface, font size,
+  and a Total Commander panel that names the `wincmd.ini` the next scan reads:
+  auto-detected, or one you pick when the registry does not know your install.
 * **Remembered window** — the size, position and maximised state you closed with
   are what the next launch opens with; only the very first run starts at the
   default 1024×768.

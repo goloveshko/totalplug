@@ -6,8 +6,16 @@ export function AppInfo() {
   return window['go']['main']['App']['AppInfo']();
 }
 
+export function BrowseTcIni(arg1) {
+  return window['go']['main']['App']['BrowseTcIni'](arg1);
+}
+
 export function CheckForAppUpdate() {
   return window['go']['main']['App']['CheckForAppUpdate']();
+}
+
+export function GetTcConfig() {
+  return window['go']['main']['App']['GetTcConfig']();
 }
 
 export function GetUpdateHistory() {
@@ -24,6 +32,10 @@ export function SaveOverride(arg1, arg2) {
 
 export function ScanPlugins(arg1) {
   return window['go']['main']['App']['ScanPlugins'](arg1);
+}
+
+export function SetTcConfig(arg1) {
+  return window['go']['main']['App']['SetTcConfig'](arg1);
 }
 
 export function SetWindowEffect(arg1) {

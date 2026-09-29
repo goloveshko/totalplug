@@ -921,6 +921,44 @@ dialog input:focus {
     font-size: 0.85rem;
     color: var(--text-muted);
 }
+/* A wincmd.ini path is the longest value in the app, so the field takes the
+   width and the state line goes under it instead of squeezing the text. */
+.tc-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.tc-row input[type='text'] {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    background: var(--input-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    user-select: text;
+}
+.tc-row input[type='text']:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.tc-state {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    font-size: 0.8rem;
+}
+.tc-mode {
+    color: var(--text-muted);
+}
+/* The failed cases are the whole reason this panel exists, so they are the one
+   red the settings view spends. */
+.tc-warn {
+    color: var(--badge-err);
+}
 .about-name {
     font-size: 1.05rem;
     font-weight: 700;

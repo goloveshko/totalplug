@@ -4,7 +4,11 @@ import {domain} from '../models';
 
 export function AppInfo():Promise<domain.AppInfo>;
 
+export function BrowseTcIni(arg1:string):Promise<string>;
+
 export function CheckForAppUpdate():Promise<domain.AppUpdate>;
+
+export function GetTcConfig():Promise<domain.TcConfig>;
 
 export function GetUpdateHistory():Promise<Array<domain.UpdateEntry>>;
 
@@ -13,6 +17,8 @@ export function GetWindowEffect():Promise<string>;
 export function SaveOverride(arg1:string,arg2:domain.Override):Promise<void>;
 
 export function ScanPlugins(arg1:boolean):Promise<Array<domain.Plugin>>;
+
+export function SetTcConfig(arg1:string):Promise<void>;
 
 export function SetWindowEffect(arg1:string):Promise<void>;
 

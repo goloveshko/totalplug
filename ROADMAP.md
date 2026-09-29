@@ -51,6 +51,11 @@ and accepted debt we deliberately postponed.
 - Since then: light/dark/system themes, EN/RU interface, plugin card with the
   override editor, update history, batch «Update all», an About panel and the
   self-update check — see the redesign and v1 sections below.
+- Settings › Total Commander: the panel names the `wincmd.ini` the next scan
+  opens, accepts a manually picked one (native picker or a typed path) for a
+  Total Commander the registry does not know about, and hands the choice back to
+  auto-detection. The path is stored in `settings.json`, so a portable install
+  carries it with the rest of the data, and both scan call sites read it.
 
 ### Engineering
 - GitHub Actions CI: Windows job (`go mod verify`, vet, `go test -race -cover ./...`,
