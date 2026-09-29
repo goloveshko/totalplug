@@ -82,19 +82,27 @@ type CatalogCache struct {
 	Snapshot  CatalogSnapshot `json:"snapshot"`
 }
 
-func getCachePath() string {
-	return cacheFilePath("community_catalog_cache.json")
-}
+// catalogCacheFile is the on-disk catalog snapshot. It lives in the data
+// folder's cache directory, whose files are all re-downloadable.
+const catalogCacheFile = "community_catalog.json"
 
-// cacheFilePath resolves a file inside the data directory (next to the
-// executable for a portable install, %APPDATA%\TotalPlug otherwise).
-func cacheFilePath(name string) string {
-	return filepath.Join(config.DataDir(), name)
+// cacheFilePath resolves a cache file inside the data folder's cache directory
+// (next to the executable for a portable install, %APPDATA%\TotalPlug
+// otherwise).
+func cacheFilePath(name string) (string, error) {
+	dir, err := config.CacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, name), nil
 }
 
 // LoadCatalogFromCache loads cached catalog from local disk.
 func LoadCatalogFromCache() (*CatalogCache, error) {
-	cacheFile := getCachePath()
+	cacheFile, err := cacheFilePath(catalogCacheFile)
+	if err != nil {
+		return nil, err
+	}
 	file, err := os.Open(cacheFile)
 	if err != nil {
 		return nil, err
@@ -121,7 +129,10 @@ func SaveCatalogToCache(snapshot CatalogSnapshot, etag string) error {
 // saveCacheAtomically writes the cache to a temp file first, then renames it
 // over the target, so a crash mid-write cannot corrupt the existing cache.
 func saveCacheAtomically(cache *CatalogCache) error {
-	cacheFile := getCachePath()
+	cacheFile, err := cacheFilePath(catalogCacheFile)
+	if err != nil {
+		return err
+	}
 	tmpFile := cacheFile + ".tmp"
 
 	file, err := os.Create(tmpFile)

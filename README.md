@@ -31,8 +31,7 @@ outside your Total Commander `plugins` directory and its own data folder (see
 
 ## 📁 Where Your Files Live
 
-TotalPlug keeps its plugin database, overrides, update history, catalog caches,
-window backdrop choice and window geometry in one folder, picked at every start:
+TotalPlug keeps everything it writes in one folder, picked at every start:
 
 * **Portable** — a `TotalPlug` folder next to the `.exe`, whenever that folder
   accepts writes. Copy the app's folder to another machine or a USB stick and the
@@ -41,6 +40,12 @@ window backdrop choice and window geometry in one folder, picked at every start:
   are copied in — the originals are left alone, so nothing is lost by trying.
 * **Per-user** — `%APPDATA%\TotalPlug`, when the executable sits somewhere
   read-only: Program Files, a write-protected share, a mounted image.
+
+Inside that folder the plugin database, the overrides, the update history and
+the window settings sit at the top level, the downloaded catalog and GitHub
+release snapshots go to `cache\`, and the WebView2 profile to `webview2\`.
+Deleting `cache\` only costs the next download; deleting `webview2\` resets the
+theme, language and font size.
 
 The About panel prints the folder in use. `TOTALPLUG_DATA_DIR` pins it to any
 path you choose.

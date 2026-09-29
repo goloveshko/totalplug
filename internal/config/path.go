@@ -20,6 +20,11 @@ const appFolder = "TotalPlug"
 // webviewFolder holds the WebView2 profile inside the data folder.
 const webviewFolder = "webview2"
 
+// cacheFolder holds the downloaded snapshots inside the data folder: they are
+// re-fetchable, so a user who wants to clean up can delete the folder whole
+// without touching the database or the overrides next to it.
+const cacheFolder = "cache"
+
 var (
 	discoverOnce sync.Once
 	discovered   string
@@ -54,6 +59,17 @@ func WebviewDataDir() (string, error) {
 	dir := filepath.Join(DataDir(), webviewFolder)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("create webview data dir %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
+// CacheDir returns the folder the downloaded snapshots live in. It is created on
+// demand so every caller that names a cache file gets a directory it can
+// actually write into.
+func CacheDir() (string, error) {
+	dir := filepath.Join(DataDir(), cacheFolder)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("create cache dir %s: %w", dir, err)
 	}
 	return dir, nil
 }

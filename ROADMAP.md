@@ -14,7 +14,7 @@ and accepted debt we deliberately postponed.
 - Version extraction tiers: PE version resource → companion DLLs → readme/INF regex → `Unknown`.
 - Community catalog from the totalplug-catalog Pages site (`catalog.min.json` on
   sergey.is-a.dev) with 24 h disk cache and offline
-  expired-cache fallback (`%APPDATA%\TotalPlug\community_catalog_cache.json`).
+  expired-cache fallback (`cache\community_catalog.json` in the data folder).
 - Per-plugin update source override: `github:Owner/Repo` custom source via Releases API.
 - Strict version comparison; unresolvable versions classify as `StatusUncertain`
   and are never auto-offered as updates.
@@ -159,7 +159,7 @@ and accepted debt we deliberately postponed.
    GitHub». Non-matching text is stored as typed.
 10. **GitHub release cache for first paint** — done (`154eb25`): successful
     `github:Owner/Repo` lookups are remembered per repo in
-    `%APPDATA%\TotalPlug\github_release_cache.json`; the cache-only startup
+    `cache\github_releases.json` inside the data folder; the cache-only startup
     pass replays the last known version/URLs instead of flickering
     «N/A (Not in catalog)», and the background network pass refreshes both
     the UI and the cache. Best-effort file, same pattern as the catalog cache.

@@ -76,10 +76,14 @@ type githubCachedRelease struct {
 	CheckedAt   time.Time `json:"checked_at"`
 }
 
-const githubCacheFile = "github_release_cache.json"
+const githubCacheFile = "github_releases.json"
 
 func loadGitHubReleaseCache() map[string]githubCachedRelease {
-	data, err := os.ReadFile(cacheFilePath(githubCacheFile))
+	path, err := cacheFilePath(githubCacheFile)
+	if err != nil {
+		return nil
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
@@ -113,7 +117,11 @@ func saveGitHubRelease(repo, tagName, downloadURL string) {
 		CheckedAt:   time.Now().UTC(),
 	}
 
-	file, err := os.Create(cacheFilePath(githubCacheFile))
+	path, err := cacheFilePath(githubCacheFile)
+	if err != nil {
+		return
+	}
+	file, err := os.Create(path)
 	if err != nil {
 		return
 	}

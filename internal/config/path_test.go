@@ -29,6 +29,22 @@ func TestDataDirHonoursEnvOverride(t *testing.T) {
 	}
 }
 
+func TestCacheDirLivesInsideDataDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(DataDirEnv, dir)
+
+	got, err := CacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, cacheFolder); got != want {
+		t.Fatalf("CacheDir() = %q, want %q", got, want)
+	}
+	if _, err := os.Stat(got); err != nil {
+		t.Errorf("CacheDir() must create the directory it reports: %v", err)
+	}
+}
+
 func TestImportPerUserDataCopiesOnce(t *testing.T) {
 	legacy := fakePerUserDir(t)
 	if err := os.MkdirAll(filepath.Join(legacy, "subdir"), 0755); err != nil {
