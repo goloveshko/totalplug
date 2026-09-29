@@ -36,6 +36,11 @@ type App struct {
 
 	refreshMu  sync.Mutex
 	refreshing bool
+
+	// winState mirrors the live window geometry so a teardown can persist it
+	// without querying the window that is already closing.
+	windowMu sync.Mutex
+	winState windowGeometry
 }
 
 // NewApp creates a new App application struct
@@ -53,6 +58,7 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	go a.trackWindowLoop()
 }
 
 // ScanPlugins returns an immediate cache-first scan: the catalog comes from

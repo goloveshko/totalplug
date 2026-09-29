@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 
@@ -10,29 +11,58 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
 	app := NewApp()
+
+	// Restore the last size, position and maximised state; a first run gets the
+	// compiled-in defaults.
+	loaded, hasSettings := loadSettings()
+	saved := loaded.Window
+	width, height := defaultWidth, defaultHeight
+	if hasSettings && saved.Width > 0 && saved.Height > 0 {
+		width, height = saved.Width, saved.Height
+	}
+	app.seedWindowState(saved)
 
 	// Frameless window with a frontend-drawn titlebar. The Mica/Acrylic backdrop
 	// is temporarily disabled: a translucent window washes out the themed UI,
 	// and a proper effects pass needs its own design work (see ROADMAP).
-	// Create application with options
 	err := wails.Run(&options.App{
 		Title:     "totalplug",
-		Width:     1024,
-		Height:    768,
+		Width:     width,
+		Height:    height,
 		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 244, G: 244, B: 247, A: 255},
-		OnStartup:        app.startup,
+		// Width and Height place the window where the OS puts a new one; the
+		// saved position can only be applied once the HWND exists.
+		OnStartup: func(ctx context.Context) {
+			app.startup(ctx)
+			if hasSettings && !saved.Maximised && (saved.X != 0 || saved.Y != 0) {
+				wailsruntime.WindowSetPosition(ctx, saved.X, saved.Y)
+			}
+		},
+		// A frameless window does not come up maximised from WindowStartState;
+		// the maximise has to be requested once the HWND exists.
+		OnDomReady: func(ctx context.Context) {
+			if saved.Maximised {
+				wailsruntime.WindowMaximise(ctx)
+			}
+		},
+		// Persist from the mirror, not from the window: a closing window answers
+		// size and position queries with zeros.
+		OnBeforeClose: func(context.Context) bool {
+			writeSettings(settings{Window: app.windowSnapshot()})
+			return false
+		},
 		Windows: &windows.Options{
 			WebviewUserDataPath: webviewUserDataPath(),
 		},

@@ -31,8 +31,8 @@ outside your Total Commander `plugins` directory and its own data folder (see
 
 ## 📁 Where Your Files Live
 
-TotalPlug keeps its plugin database, overrides, update history, catalog caches
-and window backdrop choice in one folder, picked at every start:
+TotalPlug keeps its plugin database, overrides, update history, catalog caches,
+window backdrop choice and window geometry in one folder, picked at every start:
 
 * **Portable** — a `TotalPlug` folder next to the `.exe`, whenever that folder
   accepts writes. Copy the app's folder to another machine or a USB stick and the
@@ -86,6 +86,9 @@ path you choose.
   auto-detection got it wrong.
 * **History** — the updates TotalPlug applied, with version and timestamp.
 * **Settings** — light/dark/system theme, English/Russian interface, font size.
+* **Remembered window** — the size, position and maximised state you closed with
+  are what the next launch opens with; only the very first run starts at the
+  default 1024×768.
 * **About** — the running version, where your data lives, and a check for a newer
   release. TotalPlug never replaces its own files: it opens the release page.
 
