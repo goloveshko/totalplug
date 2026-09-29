@@ -327,6 +327,14 @@ tr:hover {
 #plugins-body tr[data-idx] {
     cursor: pointer;
 }
+/* A row becomes focusable only after it opened the plugin card (see cardOpener),
+   and then it has to show it: that is where the keyboard comes back to. The
+   offset is negative so the ring stays inside the row instead of spending the
+   gap on its neighbour. */
+#plugins-body tr[data-idx]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
 
 /* Scanning / empty / no-search-hits placeholder row. */
 .table-empty td {
@@ -464,6 +472,13 @@ td code,
 }
 .dlg-message a.dlg-link {
     color: var(--accent);
+}
+/* The one control this app left to the browser's guess: a keyboard reaching a
+   link drew the UA's black rectangle, next to the accent ring every other target
+   here paints. Inline, so the ring hugs the text rather than the row. */
+a.dlg-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 .dlg-tech {
     margin-top: 10px;

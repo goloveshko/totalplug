@@ -35,6 +35,10 @@ let dialogResolve = null;
 // Element that opened the current dialog; focus goes back to it on close so
 // keyboard users do not land at the top of the document.
 let appDialogOpener = null;
+// The same for the plugin card, whose opener is a table row. A row is not
+// focusable until it is asked to be, so opening the card gives it a tabindex and
+// closing hands the keyboard back to it.
+let cardOpener = null;
 // Progress dialog state: while an update runs, the dialog cannot be dismissed.
 let progressResolve = null;
 let progressRunning = false;
@@ -295,9 +299,14 @@ function sourceIcon(source) {
     return `<span class="src-icon" role="img" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${glyph}</span>`;
 }
 
-function openCard(index) {
+function openCard(index, opener) {
     const plugin = currentPlugins[index];
     if (!plugin) return;
+
+    // Remembered before the dialog opens: closing must put the keyboard back on
+    // the row it came from, and a row only accepts focus once it is named.
+    cardOpener = opener || null;
+    cardOpener?.setAttribute('tabindex', '-1');
 
     editingPlugin = plugin;
     cardNameEl.textContent = plugin.name;
@@ -334,6 +343,21 @@ function openCard(index) {
     editorCancelEl.focus();
 }
 
+function closeCard() {
+    cardDialog.close();
+    returnCardFocus();
+}
+
+// The keyboard goes back where it came from. Done at the dismissal sites rather
+// than only in the `close` handler: that event is what catches Esc, but a dialog
+// that our own button closes should not depend on it arriving.
+function returnCardFocus() {
+    // A background refresh can repaint the table while the card is open, so the
+    // opener row may be detached by now; focusing such an element does nothing.
+    cardOpener?.focus();
+    cardOpener = null;
+}
+
 // The only scheme the checker understands is "github:Owner/Repo", but nobody
 // remembers that format — accept what users actually paste (a GitHub page URL,
 // with or without .git/trailing slash, or a bare owner/repo) and canonicalize.
@@ -366,7 +390,7 @@ async function saveOverrideFromEditor() {
     editorSaveGuard(true);
     try {
         await SaveOverride(editingPlugin.id, override);
-        cardDialog.close();
+        closeCard();
         runScan(false);
     } catch (err) {
         openAppDialog(errorDialogHtml(err, t('editor.save_friendly')));
@@ -1051,7 +1075,7 @@ function buildDom() {
         }
         if (e.target.closest('button')) return;
         const tr = e.target.closest('tr[data-idx]');
-        if (tr) openCard(Number(tr.dataset.idx));
+        if (tr) openCard(Number(tr.dataset.idx), tr);
     });
 
     appDialogOk.addEventListener('click', () => {
@@ -1190,7 +1214,10 @@ function buildDom() {
         e.preventDefault();
         await saveOverrideFromEditor();
     });
-    editorCancelEl.addEventListener('click', () => cardDialog.close());
+    editorCancelEl.addEventListener('click', closeCard);
+    // Esc is not one of our buttons, so the close event is still what hands the
+    // keyboard back for it; the paths above have already cleared the opener.
+    cardDialog.addEventListener('close', returnCardFocus);
     document.getElementById('history-close').addEventListener('click', () => historyDialog.close());
 
     if (currentPlugins.length > 0) {
