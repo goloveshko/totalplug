@@ -14,8 +14,10 @@ import (
 const DataDirEnv = "TOTALPLUG_DATA_DIR"
 
 // appFolder is the data folder's name, both next to the executable and inside
-// the per-user config dir (%APPDATA%\TotalPlug on Windows).
-const appFolder = "TotalPlug"
+// the per-user config dir (%APPDATA%\totalplug on Windows). It is lowercase
+// because that is the executable's name and the window title's name; the
+// display name TotalPlug is what prose uses.
+const appFolder = "totalplug"
 
 // webviewFolder holds the WebView2 profile inside the data folder.
 const webviewFolder = "webview2"
@@ -33,10 +35,10 @@ var (
 // DataDir returns the directory this run stores its files in. Resolution order:
 //
 //  1. TOTALPLUG_DATA_DIR, when set,
-//  2. a TotalPlug folder next to the executable, if that folder accepts writes —
+//  2. a totalplug folder next to the executable, if that folder accepts writes —
 //     this is the portable install: copying the app's folder moves the whole
 //     setup with it,
-//  3. %APPDATA%\TotalPlug otherwise, for read-only locations (Program Files, a
+//  3. %APPDATA%\totalplug otherwise, for read-only locations (Program Files, a
 //     write-protected share, a mounted image).
 //
 // The answer is remembered for the life of the process, so a file read from one
@@ -125,7 +127,7 @@ func isWritable(dir string) bool {
 	return true
 }
 
-// perUserDir is the %APPDATA%\TotalPlug path. It creates nothing: the portable
+// perUserDir is the %APPDATA%\totalplug path. It creates nothing: the portable
 // branch has to look at this folder without leaving an empty one behind.
 func perUserDir() string {
 	base, err := os.UserConfigDir()

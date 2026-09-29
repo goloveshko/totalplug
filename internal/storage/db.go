@@ -37,7 +37,7 @@ type Database struct {
 const MaxHistoryEntries = 200
 
 // GetDefaultDbPath points at the data directory, which is next to the
-// executable for a portable install and %APPDATA%\TotalPlug otherwise.
+// executable for a portable install and %APPDATA%\totalplug otherwise.
 func GetDefaultDbPath() string {
 	return filepath.Join(config.DataDir(), "installed_plugins.json")
 }

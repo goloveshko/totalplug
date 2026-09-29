@@ -87,7 +87,7 @@ type CatalogCache struct {
 const catalogCacheFile = "community_catalog.json"
 
 // cacheFilePath resolves a cache file inside the data folder's cache directory
-// (next to the executable for a portable install, %APPDATA%\TotalPlug
+// (next to the executable for a portable install, %APPDATA%\totalplug
 // otherwise).
 func cacheFilePath(name string) (string, error) {
 	dir, err := config.CacheDir()

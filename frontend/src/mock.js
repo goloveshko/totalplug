@@ -123,7 +123,7 @@ function installMockBackend() {
             return Promise.resolve({
                 version: '1.1.0',
                 releases_url: 'https://github.com/goloveshko/totalplug/releases',
-                data_dir: 'C:\\Users\\demo\\AppData\\Roaming\\TotalPlug',
+                data_dir: 'C:\\Users\\demo\\AppData\\Roaming\\totalplug',
                 go_version: 'go1.25.0',
             });
         },

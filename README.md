@@ -33,12 +33,12 @@ outside your Total Commander `plugins` directory and its own data folder (see
 
 TotalPlug keeps everything it writes in one folder, picked at every start:
 
-* **Portable** — a `TotalPlug` folder next to the `.exe`, whenever that folder
+* **Portable** — a `totalplug` folder next to the `.exe`, whenever that folder
   accepts writes. Copy the app's folder to another machine or a USB stick and the
   whole setup travels with it, WebView2 profile (theme, language, font size)
-  included. On the first portable run the files found in `%APPDATA%\TotalPlug`
+  included. On the first portable run the files found in `%APPDATA%\totalplug`
   are copied in — the originals are left alone, so nothing is lost by trying.
-* **Per-user** — `%APPDATA%\TotalPlug`, when the executable sits somewhere
+* **Per-user** — `%APPDATA%\totalplug`, when the executable sits somewhere
   read-only: Program Files, a write-protected share, a mounted image.
 
 Inside that folder the plugin database, the overrides, the update history and

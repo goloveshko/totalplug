@@ -99,7 +99,7 @@ type AppInfo struct {
 	Version     string `json:"version"`
 	ReleasesURL string `json:"releases_url"`
 	// DataDir is the folder this run writes to — next to the executable for a
-	// portable install, %APPDATA%\TotalPlug otherwise. The About panel shows it
+	// portable install, %APPDATA%\totalplug otherwise. The About panel shows it
 	// because support requests and bug reports need the path, not a guess.
 	DataDir string `json:"data_dir"`
 	// GoVersion is the runtime toolchain, e.g. "go1.25.0".
