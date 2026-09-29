@@ -22,8 +22,8 @@ $binDir = "bin"
 $cliPath = "$binDir/totalplug-cli.exe"
 $guiPath = "$binDir/totalplug.exe"
 # Wails always compiles into build/bin ("-o" only renames the file inside it), so
-# the GUI artifact is copied next to the CLI one to keep bin/ the only folder a
-# user needs.
+# the GUI artifact is hard linked into bin/ to keep bin/ the only folder a user
+# needs.
 $wailsDir = "build/bin"
 $wailsExe = "$wailsDir/totalplug.exe"
 $wailsConfig = "wails.json"
@@ -76,13 +76,28 @@ function Show-BinarySize {
     }
 }
 
-function Copy-GuiArtifact {
+function Publish-GuiArtifact {
     if (!(Test-Path $wailsExe)) {
         Write-Host "`n❌ Wails left no $wailsExe behind — nothing to publish." -ForegroundColor Red
         exit 1
     }
     Ensure-BinDir
-    Copy-Item $wailsExe $guiPath -Force
+
+    # A hard link instead of a 13 MB copy: bin/totalplug.exe and the Wails artifact
+    # become one file, so the two can never disagree, and the name survives a
+    # forgotten window — unlinking a running image is allowed, writing over it is
+    # not, so a copy over the GUI that is still open is what used to fail here.
+    # Always recreated, because Wails drops a fresh file at the artifact path and a
+    # link left standing would keep pointing at the one it replaced.
+    if (Test-Path $guiPath) { Remove-Item $guiPath -Force }
+    try {
+        New-Item -ItemType HardLink -Path $guiPath -Target (Resolve-Path $wailsExe) -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Host "`n❌ Could not link $guiPath to $wailsExe — a hard link needs both on the same volume." -ForegroundColor Red
+        Write-Host "   $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+
     Write-Host "`n✔ GUI build ready!" -ForegroundColor Green
     Show-BinarySize $guiPath
 }
@@ -200,7 +215,7 @@ function Invoke-GuiBuild {
         Write-Host "`n❌ Wails $Kind build failed!" -ForegroundColor Red
         exit $LASTEXITCODE
     }
-    Copy-GuiArtifact
+    Publish-GuiArtifact
 }
 
 function Invoke-Gui {

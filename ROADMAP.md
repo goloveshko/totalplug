@@ -58,8 +58,10 @@ and accepted debt we deliberately postponed.
   frontend bundle is actually compiled on every push (`f6702e3`).
 - Build scripts: `scripts/build-gui.cmd` (daily GUI, no cleaning) and
   `scripts/release-gui.cmd` (`-trimpath`, previous binary removed by name); both
-  copy Wails' output to `bin/totalplug.exe`, next to `bin/totalplug-cli.exe`, so
-  `bin/` is the single artifact folder. Wails' own `-clean` is deliberately unused:
+  hard link Wails' output into `bin/totalplug.exe`, next to `bin/totalplug-cli.exe`,
+  so `bin/` is the single artifact folder — and so a GUI window left open no longer
+  blocks publishing, which the copy step did by writing over the running image.
+  Wails' own `-clean` is deliberately unused:
   it deletes `build/bin` as its first step, and a handle on that directory (IDE or
   Defender watcher, a TC/Explorer tab, a shell cwd) then fails the build *after*
   the old binary is already gone.
