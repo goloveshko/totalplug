@@ -46,6 +46,11 @@ type windowGeometry struct {
 type settings struct {
 	Window       windowGeometry `json:"window"`
 	WindowEffect string         `json:"window_effect"`
+	// TcIni is a manual wincmd.ini, for a Total Commander the registry does not
+	// know about. Empty means auto-detect. It belongs to this file rather than
+	// localStorage because the scanner reads it before any page exists, and a
+	// portable install then carries the choice along with the data.
+	TcIni string `json:"tc_ini,omitempty"`
 }
 
 func settingsPath() string {
@@ -103,6 +108,17 @@ func (a *App) snapshotSettings() settings {
 func (a *App) setWindowEffect(effect string) error {
 	a.settingsMu.Lock()
 	a.state.WindowEffect = effect
+	s := a.state
+	a.settingsMu.Unlock()
+	return writeSettings(s)
+}
+
+// setTcIni stores the manual wincmd.ini choice, persisted right away for the
+// same reason the backdrop is: the next scan reads it, and a crash should not
+// silently return the user to auto-detection.
+func (a *App) setTcIni(path string) error {
+	a.settingsMu.Lock()
+	a.state.TcIni = path
 	s := a.state
 	a.settingsMu.Unlock()
 	return writeSettings(s)

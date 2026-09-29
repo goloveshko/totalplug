@@ -110,6 +110,23 @@ type AppInfo struct {
 	GoVersion string `json:"go_version"`
 }
 
+// TcConfig is the Settings panel's view of which wincmd.ini a scan reads. The
+// panel needs all three at once: the stored choice, what auto-detection finds
+// today, and whether the file the app would actually open is readable — a
+// manual path outlives its Total Commander install as soon as the folder moves.
+type TcConfig struct {
+	// Configured is the manual path, empty when auto-detection is in charge.
+	Configured string `json:"configured"`
+	// Detected is what Registry and AppData give right now; empty when TC cannot
+	// be found, which is the case a manual path is the answer to.
+	Detected string `json:"detected"`
+	// Effective is the one the next scan opens: Configured when set.
+	Effective string `json:"effective"`
+	// Readable is false when Effective names nothing usable, so the panel can
+	// offer to return to auto-detection instead of failing the scan silently.
+	Readable bool `json:"readable"`
+}
+
 // AppUpdate is the outcome of checking the running build against the latest
 // published release.
 type AppUpdate struct {

@@ -67,7 +67,11 @@ func (a *App) startup(ctx context.Context) {
 // offline. A background full check follows and pushes fresh data through the
 // plugins:refreshed event.
 func (a *App) ScanPlugins(forceRefresh bool) ([]domain.Plugin, error) {
-	res, err := pipeline.Scan(a.ctx, pipeline.Options{ForceRefresh: forceRefresh, CacheOnly: true}, a.db)
+	res, err := pipeline.Scan(a.ctx, pipeline.Options{
+		ForceRefresh: forceRefresh,
+		CacheOnly:    true,
+		IniPath:      a.snapshotSettings().TcIni,
+	}, a.db)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +100,7 @@ func (a *App) startBackgroundRefresh(force bool) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 
-		res, err := pipeline.Scan(ctx, pipeline.Options{ForceRefresh: force}, a.db)
+		res, err := pipeline.Scan(ctx, pipeline.Options{ForceRefresh: force, IniPath: a.snapshotSettings().TcIni}, a.db)
 		switch {
 		case err != nil:
 			runtime.EventsEmit(a.ctx, pluginsRefreshFailed, err.Error())
