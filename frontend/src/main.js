@@ -323,6 +323,12 @@ function openCard(index) {
     editorSourceEl.value = displaySource(plugin.custom_source);
 
     cardDialog.showModal();
+    // Without this the dialog picks the first focusable element it finds, which is
+    // the SITE link whenever the plugin has a page - so the link opens framed and
+    // Enter navigates it. Cancel is the safe place to start: the version field is
+    // prefilled from auto-detection, and confirming that would pin a manual
+    // override over the catalog value the user never typed.
+    editorCancelEl.focus();
 }
 
 // The only scheme the checker understands is "github:Owner/Repo", but nobody
