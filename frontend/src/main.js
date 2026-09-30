@@ -112,6 +112,28 @@ const emptyRow = (message) => `<tr class="table-empty"><td colspan="6">${message
 // system browser (see the appDialogMsg listener in buildDom).
 const linkify = (escaped) => escaped.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" class="dlg-link">$1</a>');
 
+// escapeHtml keeps a quote from leaving the attribute and says nothing about the
+// scheme, while these addresses arrive from the catalog and from GitHub release
+// metadata: a `javascript:` value in a plugin's homepage field would run inside
+// this window, where the Go bindings are reachable. Anything that is not http(s)
+// is not a link here.
+const safeHttpUrl = (url) => (/^https?:\/\//i.test(url || '') ? url : '');
+
+// A dialog link must not navigate the webview. A click hands the address to the
+// system browser, and a middle click has to be caught too: it fires `auxclick`,
+// which the browser otherwise acts on by itself, replacing the GUI with a
+// plugin's homepage.
+function interceptLinks(el) {
+    const onLink = (e) => {
+        const a = e.target.closest('a.dlg-link');
+        if (!a) return;
+        e.preventDefault();
+        BrowserOpenURL(a.href);
+    };
+    el.addEventListener('click', onLink);
+    el.addEventListener('auxclick', onLink);
+}
+
 function openAppDialog(html, isConfirm) {
     return new Promise((resolve) => {
         dialogResolve = resolve;
@@ -314,8 +336,9 @@ function openCard(index, opener) {
     const latest = plugin.latest_version
         ? `<code>${escapeHtml(plugin.latest_version)}</code>${sourceIcon(plugin.source)}`
         : '—';
-    const site = plugin.web_url
-        ? `<a href="${escapeHtml(plugin.web_url)}" class="dlg-link">${escapeHtml(shortUrl(plugin.web_url))}</a>`
+    const siteUrl = safeHttpUrl(plugin.web_url);
+    const site = siteUrl
+        ? `<a href="${escapeHtml(siteUrl)}" class="dlg-link">${escapeHtml(shortUrl(siteUrl))}</a>`
         : '';
     const tech =
         (plugin.source ? cardRow(t('card.source'), `<code>${escapeHtml(plugin.source)}</code>`) : '') +
@@ -641,8 +664,14 @@ function renderAboutUpdate() {
         if (!appUpdate.comparable) {
             status = `<span class="about-status">${escapeHtml(t('about.dev_build'))}</span>${when}`;
         } else if (appUpdate.available) {
-            status = `<span class="about-status accent">${escapeHtml(t('about.available', { latest: appUpdate.latest }))}</span>
-                <a href="${escapeHtml(appUpdate.release_url || '')}" class="dlg-link">${escapeHtml(t('about.open_release'))}</a>${when}`;
+            // GitHub answers with the URL, so it is remote data like the catalog's
+            // homepage field. Without a link the row still names the new version,
+            // which is the part the user came to read.
+            const releaseUrl = safeHttpUrl(appUpdate.release_url);
+            const link = releaseUrl
+                ? `<a href="${escapeHtml(releaseUrl)}" class="dlg-link">${escapeHtml(t('about.open_release'))}</a>`
+                : '';
+            status = `<span class="about-status accent">${escapeHtml(t('about.available', { latest: appUpdate.latest }))}</span> ${link}${when}`;
         } else {
             status = `<span class="about-status">${escapeHtml(t('about.up_to_date'))}</span>${when}`;
         }
@@ -1091,21 +1120,9 @@ function buildDom() {
         appDialog.close();
     });
     // Links in dialog messages open in the system browser, never in the webview.
-    appDialogMsg.addEventListener('click', (e) => {
-        const a = e.target.closest('a.dlg-link');
-        if (a) {
-            e.preventDefault();
-            BrowserOpenURL(a.href);
-        }
-    });
+    interceptLinks(appDialogMsg);
     // Same rule for the plugin card homepage link.
-    cardInfoEl.addEventListener('click', (e) => {
-        const a = e.target.closest('a.dlg-link');
-        if (a) {
-            e.preventDefault();
-            BrowserOpenURL(a.href);
-        }
-    });
+    interceptLinks(cardInfoEl);
     // Esc or any other dismissal path must resolve a pending confirm as "no".
     appDialog.addEventListener('close', () => {
         settleAppDialog(false);
@@ -1129,13 +1146,7 @@ function buildDom() {
         if (progressRunning) e.preventDefault();
     });
     progressDialog.addEventListener('close', () => settleProgress());
-    progressResult.addEventListener('click', (e) => {
-        const a = e.target.closest('a.dlg-link');
-        if (a) {
-            e.preventDefault();
-            BrowserOpenURL(a.href);
-        }
-    });
+    interceptLinks(progressResult);
 
     document.getElementById('settings-back').addEventListener('click', closeSettings);
     settingsView.querySelectorAll('.settings-nav button').forEach((btn) => {
@@ -1187,13 +1198,8 @@ function buildDom() {
     // The update row is re-rendered as HTML, so its button and release link are
     // reached through one delegated listener instead of per-render bindings.
     const aboutUpdateEl = document.getElementById('about-update');
+    interceptLinks(aboutUpdateEl);
     aboutUpdateEl.addEventListener('click', (e) => {
-        const link = e.target.closest('a.dlg-link');
-        if (link) {
-            e.preventDefault();
-            BrowserOpenURL(link.href);
-            return;
-        }
         if (e.target.closest('#btn-app-update')) checkForAppUpdate();
     });
     document.getElementById('link-releases').addEventListener('click', () => {
