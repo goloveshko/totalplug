@@ -106,6 +106,24 @@ files, so the first locked file stops the queue and the rest is skipped.
 
 ---
 
+## 📸 Screenshots
+
+The same window in both themes, with a scanned install of 28 plugins.
+
+### Light
+
+| Main window | Plugin card | About |
+| --- | --- | --- |
+| ![The plugin audit table: type, plugin, installed version, catalog version and status badge per row, with a bar above it offering to update all six available updates at once](screenshots/light/main_window.png) | ![A plugin card opened from a row: installed and catalog versions with their confidence and source, status, homepage link, and the editor for a manual version or update-source override](screenshots/light/details.png) | ![The About panel inside Settings: the running version, a check for a newer release, and links to the plugin catalog and the releases page](screenshots/light/about.png) |
+
+### Dark
+
+| Main window | Plugin card | About |
+| --- | --- | --- |
+| ![The plugin audit table in the dark theme, same columns and the same update-all bar](screenshots/dark/main_window.png) | ![The plugin card in the dark theme, with the override editor below the details](screenshots/dark/details.png) | ![The About panel in the dark theme](screenshots/dark/about.png) |
+
+---
+
 ## 🚀 Quick Start (CLI)
 
 ### Run from Source
