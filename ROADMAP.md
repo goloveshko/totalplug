@@ -338,3 +338,20 @@ and accepted debt we deliberately postponed.
   it, and two of its fields describe behaviour that was explicitly rejected.
 - **Minor `internal/config` debt** — `%COMMANDER_PATH%` expands only the first occurrence;
   no-op `existing` branch in dedup.
+- **No cap on decompressed size** — found in the pre-release review. `DefaultMaxDownloadBytes`
+  (256 MiB) bounds the archive on the wire, while every extraction member is copied with a
+  plain `io.Copy` (`internal/updater/updater.go`: zip, RAR and 7z each in their own loop), so a
+  small crafted archive can still fill the disk. Left open for v1 because a fix is one counting
+  writer shared by three formats, which is not a two-line change under a release deadline.
+- **The plugin card is mouse-only** — a row receives `tabindex="-1"` only *after* the card opens
+  (`openCard` in `frontend/src/main.js`), so there is nothing to focus and therefore no way to
+  open a card with the keyboard. The pass that fixes it also owes the dialogs their accessible
+  names: the four `<dialog>`s carry no `aria-label`/`aria-labelledby`, and neither
+  `#lang-select` nor `#font-scale` has one, while every icon button and the search box do.
+- **Stale state across a concurrent refresh** — two known races: a language switch rebuilds the
+  DOM, so the `finally` in `runScan` enables buttons that the in-flight scan never disabled
+  (harmless, but a second scan starts while the first is running); and `handleUpdate` captures
+  `plugin` before awaiting the confirmation, so a `plugins:refreshed` landing in that window
+  means updating from a `download_url` that is no longer current.
+- **Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
+  read nowhere; the About panel renders its labels from other keys.
