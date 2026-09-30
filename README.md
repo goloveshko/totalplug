@@ -66,7 +66,7 @@ path you choose.
   3. **Tier 3 (Docs / INF Scanner):** Extracts version strings from `pluginst.inf`, `readme.txt`, and `history.txt`.
   4. **Tier 4 (Confidence Tags):** Transparently labels confidence (`[PE Binary]`, `[Readme/INF]`, `[Manual DB]`, `[Unknown]`).
 * 🌐 **Powered by TotalPlug Community Catalog:**  
-  Checks updates against the open [totalplug-catalog](https://github.com/goloveshko/totalplug-catalog) database with 24-hour offline-resilient disk caching.
+  Checks updates against the open [totalplug-catalog](https://github.com/goloveshko/totalplug-catalog) database. The on-disk copy is revalidated by ETag on every launch — a newly published plugin shows up on the next start, an unchanged catalog costs a 304 instead of a full download — and it is what answers when the network does not.
 * 🗜️ **Archive-Format Aware Updater:**  
   Plugin packages are dispatched by their magic bytes, so ZIP, RAR and 7z all
   install, while an unsupported container is refused with a clear message

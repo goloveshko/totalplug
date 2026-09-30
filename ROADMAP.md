@@ -13,8 +13,9 @@ and accepted debt we deliberately postponed.
   with dedup by path and `%COMMANDER_PATH%` / `%COMMANDER_DRIVE%` expansion.
 - Version extraction tiers: PE version resource → companion DLLs → readme/INF regex → `Unknown`.
 - Community catalog from the totalplug-catalog Pages site (`catalog.min.json` on
-  sergey.is-a.dev) with 24 h disk cache and offline
-  expired-cache fallback (`cache\community_catalog.json` in the data folder).
+  sergey.is-a.dev), revalidated by ETag on every launch (an unchanged catalog
+  answers with a 304 instead of the full download) and served from the on-disk
+  copy when offline (`cache\community_catalog.json` in the data folder).
 - Per-plugin update source override: `github:Owner/Repo` custom source via Releases API.
 - Strict version comparison; unresolvable versions classify as `StatusUncertain`
   and are never auto-offered as updates.
