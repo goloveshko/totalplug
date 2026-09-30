@@ -183,6 +183,13 @@ func NewUpdater() *Updater {
 	return &Updater{
 		client: &http.Client{
 			Timeout: 60 * time.Second,
+			// The scheme rule has to be re-checked on every hop: without this
+			// the client follows an https -> http redirect on its own and hands
+			// back an archive fetched in plaintext, which is then unpacked over
+			// the plugin directory.
+			CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+				return validateDownloadURL(req.URL.String())
+			},
 		},
 		maxDownloadBytes: DefaultMaxDownloadBytes,
 	}

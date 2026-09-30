@@ -235,6 +235,48 @@ func TestDownloadFileRejectsInsecureURLBeforeNetwork(t *testing.T) {
 	}
 }
 
+func TestDownloadFileRejectsInsecureRedirect(t *testing.T) {
+	// validateDownloadURL only ever sees the URL it was handed; the redirect the
+	// server answers with used to be followed silently, so an https endpoint could
+	// point the download at plaintext http on a host we never vetted.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://plugins.example.com/pkg.zip", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	dest := filepath.Join(t.TempDir(), "out.zip")
+	err := NewUpdater().DownloadFile(context.Background(), srv.URL+"/pkg.zip", dest)
+	if !errors.Is(err, ErrInsecureScheme) {
+		t.Fatalf("error = %v, want ErrInsecureScheme", err)
+	}
+	if _, e := os.Stat(dest); !os.IsNotExist(e) {
+		t.Error("a download refused mid-redirect must not leave a destination file")
+	}
+
+	// The guard must not cost the legitimate case: mirrors are a hop between two
+	// hosts the caller already trusts, so a redirect that stays allowed downloads.
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("mirror payload"))
+	}))
+	defer target.Close()
+
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+"/mirror.zip", http.StatusFound)
+	}))
+	defer source.Close()
+
+	if err := NewUpdater().DownloadFile(context.Background(), source.URL+"/pkg.zip", dest); err != nil {
+		t.Fatalf("an allowed redirect failed: %v", err)
+	}
+	body, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "mirror payload" {
+		t.Errorf("downloaded %q, want the payload behind the redirect", body)
+	}
+}
+
 func TestDownloadFileEnforcesSizeCap(t *testing.T) {
 	// Advertised length path: handler writes a small body in one shot, so the
 	// Go server sets Content-Length automatically.
