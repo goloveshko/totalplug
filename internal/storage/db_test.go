@@ -339,3 +339,54 @@ func TestHistoryIsCapped(t *testing.T) {
 		t.Error("new entry must be at the head after capping")
 	}
 }
+
+// TestInterruptedSaveKeepsThePreviousFile covers why the savers write a temp
+// file and rename it: a save that truncates its target before encoding turns a
+// crash into a lost database, because the next start quarantines the truncated
+// file and saves the now-empty state over it.
+func TestInterruptedSaveKeepsThePreviousFile(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetUserOverride("WLX:kept", domain.Override{CustomVersion: "1.2.3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	path := db.overridesPath
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A value json cannot encode fails the write after the temp file exists.
+	if err := writeJSONAtomic(path, map[string]any{"boom": make(chan int)}); err == nil {
+		t.Fatal("expected an unencodable value to fail the save")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("failed save changed the file:\nbefore: %s\nafter:  %s", before, after)
+	}
+	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
+		t.Errorf("failed save left a temp file behind: %v", err)
+	}
+
+	// A good save must answer for the same file, and leave no temp.
+	if err := db.SetUserOverride("WLX:again", domain.Override{CustomVersion: "2.0"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
+		t.Errorf("successful save left a temp file behind: %v", err)
+	}
+	reloaded, err := NewDatabase(db.filePath)
+	if err != nil {
+		t.Fatalf("the file a save wrote must load cleanly: %v", err)
+	}
+	if got := reloaded.overrides["WLX:kept"].CustomVersion; got != "1.2.3" {
+		t.Errorf("override written before the failed save was lost, got %q", got)
+	}
+}

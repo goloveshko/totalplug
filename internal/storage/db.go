@@ -107,28 +107,12 @@ func (db *Database) LoadHistory() error {
 
 // saveHistoryLocked serializes the update log; callers must hold mu.
 func (db *Database) saveHistoryLocked() error {
-	file, err := os.Create(db.historyPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(db.history)
+	return writeJSONAtomic(db.historyPath, db.history)
 }
 
 // saveOverridesLocked serializes the current overrides map; callers must hold mu.
 func (db *Database) saveOverridesLocked() error {
-	file, err := os.Create(db.overridesPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(db.overrides)
+	return writeJSONAtomic(db.overridesPath, db.overrides)
 }
 
 func (db *Database) SaveOverrides() error {
@@ -146,15 +130,35 @@ func (db *Database) SetUserOverride(pluginID string, override domain.Override) e
 
 // saveRecordsLocked serializes the current records map; callers must hold mu.
 func (db *Database) saveRecordsLocked() error {
-	file, err := os.Create(db.filePath)
+	return writeJSONAtomic(db.filePath, db.records)
+}
+
+// writeJSONAtomic encodes value into a sibling temp file and renames it over
+// path. Writing straight to the target with os.Create truncates it before a
+// single byte of the new content exists, so a crash or a full disk there leaves
+// a half-written file behind - and the next start would quarantine that as
+// .corrupt and save the empty in-memory state over it, which loses records the
+// user never touched. Same shape as checker.saveCacheAtomically.
+func writeJSONAtomic(path string, value any) error {
+	tmpFile := path + ".tmp"
+
+	file, err := os.Create(tmpFile)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(db.records)
+	if err := encoder.Encode(value); err != nil {
+		file.Close()
+		os.Remove(tmpFile)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(tmpFile)
+		return err
+	}
+	return os.Rename(tmpFile, path)
 }
 
 // RememberVersion stores the version applied by a successful update so later
