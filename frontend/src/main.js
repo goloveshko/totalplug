@@ -304,6 +304,15 @@ const cardRow = (label, valueHtml) => `<div class="k">${label}</div><div class="
 // "https://" is noise in a narrow dialog and costs a line wrap; the href keeps it.
 const shortUrl = (url) => url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 
+// A timestamp this browser cannot parse has to cost one cell, not the whole view:
+// Intl.DateTimeFormat throws RangeError on an Invalid Date, and in the history
+// dialog that meant one bad entry took every other row down with it. The raw
+// value is shown instead, which is the thing the user can report.
+const formatStamp = (fmt, value) => {
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? fmt.format(date) : String(value || '—');
+};
+
 // Which provider resolved the latest version, shown as a glyph beside it. It
 // replaces a whole "Update source" row: for a GitHub plugin that row duplicated
 // the homepage, and the raw keys ("totalcmd", "github:Owner/Repo") are only
@@ -610,7 +619,7 @@ async function openHistory() {
                 <tr>
                     <td>${escapeHtml(e.plugin_name || e.plugin_id)}</td>
                     <td><code>${escapeHtml(e.version)}</code></td>
-                    <td>${fmt.format(new Date(e.applied_at))}</td>
+                    <td>${escapeHtml(formatStamp(fmt, e.applied_at))}</td>
                 </tr>
             `,
                 )
@@ -660,7 +669,7 @@ function renderAboutUpdate() {
         status = `<span class="about-status">${t('about.checking')}</span>`;
     } else if (appUpdate) {
         const fmt = new Intl.DateTimeFormat(currentLang() === 'ru' ? 'ru-RU' : 'en-GB', { timeStyle: 'short' });
-        const when = `<span class="about-checked">${escapeHtml(t('about.checked_at', { time: fmt.format(new Date(appUpdate.checked_at)) }))}</span>`;
+        const when = `<span class="about-checked">${escapeHtml(t('about.checked_at', { time: formatStamp(fmt, appUpdate.checked_at) }))}</span>`;
         if (!appUpdate.comparable) {
             status = `<span class="about-status">${escapeHtml(t('about.dev_build'))}</span>${when}`;
         } else if (appUpdate.available) {
