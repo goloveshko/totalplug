@@ -1,4 +1,4 @@
-# scripts/build.ps1 - Unified task runner for TotalPlug
+﻿# scripts/build.ps1 - Unified task runner for TotalPlug
 param (
     [Parameter(Position = 0)]
     [Alias("c", "cmd")]
