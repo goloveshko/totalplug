@@ -1,5 +1,5 @@
 // File: app.go
-package main
+package gui
 
 import (
 	"context"

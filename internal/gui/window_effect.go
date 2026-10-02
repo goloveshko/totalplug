@@ -1,4 +1,4 @@
-package main
+package gui
 
 // The window backdrop has to be known before wails.Run creates the HWND, so it
 // is persisted in settings.json — which is read at that moment — instead of the

@@ -1,94 +1,18 @@
 package main
 
 import (
-	"context"
 	"embed"
-	"fmt"
 
-	"totalplug/internal/config"
-
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"totalplug/internal/gui"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// The entry point stays in this package because wails build compiles the project
+// root and //go:embed cannot reach above it; the window itself is internal/gui.
 func main() {
-	app := NewApp()
-
-	// Restore the last size, position and maximised state; a first run gets the
-	// compiled-in defaults. The whole loaded state is mirrored in the app, so the
-	// save on close cannot drop the backdrop choice.
-	loaded, hasSettings := loadSettings()
-	saved := loaded.Window
-	width, height := defaultWidth, defaultHeight
-	if hasSettings && saved.Width > 0 && saved.Height > 0 {
-		width, height = saved.Width, saved.Height
-	}
-	app.seedSettings(loaded)
-
-	// Frameless window with a frontend-drawn titlebar. The Mica/Acrylic backdrop
-	// is temporarily disabled: a translucent window washes out the themed UI,
-	// and a proper effects pass needs its own design work (see ROADMAP).
-	err := wails.Run(&options.App{
-		Title:     "totalplug",
-		Width:     width,
-		Height:    height,
-		Frameless: true,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
-		},
-		BackgroundColour: &options.RGBA{R: 244, G: 244, B: 247, A: 255},
-		// Width and Height place the window where the OS puts a new one; the
-		// saved position can only be applied once the HWND exists.
-		OnStartup: func(ctx context.Context) {
-			app.startup(ctx)
-			if hasSettings && !saved.Maximised && (saved.X != 0 || saved.Y != 0) {
-				wailsruntime.WindowSetPosition(ctx, saved.X, saved.Y)
-			}
-		},
-		// A frameless window does not come up maximised from WindowStartState;
-		// the maximise has to be requested once the HWND exists.
-		OnDomReady: func(ctx context.Context) {
-			if saved.Maximised {
-				wailsruntime.WindowMaximise(ctx)
-			}
-		},
-		// Persist from the mirror, not from the window: a closing window answers
-		// size and position queries with zeros.
-		OnBeforeClose: func(context.Context) bool {
-			if err := writeSettings(app.snapshotSettings()); err != nil {
-				fmt.Printf("[!] %v\n", err)
-			}
-			return false
-		},
-		Windows: &windows.Options{
-			WebviewUserDataPath: webviewUserDataPath(),
-		},
-		Bind: []interface{}{
-			app,
-		},
-	})
-
-	if err != nil {
+	if err := gui.Run(assets); err != nil {
 		println("Error:", err.Error())
 	}
-}
-
-// webviewUserDataPath keeps the WebView2 profile — and with it the frontend's
-// localStorage: theme, language, font scale — inside the data directory, so a
-// portable folder carries those choices too. An empty answer leaves Wails with
-// its own default (%APPDATA%\totalplug.exe), which is what a run that cannot
-// write anywhere would fall back to anyway.
-func webviewUserDataPath() string {
-	dir, err := config.WebviewDataDir()
-	if err != nil {
-		fmt.Printf("[!] WebView2 data stays in the Wails default location: %v\n", err)
-		return ""
-	}
-	return dir
 }

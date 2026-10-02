@@ -228,19 +228,18 @@ see [docs/release.md](docs/release.md).
 ```text
 totalplug/
 ├── cmd/totalplug/main.go     # CLI entry point: report, --update / --update-all prompts
+├── main.go                   # GUI entry point: embeds frontend/dist, hands it to gui.Run
 ├── internal/
 │   ├── buildinfo/            # Version stamped at build time, release location
 │   ├── checker/              # Catalog client + disk cache, version compare, GitHub releases
 │   ├── config/               # Registry & wincmd.ini resolution, data folder layout
 │   ├── domain/               # Shared models (Plugin, Status, Confidence, AppInfo)
+│   ├── gui/                  # Wails bridge — the Go methods the frontend may call, window state
 │   ├── pipeline/             # Scan orchestration: detect → read → compare
 │   ├── scanner/              # Plugin discovery, PE / INF version extraction
 │   ├── storage/              # installed_plugins.json, user overrides, update history
 │   └── updater/              # Download, archive extract, backup, lock-aware install
 ├── frontend/                 # Wails GUI: plain HTML/CSS/JS built by Vite (no framework)
-├── app.go, main.go           # Wails bridge — the Go methods the frontend may call
-├── settings.go               # settings.json: window geometry and backdrop, read before the window exists
-├── window_effect.go          # The backdrop vocabulary: none / mica / acrylic
 ├── scripts/                  # build.ps1 plus the .cmd wrappers listed above
 └── wails.json
 ```

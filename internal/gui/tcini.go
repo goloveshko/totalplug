@@ -1,5 +1,5 @@
 // File: tcini.go
-package main
+package gui
 
 import (
 	"fmt"
