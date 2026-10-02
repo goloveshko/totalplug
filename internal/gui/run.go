@@ -15,6 +15,16 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// minWidth and minHeight are the smallest window that still shows the app: below
+// 880 the titlebar's count chip wraps onto two lines and the plugin table starts
+// scrolling sideways, measured at the largest font scale the Settings panel offers
+// (140%), which is what the rem-sized titlebar grows with. Wails scales both
+// against the window's DPI, so these are logical pixels.
+const (
+	minWidth  = 880
+	minHeight = 480
+)
+
 // Run opens the window over the embedded frontend and blocks until it closes.
 // The assets come in as an argument because //go:embed only reaches below the
 // directory of the file that declares it, and frontend/ sits at the repo root —
@@ -37,9 +47,14 @@ func Run(assets embed.FS) error {
 	// is temporarily disabled: a translucent window washes out the themed UI,
 	// and a proper effects pass needs its own design work (see ROADMAP).
 	return wails.Run(&options.App{
-		Title:     "totalplug",
-		Width:     width,
-		Height:    height,
+		Title:  "totalplug",
+		Width:  width,
+		Height: height,
+		// A geometry saved before the limit existed is clamped here by Wails' own
+		// validation, so the first launch after this change opens usable whatever
+		// settings.json says.
+		MinWidth:  minWidth,
+		MinHeight: minHeight,
 		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
