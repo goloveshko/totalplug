@@ -10,7 +10,7 @@ import {
     GetTcConfig,
     SetTcConfig,
     BrowseTcIni,
-} from '../wailsjs/go/main/App';
+} from '../wailsjs/go/gui/App';
 import { EventsOn, BrowserOpenURL, WindowMinimise, WindowToggleMaximise, Quit } from '../wailsjs/runtime';
 import { t, tp, currentLang, setLang } from './i18n.js';
 import { currentTheme, setTheme, currentScale, setScale } from './theme.js';

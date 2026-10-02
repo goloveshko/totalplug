@@ -175,7 +175,7 @@ function installMockBackend() {
         },
     };
 
-    window.go = { main: { App: app } };
+    window.go = { gui: { App: app } };
     window.runtime = runtime;
     console.log('[mock] TotalPlug demo backend installed — no Go/Wails needed');
 }
