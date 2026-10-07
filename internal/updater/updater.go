@@ -37,10 +37,19 @@ var (
 	// ErrUnsupportedArchive marks a downloaded package in a format that cannot
 	// be extracted (gzip, truncated HTML error pages, ...).
 	ErrUnsupportedArchive = errors.New("unsupported archive format, only ZIP, RAR and 7z can be applied")
+	// ErrExtractTooLarge aborts extraction whose cumulative decompressed output
+	// exceeds the configured cap, so a small crafted archive cannot fill the disk.
+	ErrExtractTooLarge = errors.New("archive expands beyond the decompressed size limit")
 )
 
 // DefaultMaxDownloadBytes caps archive size (256 MiB) to bound disk usage.
 const DefaultMaxDownloadBytes int64 = 256 << 20
+
+// DefaultMaxExtractBytes caps the total decompressed output of one archive
+// (1 GiB). It is far above any legitimate Total Commander plugin yet bounds a
+// highly-compressed "zip bomb", which the on-the-wire download cap alone cannot
+// catch because such an archive is small until it is unpacked.
+const DefaultMaxExtractBytes int64 = 1 << 30
 
 // DefaultBackupsKept is how many newest backup directories remain per plugin
 // after a successful update.
@@ -138,6 +147,9 @@ func isLockedErr(err error) bool {
 type Updater struct {
 	client           *http.Client
 	maxDownloadBytes int64
+	// maxExtractBytes bounds the cumulative decompressed output of one archive;
+	// zero means no limit (only tests lower it).
+	maxExtractBytes int64
 	// progress, when set, receives UpdateProgress events during UpdatePlugin.
 	// Only one update is expected at a time, so no locking is needed.
 	progress func(domain.UpdateProgress)
@@ -178,6 +190,36 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// extractLimiter enforces a ceiling on the total number of bytes unpacked from
+// one archive. A single limiter is shared by every entry, so the cap applies to
+// the cumulative decompressed size rather than to any one file; a small archive
+// crafted to expand into a disk-filling payload is stopped the moment the total
+// would go over.
+type extractLimiter struct {
+	written int64
+	limit   int64
+}
+
+// writer returns an io.Writer that counts every byte against the limiter before
+// writing it to dst, aborting with ErrExtractTooLarge when the cumulative total
+// would exceed the cap.
+func (l *extractLimiter) writer(dst io.Writer) io.Writer {
+	return &limitedWriter{dst: dst, lim: l}
+}
+
+type limitedWriter struct {
+	dst io.Writer
+	lim *extractLimiter
+}
+
+func (w *limitedWriter) Write(p []byte) (int, error) {
+	if w.lim.limit > 0 && w.lim.written+int64(len(p)) > w.lim.limit {
+		return 0, fmt.Errorf("%w: decompressed size exceeds %d bytes", ErrExtractTooLarge, w.lim.limit)
+	}
+	w.lim.written += int64(len(p))
+	return w.dst.Write(p)
+}
+
 // NewUpdater initializes an Updater with reasonable HTTP timeouts.
 func NewUpdater() *Updater {
 	return &Updater{
@@ -192,6 +234,7 @@ func NewUpdater() *Updater {
 			},
 		},
 		maxDownloadBytes: DefaultMaxDownloadBytes,
+		maxExtractBytes:  DefaultMaxExtractBytes,
 	}
 }
 
@@ -305,6 +348,7 @@ func (u *Updater) ExtractZip(zipPath, targetDir string) error {
 	}
 	defer r.Close()
 
+	lim := &extractLimiter{limit: u.maxExtractBytes}
 	for _, f := range r.File {
 		destPath, err := sanitizeEntryPath(targetDir, f.Name)
 		if err != nil {
@@ -333,7 +377,7 @@ func (u *Updater) ExtractZip(zipPath, targetDir string) error {
 			return fmt.Errorf("reading entry %q: %w", f.Name, err)
 		}
 
-		_, err = io.Copy(outFile, rc)
+		_, err = io.Copy(lim.writer(outFile), rc)
 		rc.Close()
 		outFile.Close()
 		if err != nil {
@@ -360,6 +404,7 @@ func (u *Updater) ExtractRar(rarPath, targetDir string) error {
 		return fmt.Errorf("opening rar archive %q: %w", rarPath, err)
 	}
 
+	lim := &extractLimiter{limit: u.maxExtractBytes}
 	for {
 		hdr, err := r.Next()
 		if err == io.EOF {
@@ -390,7 +435,7 @@ func (u *Updater) ExtractRar(rarPath, targetDir string) error {
 			return fmt.Errorf("opening file for write %q: %w", destPath, err)
 		}
 
-		if _, err := io.Copy(outFile, r); err != nil {
+		if _, err := io.Copy(lim.writer(outFile), r); err != nil {
 			outFile.Close()
 			return fmt.Errorf("extracting rar entry %q: %w", hdr.Name, err)
 		}
@@ -420,6 +465,7 @@ func (u *Updater) Extract7z(sevenzPath, targetDir string) error {
 		return fmt.Errorf("opening 7z archive %q: %w", sevenzPath, err)
 	}
 
+	lim := &extractLimiter{limit: u.maxExtractBytes}
 	for _, file := range r.File {
 		destPath, err := sanitizeEntryPath(targetDir, file.Name)
 		if err != nil {
@@ -448,7 +494,7 @@ func (u *Updater) Extract7z(sevenzPath, targetDir string) error {
 			return fmt.Errorf("opening file for write %q: %w", destPath, err)
 		}
 
-		if _, err := io.Copy(outFile, rc); err != nil {
+		if _, err := io.Copy(lim.writer(outFile), rc); err != nil {
 			rc.Close()
 			outFile.Close()
 			return fmt.Errorf("extracting 7z entry %q: %w", file.Name, err)

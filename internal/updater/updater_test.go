@@ -636,3 +636,41 @@ func TestSanitizeEntryPath(t *testing.T) {
 		t.Errorf("resolved path = %q", ok)
 	}
 }
+
+func TestExtractZipEnforcesDecompressedCap(t *testing.T) {
+	dir := t.TempDir()
+	zipPath := filepath.Join(dir, "bomb.zip")
+	// 64 KiB of highly compressible payload; the archive on the wire stays tiny,
+	// so only the decompressed cap can stop it.
+	payload := strings.Repeat("A", 64<<10)
+	if err := os.WriteFile(zipPath, buildTestZip(t, map[string]string{"big.bin": payload}), 0644); err != nil {
+		t.Fatalf("write zip: %v", err)
+	}
+
+	upd := NewUpdater()
+	upd.maxExtractBytes = 1024 // far below the 64 KiB the entry expands to
+
+	target := filepath.Join(dir, "out")
+	err := upd.ExtractZip(zipPath, target)
+	if !errors.Is(err, ErrExtractTooLarge) {
+		t.Fatalf("ExtractZip over cap = %v, want ErrExtractTooLarge", err)
+	}
+}
+
+func TestExtractZipWithinCapSucceeds(t *testing.T) {
+	dir := t.TempDir()
+	zipPath := filepath.Join(dir, "ok.zip")
+	content := "plugin payload"
+	if err := os.WriteFile(zipPath, buildTestZip(t, map[string]string{"plugin.txt": content}), 0644); err != nil {
+		t.Fatalf("write zip: %v", err)
+	}
+
+	upd := NewUpdater() // default 1 GiB decompressed cap
+	target := filepath.Join(dir, "out")
+	if err := upd.ExtractZip(zipPath, target); err != nil {
+		t.Fatalf("ExtractZip within cap = %v, want success", err)
+	}
+	if got := readTestFile(t, filepath.Join(target, "plugin.txt")); got != content {
+		t.Errorf("extracted content = %q, want %q", got, content)
+	}
+}
