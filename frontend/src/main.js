@@ -489,12 +489,19 @@ async function handleUpdate(index) {
     // guard a second click starts a parallel UpdatePlugin for the same plugin.
     if (progressRunning) return;
 
-    const plugin = currentPlugins[index];
-    if (!plugin) return;
+    const clicked = currentPlugins[index];
+    if (!clicked) return;
 
-    if (!(await showConfirm(t('update.confirm', { name: plugin.name, version: plugin.latest_version })))) {
+    if (!(await showConfirm(t('update.confirm', { name: clicked.name, version: clicked.latest_version })))) {
         return;
     }
+
+    // A plugins:refreshed can land while the confirm modal is open and swap
+    // currentPlugins, so the object captured above may now carry a stale
+    // download_url/version. Re-resolve by the stable id and update the live
+    // record; if the refresh dropped the plugin, there is nothing to update.
+    const plugin = currentPlugins.find((p) => p.id === clicked.id);
+    if (!plugin) return;
 
     // One dialog shows progress, then the final result in the same place.
     beginProgress(t('update.progress.title', { name: plugin.name }));
