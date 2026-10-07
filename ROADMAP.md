@@ -37,6 +37,10 @@ and accepted debt we deliberately postponed.
   only the `totalcmd` source per entry — mirrors become effective once added to the
   totalplug-catalog repo.
 - Zip-slip guarded extraction.
+- Total decompressed output of one archive capped at 1 GiB (`DefaultMaxExtractBytes`,
+  one `extractLimiter` shared by the ZIP/RAR/7z loops in `internal/updater`), so a small
+  crafted bomb is stopped before it fills the disk — the 256 MiB wire cap alone cannot
+  catch it because the archive stays tiny until it is unpacked (`b1bb4aa`).
 
 ### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
 - Scan report with update summary table.
@@ -336,22 +340,24 @@ and accepted debt we deliberately postponed.
 - ~~**`domain.Config`** struct is dead code (TCPath/IniPath/Language/AutoCheck unwired);
   either wire it into persistence or delete it.~~ Deleted in `58306b6`: nothing ever read
   it, and two of its fields describe behaviour that was explicitly rejected.
-- **Minor `internal/config` debt** — `%COMMANDER_PATH%` expands only the first occurrence;
-  no-op `existing` branch in dedup.
-- **No cap on decompressed size** — found in the pre-release review. `DefaultMaxDownloadBytes`
-  (256 MiB) bounds the archive on the wire, while every extraction member is copied with a
-  plain `io.Copy` (`internal/updater/updater.go`: zip, RAR and 7z each in their own loop), so a
-  small crafted archive can still fill the disk. Left open for v1 because a fix is one counting
-  writer shared by three formats, which is not a two-line change under a release deadline.
+- ~~**Minor `internal/config` debt** — `%COMMANDER_PATH%` expands only the first occurrence;
+  no-op `existing` branch in dedup.~~ Fixed in `94f4af3`: `replaceAllFold` expands every
+  case-insensitive occurrence, and the dedup branch is now a plain existence check.
+- ~~**No cap on decompressed size** — found in the pre-release review: `DefaultMaxDownloadBytes`
+  (256 MiB) bounds the archive on the wire, but every extraction member was copied with a plain
+  `io.Copy`, so a small crafted archive could still fill the disk.~~ Shipped in `b1bb4aa` (see
+  Safe updates): one `extractLimiter` shared by the three format loops caps the cumulative
+  decompressed output at `DefaultMaxExtractBytes` (1 GiB), aborting with `ErrExtractTooLarge`.
 - **The plugin card is mouse-only** — a row receives `tabindex="-1"` only *after* the card opens
   (`openCard` in `frontend/src/main.js`), so there is nothing to focus and therefore no way to
   open a card with the keyboard. The pass that fixes it also owes the dialogs their accessible
   names: the four `<dialog>`s carry no `aria-label`/`aria-labelledby`, and neither
   `#lang-select` nor `#font-scale` has one, while every icon button and the search box do.
-- **Stale state across a concurrent refresh** — two known races: a language switch rebuilds the
-  DOM, so the `finally` in `runScan` enables buttons that the in-flight scan never disabled
-  (harmless, but a second scan starts while the first is running); and `handleUpdate` captures
-  `plugin` before awaiting the confirmation, so a `plugins:refreshed` landing in that window
-  means updating from a `download_url` that is no longer current.
-- **Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
-  read nowhere; the About panel renders its labels from other keys.
+- **Stale state across a concurrent refresh** — one known race left: a language switch rebuilds
+  the DOM, so the `finally` in `runScan` enables buttons that the in-flight scan never disabled
+  (harmless, but a second scan starts while the first is running). The other race — `handleUpdate`
+  captured `plugin` before awaiting the confirmation, so a `plugins:refreshed` landing in that
+  window meant updating from a `download_url` that was no longer current — is fixed in `0f53feb`:
+  after the confirm the plugin is re-resolved by stable id and that fresh record is updated.
+- ~~**Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
+  read nowhere; the About panel renders its labels from other keys.~~ Removed in `4a9f6de`.
