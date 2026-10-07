@@ -22,6 +22,24 @@ jobs:
           go-version: "1.25"
           cache: true
 
+      # The root main.go embeds all:frontend/dist, which is gitignored, so a
+      # fresh checkout has no dist and `go vet ./...` / `go test ./...` fail to
+      # load the root package. Build the frontend first to materialise it.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
       - name: Verify Go Modules
         run: go mod verify
 
