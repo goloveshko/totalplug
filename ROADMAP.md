@@ -1,8 +1,8 @@
 # TotalPlug Roadmap
 
 Progress and plan tracker for the Total Commander plugin updater.
-One page, three sections: what already works, what the GUI phase will add,
-and accepted debt we deliberately postponed.
+One page: what already works, what the GUI phase added, the candidates for the
+next release (v2), and the accepted debt we deliberately postponed.
 
 ## Shipped
 
@@ -79,7 +79,7 @@ and accepted debt we deliberately postponed.
   storage and updater (httptest + in-memory zips).
 - Corrupt storage JSON is quarantined to `<file>.corrupt` and reported, not silently dropped.
 
-## GUI phase — items 1–5 shipped, backlog below remains
+## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt
 
 1. ~~**Cache-first startup scan**~~ — done (`cef9df4`): `ScanPlugins` answers instantly from the
    disk cache; a single-flight background refresh pushes rows via `plugins:refreshed` events.
@@ -133,7 +133,7 @@ and accepted debt we deliberately postponed.
    changed without recreating the window. The window is now always solid; the effect
    dropdown, `html[data-effect]` styling and i18n keys are removed. `window_effect.go`
    and the Get/SetWindowEffect bindings stay as dormant plumbing for a future
-   full effects/theme pass. See backlog.
+   full effects/theme pass. See Accepted debt below.
 4. **Update progress dialog** — done (`981efbb`): «Обновить» now opens a dialog right
    after the confirm that streams `update:progress` events from the updater
    (download percent via a counting reader over the response body, then extract and
@@ -304,7 +304,19 @@ and accepted debt we deliberately postponed.
    NSIS installer or embedded WebView2 runtime, a startup update banner (the check
    stays manual, from the About panel), and a web landing page.
 
-## Backlog / accepted debt
+## Next release (v2)
+
+- **Install plugins from the catalog** — v1 updates only plugins `wincmd.ini` already
+  references; adding one is the reverse pass: pick a catalog entry, download it,
+  extract it into its own folder under the plugins root and write the matching ini
+  section. This is the "next release" the v1 scope notes point at.
+- **Column sorting** (at least status and name) — needs a
+  sort state in `main.js` and stable ordering with the search filter.
+- **`--json` CLI output** and a documented exit-code contract for scripting.
+- **Total Commander integration docs** — README section on wiring a "check for updates"
+  user-menu button to the CLI.
+
+## Accepted debt / as needed
 
 - **Mica/Acrylic window effect** — temporarily disabled (see stage 3). Re-enabling needs
   a proper theme pass: panels readable over any desktop backdrop, opaque titlebar,
@@ -326,17 +338,12 @@ and accepted debt we deliberately postponed.
   zip error. Supporting RAR/7z extraction would make those updates work.~~
   Shipped in `1102346`: RAR (nwaples/rardecode) and 7z (bodgit/sevenzip) extract alongside
   ZIP, dispatching on the magic-byte format; gzip/unknown still rejected.
-- **`--json` CLI output** and a documented exit-code contract for scripting.
-- **Total Commander integration docs** — README section on wiring a "check for updates"
-  user-menu button to the CLI.
 - ~~**CSP meta tag for WebView2** — recommended by the review; the frontend side is
   ready (no inline `onclick`, one delegated click handler), but the pre-paint
   theme/lang script in `index.html` must move to its own file (a static page cannot
   carry a nonce) and a strict `script-src` has to be verified against the
   Wails-injected runtime on a live `wails build`.~~ Shipped in `28484d3` and
   confirmed on a live `totalplug.exe` (stage 13) — closed.
-- **Column sorting** (at least status and name) — deferred by the review; needs a
-  sort state in `main.js` and stable ordering with the search filter.
 - ~~**`domain.Config`** struct is dead code (TCPath/IniPath/Language/AutoCheck unwired);
   either wire it into persistence or delete it.~~ Deleted in `58306b6`: nothing ever read
   it, and two of its fields describe behaviour that was explicitly rejected.
