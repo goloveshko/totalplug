@@ -109,17 +109,37 @@ func expandTcVars(path string, tcDir string) string {
 		return os.ExpandEnv(path)
 	}
 
-	lowerPath := strings.ToLower(path)
-	if idx := strings.Index(lowerPath, "%commander_path%"); idx != -1 {
-		path = path[:idx] + tcDir + path[idx+len("%commander_path%"):]
-	}
-
-	if idx := strings.Index(strings.ToLower(path), "%commander_drive%"); idx != -1 {
-		drive := filepath.VolumeName(tcDir)
-		path = path[:idx] + drive + path[idx+len("%commander_drive%"):]
-	}
+	path = replaceAllFold(path, "%commander_path%", tcDir)
+	path = replaceAllFold(path, "%commander_drive%", filepath.VolumeName(tcDir))
 
 	return os.ExpandEnv(path)
+}
+
+// replaceAllFold replaces every case-insensitive occurrence of old in s with
+// repl. wincmd.ini spells %COMMANDER_PATH% and %COMMANDER_DRIVE% in any case and
+// a single path may reference the same variable more than once, so the
+// first-match-only strings.Index the old code used left later occurrences
+// unexpanded. old must be ASCII (both TC tokens are), which keeps the byte
+// offsets found in the lowercased haystack valid for the original string.
+func replaceAllFold(s, old, repl string) string {
+	if old == "" {
+		return s
+	}
+	lowerS := strings.ToLower(s)
+	lowerOld := strings.ToLower(old)
+	var b strings.Builder
+	for i := 0; ; {
+		idx := strings.Index(lowerS[i:], lowerOld)
+		if idx == -1 {
+			b.WriteString(s[i:])
+			break
+		}
+		start := i + idx
+		b.WriteString(s[i:start])
+		b.WriteString(repl)
+		i = start + len(lowerOld)
+	}
+	return b.String()
 }
 
 // deriveRealPluginName gets clean human-readable name from folder/file path
@@ -207,8 +227,7 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 			realName := deriveRealPluginName(keyName, pluginPath, pType)
 			pathKey := strings.ToLower(pluginPath)
 
-			if existing, exists := uniqueMap[pathKey]; exists {
-				_ = existing
+			if _, exists := uniqueMap[pathKey]; exists {
 				continue
 			}
 

@@ -31,6 +31,16 @@ func TestExpandTcVars(t *testing.T) {
 			input:    `D:\CustomPath\plugin.wcx`,
 			expected: `D:\CustomPath\plugin.wcx`,
 		},
+		{
+			name:     "expand every COMMANDER_PATH occurrence regardless of case",
+			input:    `%COMMANDER_PATH%\plugins\%commander_path%\tool.wcx`,
+			expected: `C:\TotalCommander\plugins\C:\TotalCommander\tool.wcx`,
+		},
+		{
+			name:     "expand every COMMANDER_DRIVE occurrence",
+			input:    `%COMMANDER_DRIVE%\a\%commander_drive%\b`,
+			expected: `C:\a\C:\b`,
+		},
 	}
 
 	for _, tt := range tests {
