@@ -769,7 +769,7 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 
 	// Best-effort cleanup: the update already succeeded, so old backups must
 	// not turn a good update into a reported failure.
-	PruneOldBackups(pluginDir, DefaultBackupsKept)
+	_, _ = PruneOldBackups(pluginDir, DefaultBackupsKept)
 
 	return backupDir, nil
 }

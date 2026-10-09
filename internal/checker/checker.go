@@ -120,16 +120,12 @@ func normalizeName(s string) string {
 
 	prefixes := []string{"tc_", "tc ", "wfx_", "wlx_", "wcx_", "wdx_", "totalcmd_"}
 	for _, p := range prefixes {
-		if strings.HasPrefix(s, p) {
-			s = strings.TrimPrefix(s, p)
-		}
+		s = strings.TrimPrefix(s, p)
 	}
 
 	suffixes := []string{"64", "32", "x64", "x86", "_64", "_32", " plugin", "plugin", " ext", "ext"}
 	for _, sfx := range suffixes {
-		if strings.HasSuffix(s, sfx) {
-			s = strings.TrimSuffix(s, sfx)
-		}
+		s = strings.TrimSuffix(s, sfx)
 	}
 
 	var sb strings.Builder
