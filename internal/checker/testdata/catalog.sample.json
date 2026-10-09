@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-09T00:00:00Z",
+  "total_count": 4,
+  "plugins": [
+    {
+      "id": "cudalister",
+      "name": "CudaLister",
+      "type": "WLX",
+      "category": "Viewer",
+      "description": "Syntax highlighting file viewer plugin based on CudaText engine",
+      "authors": ["Alexey-T"],
+      "homepage": "https://github.com/Alexey-T/CudaLister",
+      "license": "MPL-2.0",
+      "arch": "x32+x64",
+      "has_source": true,
+      "match": {
+        "aliases": ["cudalister", "wlx_cudalister"],
+        "filenames": ["cudalister.wlx", "cudalister.wlx64"]
+      },
+      "resolved": {
+        "version": "1.8.6.3",
+        "download_url": "https://github.com/Alexey-T/CudaLister/releases/download/1.8.6.3/wlx_cudalister_1.8.6.3.zip",
+        "web_url": "https://github.com/Alexey-T/CudaLister/releases/tag/1.8.6.3",
+        "arch": "x32+x64",
+        "has_source": true,
+        "published_at": "2026-08-20T08:04:09Z",
+        "resolved_from": "github"
+      },
+      "available_sources": {
+        "totalcmd": {
+          "version": "1.8.6.1",
+          "download_url": "https://totalcmd.net/download.php?id=CudaLister",
+          "web_url": "https://totalcmd.net/plugring/CudaLister.html",
+          "arch": "x32+x64",
+          "published_at": "2026-04-05T00:00:00Z",
+          "resolved_from": "totalcmd"
+        }
+      }
+    },
+    {
+      "id": "gitcommander",
+      "name": "WDX GitCommander",
+      "type": "WDX",
+      "description": "Displays Git repository branch names and commit info in custom columns",
+      "arch": "x32+x64",
+      "match": {
+        "filenames": ["gitcmd.wdx", "gitcmd64.wdx"]
+      },
+      "resolved": {
+        "version": "2.0.1.0",
+        "download_url": "https://totalcmd.net/download.php?id=gitcmd64",
+        "web_url": "https://totalcmd.net/plugring/gitcmd64.html",
+        "arch": "x32+x64",
+        "published_at": "2021-02-01T00:00:00Z",
+        "resolved_from": "totalcmd"
+      },
+      "available_sources": {
+        "github": {
+          "version": "1.2",
+          "download_url": "https://github.com/holimart/WDX_GitCommander/releases/download/1.2/gitcmd.zip",
+          "web_url": "https://github.com/holimart/WDX_GitCommander/releases/tag/1.2",
+          "arch": "x32+x64",
+          "has_source": true,
+          "published_at": "2015-04-23T16:06:40Z",
+          "resolved_from": "github"
+        }
+      }
+    },
+    {
+      "id": "totalcmd_13954",
+      "name": "VisualSpace",
+      "type": "WLX",
+      "category": "lister",
+      "match": {
+        "aliases": ["visualspace", "13954"],
+        "filenames": ["13954.wlx"]
+      },
+      "resolved": {
+        "version": "2.0b",
+        "download_url": "https://totalcmd.net/download.php?id=13954",
+        "web_url": "https://totalcmd.net/plugring/13954.html",
+        "arch": "x32+x64",
+        "published_at": "2026-09-04T00:00:00Z",
+        "resolved_from": "totalcmd"
+      }
+    },
+    {
+      "id": "directsample",
+      "name": "Direct Sample",
+      "type": "WCX",
+      "match": {
+        "filenames": ["direct.wcx"]
+      },
+      "resolved": {
+        "version": "3.4",
+        "download_url": "https://example.org/direct-3.4.zip",
+        "web_url": "https://example.org",
+        "resolved_from": "direct"
+      }
+    }
+  ]
+}
