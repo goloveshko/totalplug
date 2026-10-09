@@ -14,14 +14,20 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/bodgit/sevenzip"
 	"github.com/nwaples/rardecode"
 
+	"totalplug/internal/config"
 	"totalplug/internal/domain"
 )
+
+// sweepOnce keeps the leftover-sweep of %TEMP%\totalplug to the first Updater a
+// process builds.
+var sweepOnce sync.Once
 
 var (
 	ErrEmptyDownloadURL = errors.New("download URL is empty")
@@ -57,6 +63,16 @@ const DefaultBackupsKept = 3
 
 // backupSuffix separates a plugin directory name from its backup timestamp.
 const backupSuffix = ".bak_"
+
+// updateSpace is the folder inside the run's scratch that one download unpacks
+// into. It is emptied before each plugin rather than recreated, so a run reuses
+// one path for every update it makes.
+const updateSpace = "update"
+
+// staleScratchAfter is how long a scratch folder may sit untouched before the
+// next run treats it as the leftover of a process that died, and removes it.
+// Long enough for the largest download in the catalog to finish on a slow link.
+const staleScratchAfter = time.Hour
 
 // PruneOldBackups deletes all but the newest `keep` backup directories of
 // pluginDir (named "<pluginDir>.bak_<unix>"). Entries with an unparseable
@@ -220,8 +236,11 @@ func (w *limitedWriter) Write(p []byte) (int, error) {
 	return w.dst.Write(p)
 }
 
-// NewUpdater initializes an Updater with reasonable HTTP timeouts.
+// NewUpdater initializes an Updater with reasonable HTTP timeouts. The first
+// construction of a process also takes the folders away that runs killed
+// mid-download left in %TEMP%\totalplug.
 func NewUpdater() *Updater {
+	sweepOnce.Do(func() { config.SweepScratch(staleScratchAfter) })
 	return &Updater{
 		client: &http.Client{
 			Timeout: 60 * time.Second,
@@ -669,8 +688,18 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 		return "", ErrPluginNotFound
 	}
 
-	tmpDir, err := os.MkdirTemp("", "totalplug_update_*")
+	tmpDir, err := config.RunScratch()
 	if err != nil {
+		return "", fmt.Errorf("creating temp directory: %w", err)
+	}
+	// A run downloads every plugin of an --update-all into its own scratch folder,
+	// so each one starts from an empty `update` inside it rather than unpacking
+	// over what the previous package left.
+	tmpDir = filepath.Join(tmpDir, updateSpace)
+	if err := os.RemoveAll(tmpDir); err != nil {
+		return "", fmt.Errorf("clearing temp directory: %w", err)
+	}
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return "", fmt.Errorf("creating temp directory: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)

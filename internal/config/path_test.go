@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // fakePerUserDir points the OS config dir at a temp folder so the per-user
@@ -124,5 +126,112 @@ func TestResolveDataDirFallsBackWhenNoExecutableDir(t *testing.T) {
 	}
 	if _, err := os.Stat(legacy); err != nil {
 		t.Errorf("the fallback folder must exist: %v", err)
+	}
+}
+
+func TestScratchRootHonoursEnvAndDefaultsUnderTemp(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("TMP", root)
+	t.Setenv("TMPDIR", root)
+
+	got, err := ScratchRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(root, appFolder); got != want {
+		t.Fatalf("ScratchRoot() = %q, want the app's own folder inside the temp dir %q", got, want)
+	}
+
+	pinned := filepath.Join(t.TempDir(), "scratch")
+	t.Setenv(ScratchEnv, pinned)
+	if got, err := ScratchRoot(); err != nil || got != pinned {
+		t.Fatalf("ScratchRoot() with %s set = %q (%v), want %q", ScratchEnv, got, err, pinned)
+	}
+}
+
+func TestRunScratchIsOneFolderPerProcess(t *testing.T) {
+	t.Setenv(ScratchEnv, filepath.Join(t.TempDir(), "scratch"))
+
+	first, err := RunScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := RunScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Errorf("a run must reuse one folder, got %q then %q", first, second)
+	}
+	if want := fmt.Sprintf("%s%d", runPrefix, os.Getpid()); filepath.Base(first) != want {
+		t.Errorf("run folder = %q, want %q", filepath.Base(first), want)
+	}
+}
+
+func TestSweepScratchRemovesOnlyStaleRuns(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "scratch")
+	t.Setenv(ScratchEnv, root)
+
+	stale := filepath.Join(root, "run-1111")
+	fresh := filepath.Join(root, "run-2222")
+	foreign := filepath.Join(root, "keep-me")
+	for _, dir := range []string{stale, fresh, foreign} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		writeHere := filepath.Join(dir, "package.archive")
+		if err := os.WriteFile(writeHere, []byte("data"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := SweepScratch(time.Hour); got != 1 {
+		t.Fatalf("SweepScratch() removed %d folder(s), want 1", got)
+	}
+	for _, dir := range []string{fresh, foreign} {
+		if _, err := os.Stat(dir); err != nil {
+			t.Errorf("%s must survive the sweep: %v", dir, err)
+		}
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("a run folder left by a dead process must be gone: %v", err)
+	}
+}
+
+func TestReleaseRunScratchLeavesNothingBehind(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "scratch")
+	t.Setenv(ScratchEnv, root)
+
+	dir, err := RunScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "package.archive"), []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	ReleaseRunScratch()
+
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("the run's folder must be gone after release: %v", err)
+	}
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Errorf("an empty scratch root must not be kept: %v", err)
+	}
+}
+
+func TestSweepScratchCreatesNothing(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "never-made")
+	t.Setenv(ScratchEnv, root)
+
+	if got := SweepScratch(time.Hour); got != 0 {
+		t.Fatalf("SweepScratch() = %d over an absent root, want 0", got)
+	}
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Errorf("a sweep must not create the folder it only reads: %v", err)
 	}
 }

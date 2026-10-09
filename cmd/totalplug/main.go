@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"totalplug/internal/buildinfo"
+	"totalplug/internal/config"
 	"totalplug/internal/domain"
 	"totalplug/internal/pipeline"
 	"totalplug/internal/storage"
@@ -79,6 +80,9 @@ func confirm(reader io.Reader, prompt string) bool {
 // blind updates stop resurfacing as uncertain on the next scan.
 func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Database) (succeeded int, failed int) {
 	upd := updater.NewUpdater()
+	// One scratch folder for the whole batch, taken away again on the way out:
+	// a CLI run that finished should leave nothing in %TEMP%.
+	defer config.ReleaseRunScratch()
 	for _, p := range plugins {
 		name := truncateString(p.Name, 18)
 		if p.DownloadURL == "" {

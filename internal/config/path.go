@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 // DataDirEnv pins the data directory. Tests use it to keep their files in their
@@ -27,6 +28,13 @@ const webviewFolder = "webview2"
 // re-fetchable, so a user who wants to clean up can delete the folder whole
 // without touching the database or the overrides next to it.
 const cacheFolder = "cache"
+
+// ScratchEnv pins the throwaway folder. Tests set it to keep a downloaded
+// package out of the machine's real %TEMP%.
+const ScratchEnv = "TOTALPLUG_SCRATCH_DIR"
+
+// runPrefix names a run's folder inside the scratch root.
+const runPrefix = "run-"
 
 var (
 	discoverOnce sync.Once
@@ -75,6 +83,86 @@ func CacheDir() (string, error) {
 		return "", fmt.Errorf("create cache dir %s: %w", dir, err)
 	}
 	return dir, nil
+}
+
+// ScratchRoot returns the one %TEMP% folder this app writes outside its data
+// folder: %TEMP%\totalplug. Naming it after the app is what keeps a run that was
+// killed mid-download from leaving a scattered `totalplug_update_*` pattern
+// behind — there is a single folder to look at, and one sweep clears it.
+func ScratchRoot() (string, error) {
+	dir := scratchRootPath()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("create scratch root %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
+// scratchRootPath names the root without creating it, for the paths that only
+// have to remove something from there.
+func scratchRootPath() string {
+	if dir := strings.TrimSpace(os.Getenv(ScratchEnv)); dir != "" {
+		return dir
+	}
+	return filepath.Join(os.TempDir(), appFolder)
+}
+
+// RunScratch returns the folder this process works in, named after its pid so
+// every update of a run shares one folder and two runs never write into each
+// other's. An --update-all applies plugin after plugin, and each of them clears
+// the folder rather than creating a new one.
+func RunScratch() (string, error) {
+	root, err := ScratchRoot()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(root, runDirName())
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("create run scratch %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
+// ReleaseRunScratch takes the run's folder away on the way out, and the scratch
+// root with it once no other run has left a folder behind: a run that finished
+// normally should leave nothing at all in %TEMP%.
+func ReleaseRunScratch() {
+	root := scratchRootPath()
+	_ = os.RemoveAll(filepath.Join(root, runDirName()))
+	if rest, err := os.ReadDir(root); err == nil && len(rest) == 0 {
+		_ = os.Remove(root)
+	}
+}
+
+// SweepScratch removes run folders left behind by runs that died, keeping
+// anything written to within maxAge — an update refreshes its folder's timestamp
+// as it goes, so a second live process cannot lose the package it is downloading.
+// It reads the root without creating it: a sweep has nothing to make. Returns how
+// many folders went.
+func SweepScratch(maxAge time.Duration) int {
+	root := scratchRootPath()
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return 0
+	}
+	removed := 0
+	for _, entry := range entries {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), runPrefix) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || time.Since(info.ModTime()) < maxAge {
+			continue
+		}
+		if os.RemoveAll(filepath.Join(root, entry.Name())) == nil {
+			removed++
+		}
+	}
+	return removed
+}
+
+// runDirName is this process's folder name inside the scratch root.
+func runDirName() string {
+	return fmt.Sprintf("%s%d", runPrefix, os.Getpid())
 }
 
 func resolveDataDir() string {

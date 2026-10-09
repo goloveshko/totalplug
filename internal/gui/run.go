@@ -83,6 +83,11 @@ func Run(assets embed.FS) error {
 			}
 			return false
 		},
+		// The download scratch is the app's only %TEMP% writing, and it is the one
+		// thing a closed window should not leave behind.
+		OnShutdown: func(context.Context) {
+			config.ReleaseRunScratch()
+		},
 		Windows: &windows.Options{
 			WebviewUserDataPath: webviewUserDataPath(),
 		},

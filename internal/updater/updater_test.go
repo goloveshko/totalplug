@@ -15,8 +15,24 @@ import (
 	"testing"
 	"time"
 
+	"totalplug/internal/config"
 	"totalplug/internal/domain"
 )
+
+// TestMain keeps every update test's download inside the test's own scratch
+// folder, so the package neither writes to nor sweeps the machine's %TEMP%.
+func TestMain(m *testing.M) {
+	scratch, err := os.MkdirTemp("", "totalplug_scratch_test_*")
+	if err != nil {
+		panic(err)
+	}
+	if err := os.Setenv(config.ScratchEnv, filepath.Join(scratch, "scratch")); err != nil {
+		panic(err)
+	}
+	code := m.Run()
+	_ = os.RemoveAll(scratch)
+	os.Exit(code)
+}
 
 func writeTestFile(t *testing.T, path, content string) {
 	t.Helper()
