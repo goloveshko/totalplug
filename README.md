@@ -23,15 +23,16 @@ Both need Windows 10 or 11; the GUI renders through the WebView2 runtime that
 already ships with Windows 11 and with current Windows 10 updates.
 
 The binaries are not code-signed, so SmartScreen shows "Windows protected your
-PC" on the first run — pick **More info → Run anyway**. TotalPlug writes nothing
-outside your Total Commander `plugins` directory and its own data folder (see
-**Where Your Files Live**), and every folder it changes is backed up next to it.
+PC" on the first run — pick **More info → Run anyway**. TotalPlug writes only to
+your Total Commander `plugins` directory, to its own data folder and to a
+throwaway download folder it removes on exit (see **Where Your Files Live**), and
+every plugin folder it changes is backed up next to it.
 
 ---
 
 ## 📁 Where Your Files Live
 
-TotalPlug keeps everything it writes in one folder, picked at every start:
+TotalPlug keeps its data in one folder, picked at every start:
 
 * **Portable** — a `totalplug` folder next to the `.exe`, whenever that folder
   accepts writes. Copy the app's folder to another machine or a USB stick and the
@@ -48,6 +49,13 @@ the window settings sit at the top level, the downloaded catalog and GitHub
 release snapshots go to `cache\`, and the WebView2 profile to `webview2\`.
 Deleting `cache\` only costs the next download; deleting `webview2\` resets the
 theme, language and font size.
+
+An update also needs somewhere to hold its download while it is unpacked — the
+only place TotalPlug writes that is neither your plugins folder nor its own data
+folder: `%TEMP%\totalplug`, with one subfolder per running instance so two copies
+of the app never unpack into each other. The subfolder goes when the update ends;
+a run killed mid-download leaves a leftover that a later start sweeps once it is
+over an hour old. `TOTALPLUG_SCRATCH_DIR` moves the whole tree elsewhere.
 
 The About panel prints the folder in use. `TOTALPLUG_DATA_DIR` pins it to any
 path you choose.
@@ -161,8 +169,9 @@ go run cmd/totalplug/main.go --ini D:\TC\wincmd.ini
 go run cmd/totalplug/main.go --version
 ```
 Prints the version stamped at build time — the same value the GUI shows on its
-About panel. `go run` passes no `-ldflags`, so this command reports the unstamped
-`dev` even in a tagged tree; use `scripts\build.cmd` for a numbered binary.
+About panel, which drops the trailing `.0` of a four-part stamp. `go run` passes
+no `-ldflags`, so this command reports the unstamped `dev` even in a tagged tree;
+use `scripts\build.cmd` for a numbered binary.
 
 ### Example Output
 
@@ -210,6 +219,7 @@ Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
 | `scripts\build.cmd` | `bin\totalplug-cli.exe`, development build |
 | `scripts\build-gui.cmd` | `bin\totalplug.exe` (also accepts extra `wails` flags, e.g. `-devtools`) |
 | `scripts\release.cmd`, `scripts\release-gui.cmd` | Same, with `-trimpath` and stripped symbols |
+| `scripts\run.cmd` | Runs the CLI from source (`go run ./cmd/totalplug`), arguments pass through |
 | `scripts\test.cmd` | `go test -v ./...`, extra arguments pass through to `go test` |
 | `scripts\lint.cmd` | `go vet ./...`, plus `golangci-lint` when it is installed |
 
