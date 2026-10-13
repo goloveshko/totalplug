@@ -416,16 +416,16 @@ func TestPruneOldBackupsNoopWithinKeepLimit(t *testing.T) {
 }
 
 func TestUpdatePluginPrunesOldBackups(t *testing.T) {
-	dir := t.TempDir()
-	pluginDir := filepath.Join(dir, "WCX")
+	pluginDir := filepath.Join(t.TempDir(), "WCX", "test")
+	dir := filepath.Dir(pluginDir)
 	pluginFile := filepath.Join(pluginDir, "test.wcx")
 	writeTestFile(t, pluginFile, "old")
 
 	// Backups are siblings of the plugin directory; seeded ones use old
 	// timestamps so the fresh backup always sorts newest.
-	bakOld1 := fmt.Sprintf("WCX.bak_%d", time.Now().Add(-4*time.Hour).Unix())
-	bakOld2 := fmt.Sprintf("WCX.bak_%d", time.Now().Add(-3*time.Hour).Unix())
-	bakOld3 := fmt.Sprintf("WCX.bak_%d", time.Now().Add(-2*time.Hour).Unix())
+	bakOld1 := fmt.Sprintf("test.bak_%d", time.Now().Add(-4*time.Hour).Unix())
+	bakOld2 := fmt.Sprintf("test.bak_%d", time.Now().Add(-3*time.Hour).Unix())
+	bakOld3 := fmt.Sprintf("test.bak_%d", time.Now().Add(-2*time.Hour).Unix())
 	for _, n := range []string{bakOld1, bakOld2, bakOld3} {
 		if err := os.MkdirAll(filepath.Join(dir, n), 0755); err != nil {
 			t.Fatal(err)
@@ -501,7 +501,7 @@ func TestDetectArchiveFormat(t *testing.T) {
 
 func TestUpdatePluginRejectsUnsupportedFormatBeforeTouchingPlugin(t *testing.T) {
 	dir := t.TempDir()
-	pluginFile := filepath.Join(dir, "WCX", "nl.wdx")
+	pluginFile := filepath.Join(dir, "WCX", "nl", "nl.wdx")
 	writeTestFile(t, pluginFile, "original")
 
 	gzipBody := []byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00}
@@ -524,6 +524,55 @@ func TestUpdatePluginRejectsUnsupportedFormatBeforeTouchingPlugin(t *testing.T) 
 		if strings.Contains(e.Name(), ".bak_") {
 			t.Errorf("no backup must be created for rejected format, found %s", e.Name())
 		}
+	}
+}
+
+// A wincmd.ini entry may point straight at a plugin file rather than into a
+// folder of its own. Backup and unpack both take the whole parent directory, so
+// such an update would replace everything else living beside that file.
+func TestUpdatePluginRefusesFolderItDoesNotOwn(t *testing.T) {
+	tests := []struct {
+		name   string
+		layout func(dir string) string
+	}{
+		{
+			name: "Total Commander install root",
+			layout: func(dir string) string {
+				return filepath.Join(dir, "loose.wcx")
+			},
+		},
+		{
+			name: "folder shared by every plugin of a type",
+			layout: func(dir string) string {
+				return filepath.Join(dir, "Plugins", "loose.wcx")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestFile(t, filepath.Join(dir, "wincmd.exe"), "exe")
+			pluginFile := tt.layout(dir)
+			writeTestFile(t, pluginFile, "original")
+
+			_, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+				Path:        pluginFile,
+				DownloadURL: "https://example.invalid/loose.zip",
+			})
+			if !errors.Is(err, ErrPluginNeedsOwnFolder) {
+				t.Fatalf("error = %v, want ErrPluginNeedsOwnFolder", err)
+			}
+			if readTestFile(t, pluginFile) != "original" {
+				t.Error("plugin file must be untouched")
+			}
+			entries, _ := os.ReadDir(filepath.Dir(pluginFile))
+			for _, e := range entries {
+				if strings.Contains(e.Name(), ".bak_") {
+					t.Errorf("no backup must be created for a refused folder, found %s", e.Name())
+				}
+			}
+		})
 	}
 }
 
@@ -605,7 +654,7 @@ func TestUpdatePluginApplies7z(t *testing.T) {
 
 func TestUpdatePluginDownloadFailurePointsAtPluginPage(t *testing.T) {
 	dir := t.TempDir()
-	pluginFile := filepath.Join(dir, "WCX", "fi.wlx")
+	pluginFile := filepath.Join(dir, "WCX", "fi", "fi.wlx")
 	writeTestFile(t, pluginFile, "original")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -628,7 +677,7 @@ func TestUpdatePluginDownloadFailurePointsAtPluginPage(t *testing.T) {
 
 func TestUpdatePluginFallsBackToMirrorSource(t *testing.T) {
 	dir := t.TempDir()
-	pluginFile := filepath.Join(dir, "WLX", "fi.wlx")
+	pluginFile := filepath.Join(dir, "WLX", "fi", "fi.wlx")
 	writeTestFile(t, pluginFile, "original")
 
 	zipBody := buildTestZip(t, map[string]string{"fi.wlx": "updated"})

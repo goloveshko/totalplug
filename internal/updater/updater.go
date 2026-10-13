@@ -32,6 +32,10 @@ var sweepOnce sync.Once
 var (
 	ErrEmptyDownloadURL = errors.New("download URL is empty")
 	ErrPluginNotFound   = errors.New("plugin file not found on disk")
+	// ErrPluginNeedsOwnFolder refuses an update whose plugin file sits directly in
+	// a folder it does not own, because the updater backs up and unpacks over that
+	// whole folder.
+	ErrPluginNeedsOwnFolder = errors.New("plugin does not live in a folder of its own")
 	// ErrFileLocked marks a target file that could not be written because it is
 	// held by another process (typically a running Total Commander).
 	ErrFileLocked = errors.New("target file is locked by another process")
@@ -697,6 +701,19 @@ func (u *Updater) tryDownloadCandidates(ctx context.Context, urls []string, arch
 	return "", lastErr
 }
 
+// tcExeNames are the executables that only ever sit in a Total Commander install
+// root, which is how one is recognised from a plugin folder.
+var tcExeNames = []string{"wincmd.exe", "totalcmd64.exe"}
+
+func isTotalCommanderRoot(dir string) bool {
+	for _, exe := range tcExeNames {
+		if _, err := os.Stat(filepath.Join(dir, exe)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // UpdatePlugin downloads an update, backs up the current plugin directory, and
 // applies the new files. If applying fails, the files touched so far are rolled
 // back from the backup. On success the backup directory is kept and returned,
@@ -713,6 +730,15 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	pluginDir := filepath.Dir(plugin.Path)
 	if _, err := os.Stat(pluginDir); os.IsNotExist(err) {
 		return "", ErrPluginNotFound
+	}
+	// The backup and the unpack both take the whole of pluginDir, so a wincmd.ini
+	// entry pointing straight at a file rather than into a folder of its own would
+	// have the update replace whatever else lives beside it.
+	if isTotalCommanderRoot(pluginDir) {
+		return "", fmt.Errorf("%w: %s is the Total Commander install directory", ErrPluginNeedsOwnFolder, pluginDir)
+	}
+	if config.IsGenericPluginDir(filepath.Base(pluginDir)) {
+		return "", fmt.Errorf("%w: %s holds every plugin of its type", ErrPluginNeedsOwnFolder, pluginDir)
 	}
 
 	tmpDir, err := config.RunScratch()
