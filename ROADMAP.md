@@ -9,6 +9,11 @@ next release (v2), and the accepted debt we deliberately postponed.
 ### Core engine
 - Total Commander auto-discovery: registry key `SOFTWARE\Ghisler\Total Commander`,
   `%APPDATA%\GHISLER` fallback, portable install detection (`wincmd.exe` next to `wincmd.ini`).
+  The AppData fallback answers with an *empty* install dir: that ini is the roaming
+  settings copy, so its own folder is `%APPDATA%`, and reporting that as the install
+  dir used to expand `%COMMANDER_PATH%` into a directory no plugin lives in. Unresolved
+  leaves the placeholder in the path, which is then reported as not found, and the CLI
+  says the dir is unresolved instead of printing `%APPDATA%`.
 - `wincmd.ini` parsing for all four plugin sections (Packer / Lister / FileSystem / Content)
   with dedup by path and `%COMMANDER_PATH%` / `%COMMANDER_DRIVE%` expansion.
 - Version extraction tiers: PE version resource → companion DLLs → readme/INF regex → `Unknown`.
@@ -41,6 +46,21 @@ next release (v2), and the accepted debt we deliberately postponed.
   one `extractLimiter` shared by the ZIP/RAR/7z loops in `internal/updater`), so a small
   crafted bomb is stopped before it fills the disk — the 256 MiB wire cap alone cannot
   catch it because the archive stays tiny until it is unpacked (`b1bb4aa`).
+- Files are copied into place by rename, not by truncating the target: `copyFile` writes a
+  sibling temp and renames it over the destination. An in-place write that broke halfway
+  left a damaged file `applyTree` had not recorded, so rollback skipped it and the backup
+  holding the only good copy was then deleted as a success. The rename is also where a
+  target another process holds open fails with errno 5, which is what lock detection keys on.
+- An update is refused when the plugin file does not live in a folder of its own
+  (`ErrPluginNeedsOwnFolder`), because both the backup and the unpack take the whole parent
+  directory: a `wincmd.ini` entry pointing straight at a file next to `wincmd.exe` /
+  `totalcmd64.exe`, or into a folder Total Commander shares between every plugin of a type
+  (`plugins`, `wcx`, `wlx`, `wfx`, `wdx` — `config.IsGenericPluginDir`, the list
+  `deriveRealPluginName` already used for naming), would have replaced everything beside it.
+- `App.UpdatePlugin` holds a mutex for its whole run. The frontend already awaits updates in
+  order, but a Wails binding is callable from anywhere, and two runs would fight over the one
+  progress listener and over this process' single scratch folder, where the second run empties
+  the package the first is still unpacking.
 
 ### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
 - Scan report with update summary table.
@@ -63,9 +83,11 @@ next release (v2), and the accepted debt we deliberately postponed.
   carries it with the rest of the data, and both scan call sites read it.
 
 ### Engineering
-- GitHub Actions CI: Windows job (`go mod verify`, vet, `go test -race -cover ./...`,
-  CLI build) plus an ubuntu job that runs `npm ci` and `npm run build`, so the
-  frontend bundle is actually compiled on every push (`f6702e3`).
+- GitHub Actions CI: Windows job (`npm ci` + `npm run build` first, because the root
+  `main.go` embeds `frontend/dist` and a fresh checkout has none, then `go mod verify`,
+  vet, `go test -race -cover ./...`, CLI build) plus an ubuntu job that builds the
+  frontend on its own (`f6702e3`, `e201d1a`). Neither has run yet: `origin` is still a
+  local Gitea, so the workflow is unverified until the first push to GitHub.
 - Build scripts: `scripts/build-gui.cmd` (daily GUI, no cleaning) and
   `scripts/release-gui.cmd` (`-trimpath`, previous binary removed by name); both
   hard link Wails' output into `bin/totalplug.exe`, next to `bin/totalplug-cli.exe`,
@@ -180,7 +202,7 @@ next release (v2), and the accepted debt we deliberately postponed.
     progress incl. an always-locked plugin, overrides, history) only under
     `npm run dev`; the full GUI runs in a plain browser with no Go/Wails.
     Workflow documented in `frontend/README.md`.
-12. **External review pass (REVIEW.md)** — done: behavior, i18n and theme fixes
+12. **External review pass** — done: behavior, i18n and theme fixes
     from the design review, verified in the browser harness.
     - i18n (`b35e0d2`): CLDR plurals through `Intl.PluralRules` (`tp('count.plugins', n)` →
       «2 плагина», «5 плагинов»); `setLang` syncs `document.documentElement.lang`
@@ -286,7 +308,7 @@ next release (v2), and the accepted debt we deliberately postponed.
    does not swap its own executable: the GUI hands the user the release page URL
    from the API instead of guessing a tag slug.
 3. **About panel** — done (`e7344c0`): the place the app talks about itself —
-   version chip, the %APPDATA% data directory and the Go version behind a
+   version chip, the data directory in use and the Go version behind a
    collapsed disclosure, catalog/releases links, a privacy line, plus the update
    row (button label never changes; it only disables while checking, and the
    checked-at time follows the UI language). Errors land in the app dialog with
@@ -303,6 +325,25 @@ next release (v2), and the accepted debt we deliberately postponed.
 5. Deliberately not in v1: installing plugins from the catalog (next release), an
    NSIS installer or embedded WebView2 runtime, a startup update banner (the check
    stays manual, from the About panel), and a web landing page.
+6. **Final pre-release review pass** — a read-through of the code and the docs against
+   what the shipped binary actually does:
+    - `«Update all»` rebuilt its queue from records captured before the confirm was
+      answered, so a `plugins:refreshed` landing in that window had the batch download
+      from superseded `download_url`s; it now re-resolves each entry by stable id after
+      the confirm, the hazard `handleUpdate` was already fixed for, and drops whatever
+      is no longer offerable.
+    - `escapeHtml` did not escape `'`, which is a quote the attribute values it feeds
+      are delimited by; the progress dialog announced its phase on every download tick
+      because the live region was rewritten with the value it already had, so the percent
+      moved to its own `aria-hidden` span and only the phase name is announced.
+    - Docs corrected where they had drifted: `frontend/README.md` translated to English
+      and its Mica claim dropped (the effect is disabled), `docs/release.md` now says
+      `-race` needs `CGO_ENABLED=1` and a C compiler, README's privacy paragraph names
+      the throwaway download folder and its `%TEMP%\totalplug` lifecycle, and the
+      four-part build stamp is explained where `--version` is.
+    - The personal absolute path in a commented-out `replace` directive is gone from
+      `go.mod`, and `domain.Override.IgnoreUpdates` — declared, persisted and read by
+      nothing — is deleted along with its generated TypeScript mirror.
 
 ## Next release (v2)
 
@@ -362,9 +403,35 @@ next release (v2), and the accepted debt we deliberately postponed.
   `#lang-select` nor `#font-scale` has one, while every icon button and the search box do.
 - **Stale state across a concurrent refresh** — one known race left: a language switch rebuilds
   the DOM, so the `finally` in `runScan` enables buttons that the in-flight scan never disabled
-  (harmless, but a second scan starts while the first is running). The other race — `handleUpdate`
-  captured `plugin` before awaiting the confirmation, so a `plugins:refreshed` landing in that
-  window meant updating from a `download_url` that was no longer current — is fixed in `0f53feb`:
-  after the confirm the plugin is re-resolved by stable id and that fresh record is updated.
+  (harmless, but a second scan starts while the first is running). The two races where a
+  `plugins:refreshed` landing inside an open confirm meant acting on a superseded record are
+  both closed: `handleUpdate` in `0f53feb`, `handleUpdateAll` in the review pass above — each
+  re-resolves the entry by stable id after the confirm and drops what is no longer offerable.
 - ~~**Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
   read nowhere; the About panel renders its labels from other keys.~~ Removed in `4a9f6de`.
+
+Nits the final review pass found and deliberately left alone — each is real, none changes
+behaviour a user can reach today:
+
+- **Two `bufio.Reader`s over `os.Stdin`** — `confirm` (`cmd/totalplug/main.go:321`) and
+  `promptBlindUpdates` (`:338`) each wrap `os.Stdin` in a fresh buffered reader, and one run can
+  call both. Whatever the first buffered past its newline is gone from the second. A terminal
+  hands over one line at a time so this stays invisible; piped answers would skip a prompt.
+- **Builtin `println` in the GUI entry** — `main.go:16` reports a failed `gui.Run` with the
+  builtin, whose format is implementation-defined and whose stderr a Windows GUI-subsystem
+  binary is not attached to, so the one error the window cannot show is also the one nobody sees.
+- **`settings.json` is written in place** — `internal/gui/settings.go:84` uses `os.WriteFile`
+  where `internal/storage/db.go:161` already does temp+rename. A crash mid-write costs the saved
+  geometry, theme and language rather than a crash: `loadSettings` logs the corrupt file and
+  answers with the defaults.
+- **Bare suffix trimming in `normalizeName`** — `internal/checker/checker.go` trims `"plugin"`
+  and `"ext"` without a separator, so a catalog name legitimately ending in those letters loses
+  them (`TextExt` → `text`) and then matches the wrong plugin.
+- **Unused frontend assets** — `frontend/src/assets/fonts/nunito-v16-latin-regular.woff2`,
+  its `OFL.txt` and `assets/images/logo-universal.png` are referenced by nothing (`style.css`
+  asks for `system-ui`/`Segoe UI`). Vite bundles only what is imported, so they cost repo bytes,
+  not binary bytes.
+- **The scratch sweep's mtime claim** — `internal/config/path.go:137` says an update refreshes
+  its run folder's timestamp "as it goes"; the download writes inside `run-<pid>/update`, which
+  touches that subfolder's mtime and not the swept `run-<pid>` one. The hour is therefore a
+  window since the run started, not since its last activity.
