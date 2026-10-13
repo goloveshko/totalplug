@@ -256,7 +256,7 @@ next release (v2), and the accepted debt we deliberately postponed.
       resolves theme + language before the module graph loads (no light flash on a
       dark start) and an inline first-paint background color; unused Wails template
       `src/app.css` deleted.
-      Deliberately not done: the CSP meta tag (done later, see stage 13);
+    - Deliberately not done: the CSP meta tag (done later, see stage 13);
       `SetWindowEffect` sync from `setTheme` (moot while the window effect is
       reverted, and it needs a window recreation anyway); column sorting.
 13. **Strict CSP for the packaged GUI** — done (`ab10d64`, `28484d3`): `index.html`
