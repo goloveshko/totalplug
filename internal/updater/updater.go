@@ -565,18 +565,42 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	}
 	defer srcFile.Close()
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+	dir := filepath.Dir(dst)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("creating parent dir for %q: %w", dst, err)
 	}
 
-	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	// Written to a sibling and renamed into place instead of being truncated
+	// where it lies, so a copy that fails leaves the target byte-intact. An
+	// in-place write that broke halfway left a damaged file that rollback did
+	// not know about, and the backup holding the only good copy was then
+	// deleted. The rename also fails cleanly on a target another process holds
+	// open, which is how a locked plugin DLL is still detected.
+	tmpFile, err := os.CreateTemp(dir, ".totalplug-copy-*")
 	if err != nil {
-		return fmt.Errorf("opening destination %q: %w", dst, err)
+		return fmt.Errorf("creating temp for %q: %w", dst, err)
 	}
-	defer dstFile.Close()
+	tmpName := tmpFile.Name()
+	// A successful rename leaves nothing at tmpName, so this only ever deletes
+	// the file of a failed copy; the chmod first is because Windows refuses to
+	// delete a read-only file.
+	defer func() {
+		_ = os.Chmod(tmpName, 0600)
+		_ = os.Remove(tmpName)
+	}()
 
-	if _, err = io.Copy(dstFile, srcFile); err != nil {
+	if _, err := io.Copy(tmpFile, srcFile); err != nil {
+		tmpFile.Close()
 		return fmt.Errorf("copying %q to %q: %w", src, dst, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("closing temp for %q: %w", dst, err)
+	}
+	if err := os.Chmod(tmpName, mode); err != nil {
+		return fmt.Errorf("setting mode on %q: %w", dst, err)
+	}
+	if err := os.Rename(tmpName, dst); err != nil {
+		return fmt.Errorf("replacing %q: %w", dst, err)
 	}
 	return nil
 }
@@ -600,6 +624,9 @@ func applyTree(srcDir, dstDir string) ([]string, error) {
 			return os.MkdirAll(target, info.Mode())
 		}
 
+		// Recording only the files that were replaced is safe because copyFile
+		// renames into place: a copy that failed left its target exactly as it
+		// was, so there is nothing for rollback to undo.
 		if err := copyFile(path, target, info.Mode().Perm()); err != nil {
 			return err
 		}

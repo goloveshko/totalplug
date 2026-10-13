@@ -197,6 +197,39 @@ func TestUpdatePluginRollsBackOnApplyFailure(t *testing.T) {
 	}
 }
 
+// copyFile renames into place, so a target it could not replace is left
+// byte-intact. Truncating in place instead used to leave a damaged file that
+// applyTree had not recorded, so rollback skipped it and UpdatePlugin then
+// deleted the backup holding the only good copy.
+func TestCopyFileFailureLeavesTargetIntact(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src", "b.txt")
+	dst := filepath.Join(dir, "dst", "b.txt")
+	writeTestFile(t, src, "b-new")
+	writeTestFile(t, dst, "b-old")
+
+	if err := os.Chmod(dst, 0444); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dst, 0644) })
+
+	err := copyFile(src, dst, 0644)
+	if err == nil {
+		t.Fatal("expected copyFile to fail on a read-only target")
+	}
+	if !isLockedErr(err) {
+		t.Errorf("a target that denies writes should surface as lockable: %v", err)
+	}
+	if got := readTestFile(t, dst); got != "b-old" {
+		t.Errorf("target after a failed copy = %q, want the untouched b-old", got)
+	}
+
+	leftovers, _ := filepath.Glob(filepath.Join(dir, "dst", ".totalplug-copy-*"))
+	if len(leftovers) != 0 {
+		t.Errorf("a failed copy left temp files behind: %v", leftovers)
+	}
+}
+
 func TestUpdatePluginErrorPaths(t *testing.T) {
 	upd := NewUpdater()
 
