@@ -191,7 +191,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("[+] Total Commander Dir: %s\n", res.TCDir)
+	// The dir is empty when the ini came from %APPDATA% and the registry had no
+	// InstallDir, i.e. when TotalPlug genuinely does not know where TC is installed.
+	tcDir := res.TCDir
+	if tcDir == "" {
+		tcDir = "(unresolved; pass --ini <path to wincmd.ini> next to the install)"
+	}
+	fmt.Printf("[+] Total Commander Dir: %s\n", tcDir)
 	fmt.Printf("[+] Found wincmd.ini:    %s\n", res.IniPath)
 
 	plugins := res.Plugins

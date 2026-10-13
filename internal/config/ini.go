@@ -97,7 +97,14 @@ func FindDefaultIniPath(tcDir string) (string, string) {
 	if appData != "" {
 		appDataIni := filepath.Join(appData, "GHISLER", "wincmd.ini")
 		if _, err := os.Stat(appDataIni); err == nil {
-			return appDataIni, filepath.Dir(filepath.Dir(appDataIni))
+			// The install dir stays unknown: this ini is the roaming settings copy,
+			// so its own folder is %APPDATA% and says nothing about where Total
+			// Commander lives. Reporting it as the install dir used to expand
+			// %COMMANDER_PATH% into %APPDATA%, which turned every plugin path into a
+			// plausible-looking location that does not exist. Callers treat an empty
+			// dir as "unresolved": expandTcVars leaves the placeholder alone and
+			// stablePluginID falls back to the absolute path.
+			return appDataIni, ""
 		}
 	}
 
