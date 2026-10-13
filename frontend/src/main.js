@@ -539,15 +539,24 @@ const summaryRow = (glyph, className, text) =>
 async function handleUpdateAll() {
     if (progressRunning) return;
 
-    const queue = currentPlugins.filter(isUpdatable);
-    if (queue.length === 0) return;
+    const offered = currentPlugins.filter(isUpdatable);
+    if (offered.length === 0) return;
 
     // The count is the whole queue, not the visible rows: the search filter is a
     // way to find a plugin, not a way to scope a batch, so the confirm has to
     // spell out what is actually about to happen.
-    if (!(await showConfirm(t('update_all.confirm', { count: tp('count.plugins', queue.length) })))) {
+    if (!(await showConfirm(t('update_all.confirm', { count: tp('count.plugins', offered.length) })))) {
         return;
     }
+
+    // A plugins:refreshed can land while the confirm is open and swap
+    // currentPlugins, the hazard handleUpdate already re-resolves for: rebuild the
+    // queue from the live records by stable id, so the batch never downloads from a
+    // superseded download_url and drops whatever is no longer offerable.
+    const queue = offered
+        .map((stale) => currentPlugins.find((p) => p.id === stale.id))
+        .filter((p) => p && isUpdatable(p));
+    if (queue.length === 0) return;
 
     const done = [];
     const failed = [];
