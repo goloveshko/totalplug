@@ -265,3 +265,13 @@ TotalPlug relies on the open community registry [totalplug-catalog](https://gith
 ## ⚖️ License
 
 Distributed under the [MIT License](LICENSE).
+
+---
+
+## 👨‍💻 Author & Support
+
+Developed with ❤️ by [Sergey Goloveshko](https://sergey.is-a.dev) — **AI & Systems Engineer**.
+
+- **Portfolio**: [sergey.is-a.dev](https://sergey.is-a.dev)
+- **Telegram Support**: [@itz2bot](https://t.me/itz2bot?start=totalplug_readme)
+- **Report an Issue**: [GitHub Issues](https://github.com/goloveshko/totalplug/issues)
