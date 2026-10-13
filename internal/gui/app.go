@@ -37,6 +37,13 @@ type App struct {
 	refreshMu  sync.Mutex
 	refreshing bool
 
+	// updateMu keeps one UpdatePlugin running at a time. The frontend already
+	// awaits them in order, but a Wails binding is callable from anywhere: two
+	// runs would fight over the single progress listener and over the one
+	// scratch folder of this process, where the second run empties the package
+	// the first is still unpacking.
+	updateMu sync.Mutex
+
 	// state mirrors the persisted settings: the window geometry is sampled while
 	// the app runs so a teardown can save it without querying the window that is
 	// already closing, and the backdrop choice changes while it runs too.
@@ -169,6 +176,9 @@ func (a *App) SetWindowEffect(effect string) error {
 // target (Total Commander still running) is reported through the structured
 // result instead of an error so the frontend can show recovery guidance.
 func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
+	a.updateMu.Lock()
+	defer a.updateMu.Unlock()
+
 	a.updater.SetProgressListener(func(p domain.UpdateProgress) {
 		runtime.EventsEmit(a.ctx, updateProgressEvent, p)
 	})
