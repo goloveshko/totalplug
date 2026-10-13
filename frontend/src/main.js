@@ -27,7 +27,7 @@ let editorForm, editorVersionEl, editorSourceEl, editorCancelEl;
 let historyDialog, historyBody;
 let appDialog, appDialogMsg, appDialogOk, appDialogCancel;
 let progressDialog, progressTitle, progressLive, progressTrack, progressFill;
-let progressPhase, progressUrl, progressResult, progressOk, progressClose;
+let progressPhase, progressPct, progressUrl, progressResult, progressOk, progressClose;
 let mainView, settingsView, langSelect, fontScaleEl, fontScaleValueEl;
 let titlebarActionsEl, pluginCountEl;
 let updateAllEl, updateAllCountEl, btnUpdateAll;
@@ -194,6 +194,12 @@ function settleProgress() {
     }
 }
 
+// #progress-phase is a live region, so writing the value it already has would
+// make a screen reader repeat the phase for every item of a batch update.
+function setProgressPhase(text) {
+    if (progressPhase.textContent !== text) progressPhase.textContent = text;
+}
+
 // renderUpdateProgress maps one updater event onto the dialog. Events arriving
 // outside a running update (stale listener, closed dialog) are ignored.
 function renderUpdateProgress(p) {
@@ -202,11 +208,13 @@ function renderUpdateProgress(p) {
     const percent = Number(p?.percent ?? -1);
     const phase = p?.phase || 'download';
     if (phase === 'download' && percent >= 0) {
-        progressPhase.textContent = `${t('update.progress.download')} — ${Math.min(100, Math.round(percent))}%`;
+        setProgressPhase(t('update.progress.download'));
+        progressPct.textContent = ` — ${Math.min(100, Math.round(percent))}%`;
         progressTrack.classList.remove('indeterminate');
         progressFill.style.width = `${Math.min(100, percent)}%`;
     } else {
-        progressPhase.textContent = `${t('update.progress.' + phase) || phase}…`;
+        setProgressPhase(t('update.progress.' + phase));
+        progressPct.textContent = '…';
         progressTrack.classList.add('indeterminate');
     }
     const url = String(p?.url || '');
@@ -457,7 +465,8 @@ function beginProgress(titleText) {
 }
 
 function beginProgressItem() {
-    progressPhase.textContent = `${t('update.progress.download')}…`;
+    setProgressPhase(t('update.progress.download'));
+    progressPct.textContent = '…';
     progressUrl.textContent = '';
     progressFill.style.width = '0%';
     progressTrack.classList.add('indeterminate');
@@ -1049,10 +1058,13 @@ function buildDom() {
         <h2 id="progress-title"></h2>
         <div id="progress-live">
           <div class="progress-track" id="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-          <div class="progress-phase" id="progress-phase"></div>
+          <!-- The percent sits in its own aria-hidden span: a live region that
+               announced every download tick would talk over itself, so only the
+               phase name is worth announcing. -->
+          <div class="progress-phase"><span id="progress-phase" role="status"></span><span id="progress-pct" aria-hidden="true"></span></div>
           <div class="progress-url" id="progress-url"></div>
         </div>
-        <div class="dlg-message" id="progress-result" hidden></div>
+        <div class="dlg-message" id="progress-result" role="status" hidden></div>
         <div class="editor-actions">
           <button type="button" class="btn-save" id="progress-ok" hidden>${t('dialog.ok')}</button>
         </div>
@@ -1089,6 +1101,7 @@ function buildDom() {
     progressTrack = document.getElementById('progress-track');
     progressFill = document.getElementById('progress-fill');
     progressPhase = document.getElementById('progress-phase');
+    progressPct = document.getElementById('progress-pct');
     progressUrl = document.getElementById('progress-url');
     progressResult = document.getElementById('progress-result');
     progressOk = document.getElementById('progress-ok');
