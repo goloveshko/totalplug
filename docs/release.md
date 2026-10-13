@@ -39,6 +39,20 @@ go vet ./...
 go test -race ./...
 ```
 
+`-race` needs cgo, so that last command dies with
+`go: -race requires cgo; enable cgo by setting CGO_ENABLED=1` on a machine where
+`CGO_ENABLED=0` or no C compiler is in `PATH`. Enable it for the one run, naming
+the compiler if it is not `gcc`:
+
+```powershell
+$env:CGO_ENABLED = "1"; $env:CC = "clang"; go test -race ./...
+```
+
+The linker then prints a `LNK4217` warning about `_errno` per test package; it is
+noise, and the suite still has to end in `ok` for every package. Plain
+`go test ./...` runs without cgo and is what CI-less checking falls back to — but
+it does not detect races, so the release build gets the `-race` run.
+
 Run the GUI from the tree once and look at what is about to be published: the
 About panel (version, data directory, links), the plugin table, the batch update
 summary.
