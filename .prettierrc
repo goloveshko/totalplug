@@ -2,5 +2,11 @@
   "singleQuote": true,
   "tabWidth": 4,
   "printWidth": 120,
-  "endOfLine": "lf"
+  "endOfLine": "lf",
+  "overrides": [
+    {
+      "files": ["*.json", "*.yml", "*.yaml", ".prettierrc"],
+      "options": { "tabWidth": 2, "singleQuote": false }
+    }
+  ]
 }

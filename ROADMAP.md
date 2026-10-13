@@ -7,9 +7,10 @@ next release (v2), and the accepted debt we deliberately postponed.
 ## Shipped
 
 ### Core engine
+
 - Total Commander auto-discovery: registry key `SOFTWARE\Ghisler\Total Commander`,
   `%APPDATA%\GHISLER` fallback, portable install detection (`wincmd.exe` next to `wincmd.ini`).
-  The AppData fallback answers with an *empty* install dir: that ini is the roaming
+  The AppData fallback answers with an _empty_ install dir: that ini is the roaming
   settings copy, so its own folder is `%APPDATA%`, and reporting that as the install
   dir used to expand `%COMMANDER_PATH%` into a directory no plugin lives in. Unresolved
   leaves the placeholder in the path, which is then reported as not found, and the CLI
@@ -28,6 +29,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   resolve ini → parse → enrich versions → apply overrides → check updates.
 
 ### Safe updates
+
 - Download + extract to temp first, side-by-side copy backup
   (`<plugin-dir>.bak_<unix>`), then apply over the live directory.
 - Automatic rollback of exactly the files touched before a failure;
@@ -63,6 +65,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   the package the first is still unpacking.
 
 ### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
+
 - Scan report with update summary table.
 - `--refresh-cache / -r`, `--ini <path> / -c` (portable installs),
   `--update / -u`, `--update-all`, `--version / -v` (the stamped build version).
@@ -71,6 +74,7 @@ next release (v2), and the accepted debt we deliberately postponed.
 - Non-zero exit code when any update fails.
 
 ### GUI (Wails, `bin/totalplug.exe`, built by `scripts/build-gui.cmd`)
+
 - Interactive plugin dashboard with scan, filter and per-plugin update
   (commit `54aa8f4`); pre-existing Russian UI text.
 - Since then: light/dark/system themes, EN/RU interface, plugin card with the
@@ -83,6 +87,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   carries it with the rest of the data, and both scan call sites read it.
 
 ### Engineering
+
 - GitHub Actions CI: Windows job (`npm ci` + `npm run build` first, because the root
   `main.go` embeds `frontend/dist` and a fresh checkout has none, then `go mod verify`,
   vet, `go test -race -cover ./...`, CLI build) plus an ubuntu job that builds the
@@ -95,7 +100,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   blocks publishing, which the copy step did by writing over the running image.
   Wails' own `-clean` is deliberately unused:
   it deletes `build/bin` as its first step, and a handle on that directory (IDE or
-  Defender watcher, a TC/Explorer tab, a shell cwd) then fails the build *after*
+  Defender watcher, a TC/Explorer tab, a shell cwd) then fails the build _after_
   the old binary is already gone.
 - Hermetic unit tests for checker, config, CLI arg/prompt logic, pipeline ini resolution,
   storage and updater (httptest + in-memory zips).
@@ -232,24 +237,23 @@ next release (v2), and the accepted debt we deliberately postponed.
       buttons, `dialog { max-height: 85vh; overflow-y: auto }`, `--badge-err` for
       dark, `.btn-update:hover` via a themed `--badge-avail-strong` token, light
       badges darkened for AA (`--badge-up #15803d`, `--badge-avail #c05621`) with
-      `color-mix` tints replacing per-theme rgba, `[hidden] { display: none
-      !important }` (the three element-specific patches removed), tabular numerals
-      + `user-select: text` for versions/paths, `prefers-reduced-motion`, titlebar
-      and button widths in rem so the font-scale setting scales them, Windows-only
-      font stack.
+      `color-mix` tints replacing per-theme rgba,
+      `[hidden] { display: none !important }` (the three element-specific patches
+      removed), tabular numerals and `user-select: text` for versions/paths,
+      `prefers-reduced-motion`, titlebar and button widths in rem so the font-scale
+      setting scales them, Windows-only font stack.
     - Shell (`cd81f89`, `1152dce`): `index.html` defaults to `lang="en"` with a pre-paint script that
       resolves theme + language before the module graph loads (no light flash on a
       dark start) and an inline first-paint background color; unused Wails template
       `src/app.css` deleted.
-    Deliberately not done: the CSP meta tag (done later, see stage 13);
-    `SetWindowEffect` sync from `setTheme` (moot while the window effect is
-    reverted, and it needs a window recreation anyway); column sorting.
+      Deliberately not done: the CSP meta tag (done later, see stage 13);
+      `SetWindowEffect` sync from `setTheme` (moot while the window effect is
+      reverted, and it needs a window recreation anyway); column sorting.
 13. **Strict CSP for the packaged GUI** — done (`ab10d64`, `28484d3`): `index.html`
-    declares `default-src 'self'; script-src 'self'; style-src 'self'; img-src
-    'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri
-    'self'; form-action 'self'` — no `'unsafe-inline'`, no `'unsafe-eval'`. To make
-    that possible the pre-paint theme/lang script and the first-paint background
-    moved to `frontend/public/boot.{js,css}` (Vite copies `public/` verbatim, so
+    declares `'self'` for every directive but `object-src 'none'` — no
+    `'unsafe-inline'`, no `'unsafe-eval'`. To make that possible the pre-paint
+    theme/lang script and the first-paint background moved to
+    `frontend/public/boot.{js,css}` (Vite copies `public/` verbatim, so
     they load as classic same-origin resources instead of inline tags, and a
     parser-blocking `<script src>` still runs before first paint). The policy ships
     in the production bundle only: the new `vite.config.js` strips the meta tag for
@@ -396,7 +400,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   `io.Copy`, so a small crafted archive could still fill the disk.~~ Shipped in `b1bb4aa` (see
   Safe updates): one `extractLimiter` shared by the three format loops caps the cumulative
   decompressed output at `DefaultMaxExtractBytes` (1 GiB), aborting with `ErrExtractTooLarge`.
-- **The plugin card is mouse-only** — a row receives `tabindex="-1"` only *after* the card opens
+- **The plugin card is mouse-only** — a row receives `tabindex="-1"` only _after_ the card opens
   (`openCard` in `frontend/src/main.js`), so there is nothing to focus and therefore no way to
   open a card with the keyboard. The pass that fixes it also owes the dialogs their accessible
   names: the four `<dialog>`s carry no `aria-label`/`aria-labelledby`, and neither

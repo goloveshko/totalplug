@@ -9,9 +9,9 @@ tagging, and `bin\totalplug*.exe` is produced only by the scripts below.
 `scripts/build.ps1` runs `git describe --tags --dirty` and strips the leading `v`,
 or reads `wails.json → info.productVersion` when no tag is reachable:
 
-| Consumer | How it gets the value |
-| --- | --- |
-| CLI `--version`, the About panel, the app's own release check | `-ldflags -X totalplug/internal/buildinfo.Version=…` |
+| Consumer                                                                 | How it gets the value                                                                                                            |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| CLI `--version`, the About panel, the app's own release check            | `-ldflags -X totalplug/internal/buildinfo.Version=…`                                                                             |
 | Windows file properties of the GUI exe (`FileVersion`, `ProductVersion`) | the numeric head of that string written into `wails.json → info.productVersion` for the duration of `wails build`, then put back |
 
 Three consequences worth knowing:
