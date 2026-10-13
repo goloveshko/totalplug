@@ -102,7 +102,12 @@ let settingsSection = 'appearance';
 // In-app replacement for native confirm()/alert(): those render with the
 // "wails" origin header and cannot be styled.
 const escapeHtml = (s) =>
-    String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 
 // Placeholder row for the plugin table (scanning / empty / no search hits).
 const emptyRow = (message) => `<tr class="table-empty"><td colspan="6">${message}</td></tr>`;
