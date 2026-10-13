@@ -1,6 +1,6 @@
-# TotalPlug GUI — запуск без Go и Wails
+# TotalPlug GUI — running it without Go or Wails
 
-Для правок дизайна нужен только Node.js:
+Design work needs nothing but Node.js:
 
 ```
 cd frontend
@@ -8,22 +8,25 @@ npm install
 npm run dev
 ```
 
-Открыть http://localhost:5199 — интерфейс работает на демо-моке
-(`src/mock.js`): список плагинов, карточка, диалог обновления с прогрессом,
-история, настройки, счётчики. Hot reload: правки видно сразу в браузере.
+Open http://localhost:5199 — the interface runs on a demo mock (`src/mock.js`):
+the plugin list, the plugin card, the update dialog with its progress, history,
+settings and the counters. Hot reload: an edit shows up in the browser at once.
 
-Что править:
+What to edit:
 
-- `src/style.css` — 95% дизайна: палитра и отступы в CSS-переменных (`:root`
-  и тёмная тема), таблица, карточка плагина, диалоги, заголовок окна;
-- `src/i18n.js` — все подписи (EN + RU);
-- `src/main.js` — разметка и поведение;
-- `src/mock.js` — демо-данные (плагины, история), если нужно что-то
-  подсмотреть/добавить.
+- `src/style.css` — 95% of the design: the palette and the spacing live in CSS
+  custom properties (`:root` plus the dark theme), and so do the table, the
+  plugin card, the dialogs and the window titlebar;
+- `src/i18n.js` — every label (EN + RU);
+- `src/main.js` — markup and behavior;
+- `src/mock.js` — the demo data (plugins, history), for anything you want to
+  look at or add to.
 
-Моки существуют только для `npm run dev`: в собранном приложении
-(`import.meta.env.DEV` выключен) они вырезаются из бандла и весь код идёт
-через реальный бэкенд.
+The mock exists only for `npm run dev`: in the built application
+(`import.meta.env.DEV` is off) it is cut out of the bundle and every call goes
+to the real backend.
 
-Нативные вещи (тень окна, Mica) в браузере не видны — их можно проверить
-только в собранном `totalplug.exe`.
+The native parts are invisible in a plain browser — the frameless window's drag
+region and caption buttons, the window shadow, a link handed to the system
+browser, and the WebView2 profile the persisted settings live in. Those can only
+be checked in a built `totalplug.exe`.
