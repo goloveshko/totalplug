@@ -37,7 +37,6 @@ type Override struct {
 	CustomName    string `json:"custom_name,omitempty"`    // Override display name
 	CustomVersion string `json:"custom_version,omitempty"` // Override version
 	CustomSource  string `json:"custom_source,omitempty"`  // e.g. "github:Alexey-T/CudaLister"
-	IgnoreUpdates bool   `json:"ignore_updates,omitempty"` // Skip update check for this plugin
 }
 
 // Plugin represents an installed Total Commander plugin.

@@ -44,7 +44,6 @@ export namespace domain {
 	    custom_name?: string;
 	    custom_version?: string;
 	    custom_source?: string;
-	    ignore_updates?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Override(source);
@@ -55,7 +54,6 @@ export namespace domain {
 	        this.custom_name = source["custom_name"];
 	        this.custom_version = source["custom_version"];
 	        this.custom_source = source["custom_source"];
-	        this.ignore_updates = source["ignore_updates"];
 	    }
 	}
 	export class Plugin {
