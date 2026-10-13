@@ -142,15 +142,32 @@ func replaceAllFold(s, old, repl string) string {
 	return b.String()
 }
 
+// genericPluginDirs are the folder names Total Commander groups plugins under
+// instead of naming one: a plugin file sitting directly inside any of them has
+// no folder of its own, which changes both what it should be called and whether
+// anything may unpack over it.
+var genericPluginDirs = map[string]bool{
+	"plugins": true,
+	"wcx":     true,
+	"wlx":     true,
+	"wfx":     true,
+	"wdx":     true,
+}
+
+// IsGenericPluginDir reports whether name is one of those grouping folders,
+// matched case-insensitively as every Windows path here is.
+func IsGenericPluginDir(name string) bool {
+	return genericPluginDirs[strings.ToLower(name)]
+}
+
 // deriveRealPluginName gets clean human-readable name from folder/file path
 func deriveRealPluginName(keyName string, pluginPath string, pType domain.PluginType) string {
 	// If key is numeric ("0", "1") or Packer type (WCX)
 	if isNumeric(keyName) || pType == domain.TypePacker {
 		dirName := filepath.Base(filepath.Dir(pluginPath))
-		lowerDir := strings.ToLower(dirName)
 
 		// Ignore generic root folder names
-		if dirName != "" && lowerDir != "plugins" && lowerDir != "wlx" && lowerDir != "wcx" && lowerDir != "wfx" && lowerDir != "wdx" {
+		if dirName != "" && !IsGenericPluginDir(dirName) {
 			return dirName
 		}
 
