@@ -90,9 +90,19 @@ next release (v2), and the accepted debt we deliberately postponed.
 
 - GitHub Actions CI: Windows job (`npm ci` + `npm run build` first, because the root
   `main.go` embeds `frontend/dist` and a fresh checkout has none, then `go mod verify`,
-  vet, `go test -race -cover ./...`, CLI build) plus an ubuntu job that builds the
-  frontend on its own (`f6702e3`, `e201d1a`). Neither has run yet: `origin` is still a
-  local Gitea, so the workflow is unverified until the first push to GitHub.
+  vet, `go test -race -cover ./...`, CLI build) plus an ubuntu job that checks the
+  formatting and builds the frontend on its own (`f6702e3`, `e201d1a`). Neither has run
+  yet: `origin` is still a local Gitea, so the workflow is unverified until the first
+  push to GitHub.
+- Prettier over the whole tree, not just the frontend: `.prettierrc` keeps 4 spaces and
+  single quotes for JS/CSS/HTML/Markdown (how `frontend/src` is written by hand) and
+  overrides JSON/YAML back to 2 spaces and double quotes (how npm, Wails and a pasted
+  workflow example write them), so `wails.json` and `package.json` come out of the next
+  tool run already formatted instead of dirty. `npm run format:check` is the gate, wired
+  into that ubuntu job. One thing to know before pointing `--write` at prose: an inline
+  code span wrapped across two lines makes prettier push its continuation to column 0,
+  and a line that then begins with `+ ` parses as a nested list — so such a span has to
+  stay on one line.
 - Build scripts: `scripts/build-gui.cmd` (daily GUI, no cleaning) and
   `scripts/release-gui.cmd` (`-trimpath`, previous binary removed by name); both
   hard link Wails' output into `bin/totalplug.exe`, next to `bin/totalplug-cli.exe`,

@@ -30,3 +30,16 @@ The native parts are invisible in a plain browser — the frameless window's dra
 region and caption buttons, the window shadow, a link handed to the system
 browser, and the WebView2 profile the persisted settings live in. Those can only
 be checked in a built `totalplug.exe`.
+
+## Formatting
+
+`npm run format` reformats the repository, `npm run format:check` only reports —
+that is the check CI runs. Both step out to the repo root first: the config that
+answers for the whole tree is `/.prettierrc`, and so are `/.prettierignore` and
+`/.gitignore`, which keep the generated `dist/` and `wailsjs/` out of it.
+
+The config is 4 spaces and single quotes, matching how `src/` is written by
+hand, with an override back to 2 spaces and double quotes for JSON and YAML:
+that is how npm writes `package.json`, how Wails writes `wails.json` and how
+every CI example is pasted, so those files stay formatted by themselves instead
+of being rewritten on the next tool run.

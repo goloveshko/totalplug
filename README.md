@@ -232,6 +232,7 @@ Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
 | `scripts\run.cmd`                                | Runs the CLI from source (`go run ./cmd/totalplug`), arguments pass through |
 | `scripts\test.cmd`                               | `go test -v ./...`, extra arguments pass through to `go test`               |
 | `scripts\lint.cmd`                               | `go vet ./...`, plus `golangci-lint` when it is installed                   |
+| `npm run format` (in `frontend\`)                | Prettier over the repo; `format:check` only reports, and is what CI runs    |
 
 Tagged builds are stamped with `git describe --tags --dirty` through `-ldflags
 -X`, which is the version the About panel shows and the release check compares
