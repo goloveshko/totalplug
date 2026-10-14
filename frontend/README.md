@@ -18,7 +18,13 @@ What to edit:
   custom properties (`:root` plus the dark theme), and so do the table, the
   plugin card, the dialogs and the window titlebar;
 - `src/i18n.js` — every label (EN + RU);
-- `src/main.js` — markup and behavior;
+- `src/*.js` — markup and behavior, one module per screen: `catalog.js` (the table
+  and its search), `card.js`, `update.js`, `progress.js` and `dialog.js` (the two
+  result dialogs), `history.js`, `about.js`, `tc.js`, `settings.js`, over
+  `state.js`, `dom.js`, `text.js` and `plugin.js` for what they share. `main.js`
+  is only the composition root: the titlebar, the order the screens go in, and the
+  two wires that cross them — a row opening its card, a language switch rebuilding
+  every label;
 - `src/mock.js` — the demo data (plugins, history), for anything you want to
   look at or add to.
 

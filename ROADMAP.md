@@ -299,6 +299,20 @@ next release (v2), and the accepted debt we deliberately postponed.
     Verified in the dev harness across all nine mock rows: correct glyph per source,
     details closed by default and overflow-free open or closed, RU and EN labels
     both fitting the dialog.
+16. **One module per screen** — done (`e5ef0c1`): `main.js` had grown to 1305 lines
+    holding every screen's markup, state and listeners at once, so following one flow
+    meant keeping all of them in head. Each screen is now a module of its own —
+    `catalog.js`, `card.js`, `update.js`, `progress.js`, `dialog.js`, `history.js`,
+    `about.js`, `tc.js`, `settings.js` — over four shared bases (`state.js`, `dom.js`,
+    `text.js`, `plugin.js`), and the file that remains is 134 lines: the titlebar, the
+    row click that opens either the card or an update, and the language switch that
+    rebuilds every label. Plain ESM, so no new dependency and nothing to relax from the
+    stage 13 policy; the production bundle pays 1.67 kB (+3.7%) for the import graph.
+    Two findings worth keeping. Only three pieces of state are genuinely shared — the
+    plugin list, whether an update run is in progress, and whether settings is open.
+    And `EventsOn` must stay at module scope, registered once before the first
+    `buildDom()`: a language switch re-binds every screen, so the same event would
+    acquire a second listener each time.
 
 ## Before the first public release (v1) — shipped
 
@@ -366,7 +380,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   extract it into its own folder under the plugins root and write the matching ini
   section. This is the "next release" the v1 scope notes point at.
 - **Column sorting** (at least status and name) — needs a
-  sort state in `main.js` and stable ordering with the search filter.
+  sort state in `catalog.js` and stable ordering with the search filter.
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
   user-menu button to the CLI.
@@ -411,7 +425,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   Safe updates): one `extractLimiter` shared by the three format loops caps the cumulative
   decompressed output at `DefaultMaxExtractBytes` (1 GiB), aborting with `ErrExtractTooLarge`.
 - **The plugin card is mouse-only** — a row receives `tabindex="-1"` only _after_ the card opens
-  (`openCard` in `frontend/src/main.js`), so there is nothing to focus and therefore no way to
+  (`openCard` in `frontend/src/card.js`), so there is nothing to focus and therefore no way to
   open a card with the keyboard. The pass that fixes it also owes the dialogs their accessible
   names: the four `<dialog>`s carry no `aria-label`/`aria-labelledby`, and neither
   `#lang-select` nor `#font-scale` has one, while every icon button and the search box do.
@@ -423,6 +437,15 @@ next release (v2), and the accepted debt we deliberately postponed.
   re-resolves the entry by stable id after the confirm and drops what is no longer offerable.
 - ~~**Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
   read nowhere; the About panel renders its labels from other keys.~~ Removed in `4a9f6de`.
+- **Frontend migration (Wails v3 + Svelte 5)** — planned for after v1, with no schedule
+  for the framework move itself. The cheap half is stage 16: `main.js` is now a composition
+  root over one module per screen, with no new dependency and no change to the stage 13
+  policy. That policy, not taste, is what decides the framework: `style-src 'self'` without
+  `'unsafe-inline'` rules out CSS-in-JS, `script-src 'self'` without `'unsafe-eval'` rules
+  out Vue's runtime template compiler, and what survives is the compiled-template group —
+  Svelte being the pick there. If it happens, Wails v2 to v3 and the framework move are one
+  migration and not two, because the generated bindings, the embed path and the
+  verification pass all change either way. Wails v3 is still beta.
 
 Nits the final review pass found and deliberately left alone — each is real, none changes
 behaviour a user can reach today:
