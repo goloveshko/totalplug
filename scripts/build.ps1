@@ -2,7 +2,7 @@
 param (
     [Parameter(Position = 0)]
     [Alias("c", "cmd")]
-    [ValidateSet("build", "b", "release", "rel", "gui", "g", "release-gui", "relg", "run", "r", "lint", "l", "test", "t", "fmt")]
+    [ValidateSet("build", "b", "release", "rel", "gui", "g", "release-gui", "relg", "package", "pkg", "run", "r", "lint", "l", "test", "t", "fmt")]
     [string]$Action = "build",
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -228,6 +228,56 @@ function Invoke-ReleaseGui {
     Invoke-GuiBuild "release" @("-platform", "windows/amd64", "-trimpath", "-ldflags=$versionLdflags")
 }
 
+# The archive a GitHub release takes: both release binaries and the license they are
+# distributed under. Pointed at the files one by one rather than at a folder, because
+# a folder would put its name in front of every entry - the exe has to sit at the
+# archive root, where a double-click finds it. The README is deliberately not inside:
+# its screenshots and its links to docs/ are relative to the repository, so extracted
+# it would show broken images and dead links.
+function Invoke-Package {
+    Invoke-Release
+    Invoke-ReleaseGui
+
+    Write-Host "======================================" -ForegroundColor Cyan
+    Write-Host "      Packaging TotalPlug release     " -ForegroundColor Cyan
+    Write-Host "======================================" -ForegroundColor Cyan
+
+    $artifactsDir = "build/artifacts"
+    if (!(Test-Path $artifactsDir)) { New-Item -ItemType Directory -Path $artifactsDir | Out-Null }
+
+    # The stamped version lost its leading "v" (git describe strips it for the binary),
+    # but an archive is read by people, so it goes back on the name. A pre-tag tree
+    # stamps from wails.json, which carries the four-part form VERSIONINFO wants, so
+    # the trailing ".0" is dropped exactly the way the About panel drops it - the
+    # archive, the binary's own About row and the future tag have to agree.
+    $releaseVersion = ($buildVersion -replace '^(\d+\.\d+\.\d+)\.0$', '$1')
+    $archiveName = "totalplug-v$releaseVersion-win-x64"
+    $zipPath = "$artifactsDir/$archiveName.zip"
+
+    $payload = @($guiPath, $cliPath, "LICENSE")
+    foreach ($file in $payload) {
+        if (!(Test-Path $file)) {
+            Write-Host "`n❌ Nothing to package: $file is missing." -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    if (Test-Path $zipPath) { Remove-Item -Path $zipPath -Force }
+    Write-Host "Compressing $zipPath..." -ForegroundColor Yellow
+    Compress-Archive -Path $payload -DestinationPath $zipPath -Force
+
+    # The sha256sum file format, so `sha256sum -c` works on it unchanged. ASCII and
+    # no trailing newline: a UTF-16 or BOM-prefixed line makes the tool reject the file.
+    $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+    Set-Content -Path "$zipPath.sha256" -Value "$hash *$archiveName.zip" -NoNewline -Encoding Ascii
+
+    $sizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+    Write-Host "`n✔ Release package ready!" -ForegroundColor Green
+    Write-Host "  $zipPath ($sizeMB MB)" -ForegroundColor Gray
+    Write-Host "  $zipPath.sha256" -ForegroundColor Gray
+    Write-Host "  contains: $((Get-ChildItem -Path $payload | ForEach-Object Name) -join ', ')" -ForegroundColor Gray
+}
+
 function Invoke-Run {
     go run ./cmd/totalplug @ArgsList
 }
@@ -310,6 +360,7 @@ try {
         { $_ -in "release", "rel" }      { Invoke-Release }
         { $_ -in "gui", "g" }            { Invoke-Gui }
         { $_ -in "release-gui", "relg" } { Invoke-ReleaseGui }
+        { $_ -in "package", "pkg" }      { Invoke-Package }
         { $_ -in "run",   "r" }          { Invoke-Run }
         { $_ -in "lint",  "l" }          { Invoke-Lint }
         { $_ -in "test",  "t" }          { Invoke-Test }

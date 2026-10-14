@@ -14,12 +14,15 @@
 
 Prebuilt Windows x64 binaries are on the [Releases page](https://github.com/goloveshko/totalplug/releases):
 
-| File                | What it is                                                        |
-| ------------------- | ----------------------------------------------------------------- |
-| `totalplug.exe`     | Desktop GUI (Wails window, no installer — run it from any folder) |
-| `totalplug-cli.exe` | Command-line scanner and updater                                  |
+- `totalplug-vX.Y.Z-win-x64.zip` — both binaries at the archive root, plus the
+  license: `totalplug.exe` is the desktop GUI (Wails window, no installer, run it
+  from any folder) and `totalplug-cli.exe` the command-line scanner and updater;
+- `totalplug-vX.Y.Z-win-x64.zip.sha256` — the archive's checksum, in the format
+  `sha256sum -c` reads.
 
-Both need Windows 10 or 11; the GUI renders through the WebView2 runtime that
+Extract the whole folder instead of running an exe out of the archive: Windows
+keeps the downloaded zip's marker and repeats the warning for every file inside
+it. Both need Windows 10 or 11; the GUI renders through the WebView2 runtime that
 already ships with Windows 11 and with current Windows 10 updates.
 
 The binaries are not code-signed, so SmartScreen shows "Windows protected your
@@ -229,6 +232,7 @@ Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
 | `scripts\build.cmd`                              | `bin\totalplug-cli.exe`, development build                                  |
 | `scripts\build-gui.cmd`                          | `bin\totalplug.exe` (also accepts extra `wails` flags, e.g. `-devtools`)    |
 | `scripts\release.cmd`, `scripts\release-gui.cmd` | Same, with `-trimpath` and stripped symbols                                 |
+| `scripts\package.cmd`                            | Release builds of both, zipped for a GitHub release, plus its `.sha256`     |
 | `scripts\run.cmd`                                | Runs the CLI from source (`go run ./cmd/totalplug`), arguments pass through |
 | `scripts\test.cmd`                               | `go test -v ./...`, extra arguments pass through to `go test`               |
 | `scripts\lint.cmd`                               | `go vet ./...`, plus `golangci-lint` when it is installed                   |

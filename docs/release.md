@@ -71,9 +71,15 @@ the patch for fixes.
 ## 3. Build the artifacts
 
 ```powershell
-scripts\release.cmd         # -> bin\totalplug-cli.exe
-scripts\release-gui.cmd     # -> bin\totalplug.exe
+scripts\package.cmd
 ```
+
+That one run builds both binaries in the release profile and packs them into
+`build\artifacts\totalplug-vX.Y.Z-win-x64.zip`, with the archive name coming from
+the same stamped version the binaries carry. It also writes the `.sha256` beside
+it. `build\artifacts\` is gitignored, so a stale archive from an earlier run can
+never be mistaken for a tracked file, but do check you are uploading the one this
+run printed.
 
 Check the stamp landed in both:
 
@@ -91,26 +97,29 @@ git describe --tags --exact-match HEAD   # must print vX.Y.Z, not vX.Y.(Z-1)-N-g
 ```
 
 If either says otherwise, delete the tag (`git tag -d vX.Y.Z`), fix the tree and
-start again: an artifact and its tag must never disagree.
+start again: an artifact and its tag must never disagree. A build that is not
+exactly on the tag still packages, and its archive is named after what
+`git describe` said, which is how a `…-3-g2c1f9ab` build announces itself.
 
 ## 4. Publish
 
 ```powershell
 git push <public-remote> main
 git push <public-remote> vX.Y.Z
-gh release create vX.Y.Z bin/totalplug.exe bin/totalplug-cli.exe --title "TotalPlug vX.Y.Z" --generate-notes
+gh release create vX.Y.Z build/artifacts/totalplug-vX.Y.Z-win-x64.zip build/artifacts/totalplug-vX.Y.Z-win-x64.zip.sha256 --title "TotalPlug vX.Y.Z" --generate-notes
 ```
 
 `buildinfo.ReleaseRepo` is `goloveshko/totalplug` and that is the repository the
 in-app release check queries, so the tag has to reach it — not only a local
-mirror. Keep the two asset names exactly as above: the README Download section
-names them and tells the reader which one to pick. The binaries are unsigned,
-which SmartScreen will mention on first run; that is expected and documented
-there, not something a release step fixes.
+mirror. The archive name is what the README Download section tells a reader to
+expect, so it comes from the script rather than from the release form. The
+binaries are unsigned, which SmartScreen will mention on first run; that is
+expected and documented there, not something a release step fixes.
 
 ## 5. Smoke-test what was published
 
-Download from the release page and run it where no toolchain is installed:
+Download the archive from the release page, verify it against the published
+`.sha256`, extract it and run it where no toolchain is installed:
 `--version` prints `X.Y.Z`, the About panel agrees, its release check says this
 is the latest version, and a scan works with Total Commander closed. TotalPlug
 does not replace its own executable, so a newer release reaches the user only as

@@ -6,6 +6,8 @@ bin/
 *.so
 *.dylib
 build/bin/
+# Release archives from `scripts\package.cmd`; the zip is not covered by *.exe.
+build/artifacts/
 # wails writes <name>-res.syso next to the main package and deletes it after
 # linking; an interrupted build leaves it behind as an untracked binary.
 *.syso
