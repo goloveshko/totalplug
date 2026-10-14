@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 type Checker struct {

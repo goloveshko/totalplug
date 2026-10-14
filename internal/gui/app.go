@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"totalplug/internal/buildinfo"
-	"totalplug/internal/checker"
-	"totalplug/internal/config"
-	"totalplug/internal/domain"
-	"totalplug/internal/pipeline"
-	"totalplug/internal/storage"
-	"totalplug/internal/updater"
+	"github.com/goloveshko/totalplug/internal/buildinfo"
+	"github.com/goloveshko/totalplug/internal/checker"
+	"github.com/goloveshko/totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/pipeline"
+	"github.com/goloveshko/totalplug/internal/storage"
+	"github.com/goloveshko/totalplug/internal/updater"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

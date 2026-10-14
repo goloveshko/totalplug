@@ -62,7 +62,7 @@ function Get-BuildVersion {
 }
 
 $buildVersion = Get-BuildVersion
-$versionLdflags = "-X totalplug/internal/buildinfo.Version=$buildVersion"
+$versionLdflags = "-X github.com/goloveshko/totalplug/internal/buildinfo.Version=$buildVersion"
 
 function Ensure-BinDir {
     if (!(Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir | Out-Null }

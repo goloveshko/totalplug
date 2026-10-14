@@ -9,11 +9,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"totalplug/internal/checker"
-	"totalplug/internal/config"
-	"totalplug/internal/domain"
-	"totalplug/internal/scanner"
-	"totalplug/internal/storage"
+	"github.com/goloveshko/totalplug/internal/checker"
+	"github.com/goloveshko/totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/scanner"
+	"github.com/goloveshko/totalplug/internal/storage"
 )
 
 // Options controls a single scan run.

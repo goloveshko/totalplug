@@ -3,7 +3,7 @@ package main
 import (
 	"embed"
 
-	"totalplug/internal/gui"
+	"github.com/goloveshko/totalplug/internal/gui"
 )
 
 //go:embed all:frontend/dist

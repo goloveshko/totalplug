@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/config"
 )
 
 func TestSettingsRoundTrip(t *testing.T) {

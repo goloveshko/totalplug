@@ -1,4 +1,4 @@
-module totalplug
+module github.com/goloveshko/totalplug
 
 go 1.25.0
 

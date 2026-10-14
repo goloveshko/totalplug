@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 func TestExpandTcVars(t *testing.T) {

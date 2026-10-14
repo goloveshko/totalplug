@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"totalplug/internal/buildinfo"
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/buildinfo"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 // CheckAppRelease compares the running build with the latest published release.

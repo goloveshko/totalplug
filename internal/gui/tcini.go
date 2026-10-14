@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"totalplug/internal/domain"
-	"totalplug/internal/pipeline"
+	"github.com/goloveshko/totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/pipeline"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

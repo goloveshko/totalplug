@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 	"gopkg.in/ini.v1"
 
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 func isMetadataKey(keyName string) bool {

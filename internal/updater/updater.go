@@ -21,8 +21,8 @@ import (
 	"github.com/bodgit/sevenzip"
 	"github.com/nwaples/rardecode"
 
-	"totalplug/internal/config"
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 // sweepOnce keeps the leftover-sweep of %TEMP%\totalplug to the first Updater a

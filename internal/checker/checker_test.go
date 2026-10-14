@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"totalplug/internal/config"
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 func TestCompareVersions(t *testing.T) {

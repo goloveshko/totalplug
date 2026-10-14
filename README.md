@@ -227,6 +227,11 @@ LEGEND:
 Requirements: Go 1.25+, Node 22+, and for the GUI the Wails v2 CLI
 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.14.0`).
 
+The module is `github.com/goloveshko/totalplug`, so the CLI alone needs no clone:
+`go install github.com/goloveshko/totalplug/cmd/totalplug@latest`. The GUI cannot be
+installed that way — it embeds `frontend/dist`, which is build output and stays out
+of the repository — so it is built with the scripts below.
+
 | Command                                          | Result                                                                      |
 | ------------------------------------------------ | --------------------------------------------------------------------------- |
 | `scripts\build.cmd`                              | `bin\totalplug-cli.exe`, development build                                  |
@@ -242,7 +247,8 @@ Tagged builds are stamped with `git describe --tags --dirty` through `-ldflags
 -X`, which is the version the About panel shows and the release check compares
 against; before the first tag exists the build scripts fall back to the version
 tracked in `wails.json`, so an untagged tree compares too. Only a binary built by
-hand carries no stamp (`dev`) and is never told an update exists.
+hand — a bare `go build`, or the `go install` above — carries no stamp (`dev`) and is
+never told an update exists.
 Publishing a version (tag → build → release assets) is a documented procedure:
 see [docs/release.md](docs/release.md).
 

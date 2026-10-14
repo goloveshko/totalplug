@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"totalplug/internal/buildinfo"
+	"github.com/goloveshko/totalplug/internal/buildinfo"
 )
 
 // GitHubRelease represents official response from GitHub Releases API

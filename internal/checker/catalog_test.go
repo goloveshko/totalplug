@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/config"
 )
 
 func testSnapshot(version string) CatalogSnapshot {

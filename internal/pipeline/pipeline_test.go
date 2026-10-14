@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 func TestResolveIniExplicitPortable(t *testing.T) {

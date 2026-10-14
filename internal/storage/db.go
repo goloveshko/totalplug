@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"totalplug/internal/config"
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 type Record struct {

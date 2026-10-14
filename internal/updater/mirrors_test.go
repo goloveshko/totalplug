@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 // Excerpt of the real https://totalcmd.net/plugring/fileinfo.html markup

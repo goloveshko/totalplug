@@ -5,7 +5,7 @@
 // leaves the plugin uncertain.
 package scanner
 
-import "totalplug/internal/domain"
+import "github.com/goloveshko/totalplug/internal/domain"
 
 // EnrichPluginVersions sets each plugin's installed version and the confidence in
 // it, trying the sources named in the package comment and stopping at the first

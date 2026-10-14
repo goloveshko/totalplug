@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"totalplug/internal/config"
-	"totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/domain"
 )
 
 // newTestDb pins the data directory to a fresh temp folder through

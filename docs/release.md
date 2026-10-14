@@ -11,7 +11,7 @@ or reads `wails.json → info.productVersion` when no tag is reachable:
 
 | Consumer                                                                 | How it gets the value                                                                                                            |
 | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| CLI `--version`, the About panel, the app's own release check            | `-ldflags -X totalplug/internal/buildinfo.Version=…`                                                                             |
+| CLI `--version`, the About panel, the app's own release check            | `-ldflags -X github.com/goloveshko/totalplug/internal/buildinfo.Version=…`                                                       |
 | Windows file properties of the GUI exe (`FileVersion`, `ProductVersion`) | the numeric head of that string written into `wails.json → info.productVersion` for the duration of `wails build`, then put back |
 
 Three consequences worth knowing:

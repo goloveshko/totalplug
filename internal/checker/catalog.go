@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"totalplug/internal/config"
+	"github.com/goloveshko/totalplug/internal/config"
 )
 
 const (
