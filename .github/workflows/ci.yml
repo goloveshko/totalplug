@@ -26,7 +26,7 @@ jobs:
       # fresh checkout has no dist and `go vet ./...` / `go test ./...` fail to
       # load the root package. Build the frontend first to materialise it.
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: "22"
           cache: npm
@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: "22"
           cache: npm
