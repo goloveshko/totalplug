@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/goloveshko/totalplug/internal/checker"
 	"github.com/goloveshko/totalplug/internal/config"
@@ -32,11 +33,20 @@ type Result struct {
 	CatalogErr error // non-fatal: catalog unreachable, plugins may be unresolved
 }
 
+// cleanIniPath accepts what a user actually pastes. Explorer's "Copy as path"
+// hands over the path wrapped in double quotes, and a quoted string is not
+// absolute, so filepath.Abs below would prepend the current directory and the
+// error would then name a path that never existed anywhere.
+func cleanIniPath(raw string) string {
+	return strings.Trim(strings.TrimSpace(raw), `"`)
+}
+
 // ResolveIni determines the wincmd.ini location and the Total Commander root
 // directory used to expand plugin paths. An empty flagPath triggers auto
 // discovery via Registry and AppData. The root can come back empty, which means
 // nothing vouched for a folder and %COMMANDER_PATH% cannot be expanded.
 func ResolveIni(flagPath string) (iniPath string, tcDir string, err error) {
+	flagPath = cleanIniPath(flagPath)
 	if flagPath == "" {
 		iniPath, tcDir = config.FindDefaultIniPath("")
 		if iniPath == "" {
@@ -54,8 +64,13 @@ func ResolveIni(flagPath string) (iniPath string, tcDir string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("resolving ini path: %w", err)
 	}
-	if info, statErr := os.Stat(abs); statErr != nil || info.IsDir() {
-		return "", "", fmt.Errorf("wincmd.ini not accessible at %s", abs)
+	// The three ways this fails are worth telling apart: a path that is not
+	// there, and a folder picked instead of the file inside it, look the same in
+	// the Settings field but need different fixes.
+	if info, statErr := os.Stat(abs); statErr != nil {
+		return "", "", fmt.Errorf("no readable wincmd.ini at %s", abs)
+	} else if info.IsDir() {
+		return "", "", fmt.Errorf("%s is a folder, not a wincmd.ini file", abs)
 	}
 
 	// Which install does this ini describe? Only the file system around it can

@@ -33,6 +33,24 @@ func TestResolveIniExplicitPortable(t *testing.T) {
 	}
 }
 
+func TestResolveIniAcceptsQuotedPath(t *testing.T) {
+	dir := t.TempDir()
+	iniPath := filepath.Join(dir, "wincmd.ini")
+	if err := os.WriteFile(iniPath, []byte("[Configuration]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Explorer's "Copy as path" wraps the value in quotes; without stripping them
+	// the path stops being absolute and gets the current directory glued in front.
+	gotIni, _, err := ResolveIni(`"` + iniPath + `"`)
+	if err != nil {
+		t.Fatalf("ResolveIni on a quoted path: %v", err)
+	}
+	if gotIni != iniPath {
+		t.Errorf("iniPath = %q, want %q", gotIni, iniPath)
+	}
+}
+
 func TestResolveIniRejectsMissingAndDirectory(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "absent", "wincmd.ini")
 	if _, _, err := ResolveIni(missing); err == nil {
@@ -42,6 +60,8 @@ func TestResolveIniRejectsMissingAndDirectory(t *testing.T) {
 	dir := t.TempDir()
 	if _, _, err := ResolveIni(dir); err == nil {
 		t.Error("expected error when path is a directory, got nil")
+	} else if !strings.Contains(err.Error(), "is a folder") {
+		t.Errorf("a folder should be named as one: %v", err)
 	}
 }
 
