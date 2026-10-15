@@ -34,12 +34,18 @@ type Result struct {
 
 // ResolveIni determines the wincmd.ini location and the Total Commander root
 // directory used to expand plugin paths. An empty flagPath triggers auto
-// discovery via Registry and AppData.
+// discovery via Registry and AppData. The root can come back empty, which means
+// nothing vouched for a folder and %COMMANDER_PATH% cannot be expanded.
 func ResolveIni(flagPath string) (iniPath string, tcDir string, err error) {
 	if flagPath == "" {
 		iniPath, tcDir = config.FindDefaultIniPath("")
 		if iniPath == "" {
 			return "", "", fmt.Errorf("could not automatically locate wincmd.ini via Registry or AppData; point TotalPlug at it (Settings > Total Commander, or --ini <path> on the command line)")
+		}
+		if tcDir == "" {
+			// The AppData fallback knows the ini but not the install, and the ini
+			// itself does: TC keeps its own folder in [Configuration] InstallDir.
+			tcDir = config.ResolveTCDir(iniPath)
 		}
 		return iniPath, tcDir, nil
 	}
@@ -52,14 +58,13 @@ func ResolveIni(flagPath string) (iniPath string, tcDir string, err error) {
 		return "", "", fmt.Errorf("wincmd.ini not accessible at %s", abs)
 	}
 
-	// A wincmd.exe next to the ini marks a portable install; otherwise fall back
-	// to the registry install dir for non-portable layouts.
-	tcDir = filepath.Dir(abs)
-	if _, statErr := os.Stat(filepath.Join(tcDir, "wincmd.exe")); statErr != nil {
-		if _, regDir := config.FindIniFromRegistry(); regDir != "" {
-			tcDir = regDir
-		}
-	}
+	// Which install does this ini describe? Only the file system around it can
+	// answer: an ini copied out of a portable Total Commander still names the
+	// folder it came from, and following that claim scans a Total Commander the
+	// user never selected. An unresolved directory is reported as such - the
+	// %COMMANDER_PATH% placeholder then stays literal, which reads as "plugin not
+	// found" instead of silently matching some other install's plugins.
+	tcDir = config.ResolveTCDir(abs)
 	return abs, tcDir, nil
 }
 

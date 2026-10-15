@@ -72,3 +72,33 @@ func TestBuildLegacyIDMapDropsAmbiguous(t *testing.T) {
 		t.Errorf("legacy mapping = %q, want stable new ID", got)
 	}
 }
+
+func TestResolveIniExplicitSubfolderIni(t *testing.T) {
+	// The layout a portable Total Commander actually uses: the ini one level down
+	// in ini\, and on a 64-bit install no wincmd.exe at all - only totalcmd64.exe.
+	// Resolving this to the ini's own folder expands every %COMMANDER_PATH% into
+	// a directory that holds no plugins, which reads as an install with nothing in
+	// it.
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "ini"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "totalcmd64.exe"), []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	iniPath := filepath.Join(dir, "ini", "wincmd.ini")
+	if err := os.WriteFile(iniPath, []byte("[Configuration]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	gotIni, gotDir, err := ResolveIni(iniPath)
+	if err != nil {
+		t.Fatalf("ResolveIni: %v", err)
+	}
+	if gotIni != iniPath {
+		t.Errorf("iniPath = %q, want %q", gotIni, iniPath)
+	}
+	if gotDir != dir {
+		t.Errorf("tcDir = %q, want %q", gotDir, dir)
+	}
+}

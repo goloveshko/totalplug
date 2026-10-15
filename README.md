@@ -68,7 +68,7 @@ path you choose.
 ## ✨ Key Features
 
 - 🔍 **Zero-Config Total Commander Detection:**  
-  Automatically discovers `wincmd.ini` and installation paths from Windows Registry (`HKCU`/`HKLM` 32-bit & 64-bit) or `%APPDATA%`, resolving `%COMMANDER_PATH%` and `%COMMANDER_DRIVE%` variables. A Total Commander the registry does not know about — a portable one, usually — can be named by hand instead.
+  Automatically discovers `wincmd.ini` from Windows Registry (`HKCU`/`HKLM` 32-bit & 64-bit) or `%APPDATA%`, and resolves `%COMMANDER_PATH%` / `%COMMANDER_DRIVE%`. The installation folder is recognised by the Total Commander launcher found next to the ini or one level above it — the layout a portable install uses (`<install>\ini\wincmd.ini`, with `totalcmd64.exe` on a 64-bit copy) — so pointing TotalPlug at any `wincmd.ini` scans the install it belongs to, not the one the registry happens to know. When no launcher is found around the ini, the folder is reported as unresolved instead of guessing.
 - 📦 **Smart Plugin Parser & Deduplication:**  
   Extracts all Packer (`WCX`), Lister (`WLX`), File System (`WFX`), and Content (`WDX`) plugins, merging duplicate archive extensions into single logical plugins.
 - 🧬 **4-Tier Version Extraction Engine:**

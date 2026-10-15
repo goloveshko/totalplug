@@ -14,8 +14,9 @@ import (
 )
 
 // iniFilters narrows the picker to a Total Commander config without hiding the
-// case it exists for: a portable TC keeps wincmd.ini next to wincmd.exe, and an
-// ini taken from elsewhere can carry any name.
+// case it exists for: a portable TC keeps wincmd.ini either next to its launcher
+// or one level down in an ini folder, and an ini taken from elsewhere can carry
+// any name.
 var iniFilters = []runtime.FileFilter{
 	{DisplayName: "Total Commander configuration (wincmd.ini)", Pattern: "wincmd.ini"},
 	{DisplayName: "All files", Pattern: "*.*"},

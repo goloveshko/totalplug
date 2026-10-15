@@ -111,6 +111,71 @@ func FindDefaultIniPath(tcDir string) (string, string) {
 	return "", ""
 }
 
+// tcLaunchers are the executables that mark a folder as a Total Commander root.
+// wincmd.exe is the 32-bit launcher and the one everyone names, but a 64-bit
+// install can ship only totalcmd64.exe, so accepting one name misses every
+// machine like that - which is most of them.
+var tcLaunchers = []string{"wincmd.exe", "totalcmd64.exe"}
+
+// hasTCLauncher reports whether dir holds a Total Commander executable.
+func hasTCLauncher(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	for _, name := range tcLaunchers {
+		if info, err := os.Stat(filepath.Join(dir, name)); err == nil && !info.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
+// IniInstallDir returns the [Configuration] InstallDir key of an ini file, which
+// is where TC records the folder it was last run from. Empty when the ini has no
+// such key or cannot be read.
+func IniInstallDir(iniPath string) string {
+	cfg, err := ini.Load(iniPath)
+	if err != nil {
+		return ""
+	}
+	// Key names in wincmd.ini are not spelled consistently across TC versions
+	// (pluginbasedir and InstallDir live side by side in the same file), and
+	// gopkg.in/ini matches keys case-sensitively, so look the section up by scan.
+	for _, key := range cfg.Section("Configuration").Keys() {
+		if strings.EqualFold(key.Name(), "InstallDir") {
+			return strings.TrimSpace(os.ExpandEnv(key.Value()))
+		}
+	}
+	return ""
+}
+
+// ResolveTCDir finds the Total Commander folder an ini file belongs to, from the
+// file system alone. An empty result means nothing on disk vouched for a folder,
+// and the caller decides what to guess.
+//
+// The order is deliberate. A folder that holds a launcher is the install it
+// claims to be, so the ini's own directory and its parent - TC's portable layout
+// is <root>\ini\wincmd.ini - outrank any recorded path: the ini the user pointed
+// at describes the copy next to it, while InstallDir and the registry describe
+// whichever machine wrote them. An ini copied out of a portable install carries
+// an InstallDir that points at the original, and following it scans a Total
+// Commander the user did not select.
+func ResolveTCDir(iniPath string) string {
+	iniDir := filepath.Dir(iniPath)
+	if hasTCLauncher(iniDir) {
+		return iniDir
+	}
+	// One level up is the whole depth of TC's documented layouts; walking further
+	// would search for a launcher outside the tree the user chose.
+	if parent := filepath.Dir(iniDir); hasTCLauncher(parent) {
+		return parent
+	}
+	if recorded := IniInstallDir(iniPath); recorded != "" && hasTCLauncher(recorded) {
+		return recorded
+	}
+	return ""
+}
+
 func expandTcVars(path string, tcDir string) string {
 	if tcDir == "" {
 		return os.ExpandEnv(path)

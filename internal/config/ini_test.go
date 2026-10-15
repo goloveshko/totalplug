@@ -210,3 +210,92 @@ func TestParsePluginsFromIniIDsAreStable(t *testing.T) {
 		t.Errorf("ID = %q; want %q", got, want)
 	}
 }
+
+// writeTCLayout builds a folder holding a Total Commander launcher and returns it.
+func writeTCLayout(t *testing.T, dir, launcher string) string {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, launcher), []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func writeIni(t *testing.T, path, installDir string) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "[Configuration]\n"
+	if installDir != "" {
+		body += "InstallDir=" + installDir + "\n"
+	}
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestResolveTCDirPortableIniSubfolder(t *testing.T) {
+	// TC's portable layout: <root>\ini\wincmd.ini, and a 64-bit install whose only
+	// launcher is totalcmd64.exe.
+	root := writeTCLayout(t, filepath.Join(t.TempDir(), "Total Commander"), "totalcmd64.exe")
+	iniPath := writeIni(t, filepath.Join(root, "ini", "wincmd.ini"), "")
+
+	if got := ResolveTCDir(iniPath); got != root {
+		t.Errorf("ResolveTCDir = %q, want %q", got, root)
+	}
+}
+
+func TestResolveTCDirPrefersTheTreeOverARecordedInstallDir(t *testing.T) {
+	// An ini copied out of a portable install still names the folder it came from.
+	// Believing that claim scans a Total Commander the user never picked.
+	other := writeTCLayout(t, filepath.Join(t.TempDir(), "elsewhere"), "wincmd.exe")
+	root := writeTCLayout(t, filepath.Join(t.TempDir(), "Total Commander"), "totalcmd64.exe")
+	iniPath := writeIni(t, filepath.Join(root, "ini", "wincmd.ini"), other)
+
+	if got := ResolveTCDir(iniPath); got != root {
+		t.Errorf("ResolveTCDir = %q, want %q", got, root)
+	}
+}
+
+func TestResolveTCDirUsesInstallDirForRoamingIni(t *testing.T) {
+	// The installed layout keeps the ini in AppData, far from the program folder,
+	// so the recorded path is the only evidence left.
+	root := writeTCLayout(t, filepath.Join(t.TempDir(), "totalcmd"), "totalcmd64.exe")
+	iniPath := writeIni(t, filepath.Join(t.TempDir(), "Roaming", "GHISLER", "wincmd.ini"), root)
+
+	if got := ResolveTCDir(iniPath); got != root {
+		t.Errorf("ResolveTCDir = %q, want %q", got, root)
+	}
+}
+
+func TestResolveTCDirRejectsRecordedFolderWithoutALauncher(t *testing.T) {
+	// A stale InstallDir that happens to exist (an emptied or moved install) is no
+	// better than nothing: guessing there expands every plugin path into a folder
+	// that cannot hold it.
+	stale := t.TempDir()
+	iniDir := filepath.Join(t.TempDir(), "copy")
+	iniPath := writeIni(t, filepath.Join(iniDir, "wincmd.ini"), stale)
+
+	if got := ResolveTCDir(iniPath); got != "" {
+		t.Errorf("ResolveTCDir = %q, want unresolved", got)
+	}
+}
+
+func TestIniInstallDirReadsAnyCase(t *testing.T) {
+	iniPath := writeIni(t, filepath.Join(t.TempDir(), "wincmd.ini"), `C:\somewhere`)
+	if got := IniInstallDir(iniPath); got != `C:\somewhere` {
+		t.Errorf("IniInstallDir = %q", got)
+	}
+
+	odd := filepath.Join(t.TempDir(), "wincmd.ini")
+	if err := os.WriteFile(odd, []byte("[Configuration]\ninstalldir=D:\\TotalCmd\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := IniInstallDir(odd); got != `D:\TotalCmd` {
+		t.Errorf("IniInstallDir(lowercased key) = %q, want %q", got, `D:\TotalCmd`)
+	}
+}
