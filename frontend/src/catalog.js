@@ -146,10 +146,19 @@ export async function runScan(forceRefresh = false) {
 
         renderTable();
     } catch (err) {
-        // The scan never produced rows, so the "scanning" placeholder must go:
-        // no status bar is left, and the error itself opens a dialog (the URL in
-        // it points at the catalog, not a plugin page).
-        dom.tbody.innerHTML = emptyRow(t('table.error'));
+        // The scan never produced rows, so the placeholder has to carry the reason:
+        // the dialog below gets dismissed, and a row that only points at "the error
+        // message" would then tell the user to look at something no longer on
+        // screen. The exact error goes into a disclosure, as everywhere else.
+        const raw = escapeHtml(String(err?.message ?? err));
+        dom.tbody.innerHTML = emptyRow(
+            escapeHtml(t('scan.error_friendly')) +
+                '<details class="dlg-tech"><summary>' +
+                escapeHtml(t('dialog.tech_details')) +
+                '</summary><div class="dlg-tech-body">' +
+                raw +
+                '</div></details>',
+        );
         openAppDialog(errorDialogHtml(err, t('scan.error_friendly'), t('about.catalog')));
         console.error(err);
     } finally {
