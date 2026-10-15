@@ -125,6 +125,15 @@ is the latest version, and a scan works with Total Commander closed. TotalPlug
 does not replace its own executable, so a newer release reaches the user only as
 a link back to the release page.
 
+A clean Windows 10 without the WebView2 runtime is worth one run of its own
+(`scripts\sandbox.cmd -NoRuntime`): the GUI then opens with Wails' own "Missing
+Requirements" prompt before any window of ours exists, and **OK** downloads and
+installs the runtime. That dialog is not ours to translate — it is shown before
+the interface language is even read — so what the check is really for is that the
+path out of it works. Other sandbox runs install the runtime themselves instead,
+from the offline Evergreen Standalone Installer that the script keeps in
+`bin\totalplug-sandbox`, so an ordinary run is not waiting on that download.
+
 ## Recovery
 
 A published tag belongs to the release: prefer cutting the next patch version

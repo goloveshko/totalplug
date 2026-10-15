@@ -2,11 +2,16 @@
 param (
     [Parameter(Position = 0)]
     [Alias("c", "cmd")]
-    [ValidateSet("build", "b", "release", "rel", "gui", "g", "release-gui", "relg", "package", "pkg", "run", "r", "lint", "l", "test", "t", "fmt")]
+    [ValidateSet("build", "b", "release", "rel", "gui", "g", "release-gui", "relg", "package", "pkg", "run", "r", "lint", "l", "test", "t", "fmt", "sandbox", "sb")]
     [string]$Action = "build",
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
-    [string[]]$ArgsList
+    [string[]]$ArgsList,
+
+    # Read only by the sandbox verb, and declared here because a switch cannot
+    # travel through @ArgsList: splatting an array passes "-NoRuntime" as a plain
+    # string, which binds to nothing.
+    [switch]$NoRuntime
 )
 
 $ErrorActionPreference = "Stop"
@@ -323,6 +328,15 @@ function Invoke-Fmt {
     Write-Host "✔ Done!" -ForegroundColor Green
 }
 
+# The scenario itself lives in sandbox.ps1; this verb exists so the double-clicked
+# window gets the same "press any key" hold as every other wrapper, instead of a
+# pause invented for one script.
+function Invoke-Sandbox {
+    $runtimeArgs = @{}
+    if ($NoRuntime) { $runtimeArgs.NoRuntime = $true }
+    & "$PSScriptRoot\sandbox.ps1" @runtimeArgs
+}
+
 # A window opened for a double-clicked wrapper closes the moment this script
 # exits, taking the build error with it. Every other way in - a terminal, an IDE,
 # a shell - leaves a prompt behind, so what decides it is the ABSENCE of a shell
@@ -365,6 +379,7 @@ try {
         { $_ -in "lint",  "l" }          { Invoke-Lint }
         { $_ -in "test",  "t" }          { Invoke-Test }
         { $_ -in "fmt" }                 { Invoke-Fmt }
+        { $_ -in "sandbox", "sb" }       { Invoke-Sandbox }
     }
 } finally {
     Wait-AfterWindowRun
