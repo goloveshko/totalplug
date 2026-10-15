@@ -114,6 +114,16 @@ next release (v2), and the accepted debt we deliberately postponed.
   the old binary is already gone.
 - Hermetic unit tests for checker, config, CLI arg/prompt logic, pipeline ini resolution,
   storage and updater (httptest + in-memory zips).
+- Clean-environment run: `scripts/sandbox.cmd` (the `sandbox` verb of `scripts/build.ps1`)
+  stages a release build and a Total Commander fixture in `bin/totalplug-sandbox`,
+  generates the `.wsb` and starts Windows Sandbox. The fixture is the layout a 64-bit
+  portable install uses — `<install>\ini\wincmd.ini`, no `wincmd.exe` anywhere — which is
+  the case that used to resolve to the wrong install. The image has no WebView2 runtime,
+  so the Evergreen Standalone Installer is downloaded on the host once and installed at
+  logon from the shared folder; the bootstrapper Wails' own prompt offers would otherwise
+  re-download it into every fresh VM. `webview2-install.log` next to the build is the
+  evidence the install took, and `-NoRuntime` skips the whole thing to reproduce the
+  missing-runtime first run.
 - Corrupt storage JSON is quarantined to `<file>.corrupt` and reported, not silently dropped.
 
 ## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt

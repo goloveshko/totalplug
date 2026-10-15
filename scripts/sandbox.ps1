@@ -164,7 +164,12 @@ $wsbContent = @"
 <!-- ============================================================================ -->
 <Configuration>
   <!-- Virtual GPU Acceleration (Default | Disable) -->
+  <!-- Leave this on Default: the scan never touches the GPU, so Disable buys no
+       speed, only software compositing. Uncomment the alternative when a run
+       dies early with "The connection to the sandbox was lost. Error code:
+       0x80072746" - the vGPU driver is the usual suspect for that one. -->
   <VGpu>Default</VGpu>
+  <!-- <VGpu>Disable</VGpu> -->
 
   <!-- Network Access (Default | Disable) -->
   <Networking>Default</Networking>
