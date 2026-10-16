@@ -2,8 +2,8 @@
 // (re)render. A language switch rebuilds the screens from main.js, so refs
 // cached at module scope would point at detached nodes; collect() is the single
 // place that has to run again, and no screen can keep a stale one by accident.
-// The titlebar and the plugin table are not here: they are Svelte islands that
-// never rebuild.
+// The titlebar, the plugin table and the two dialogs are not here: they are
+// Svelte islands that never rebuild.
 export const dom = {};
 
 const byId = (id) => document.getElementById(id);
@@ -24,25 +24,6 @@ export function collect() {
     dom.historyDialog = byId('history-dialog');
     dom.historyBody = byId('history-body');
     dom.historyClose = byId('history-close');
-
-    // Confirmation / message dialog.
-    dom.appDialog = byId('app-dialog');
-    dom.appDialogMsg = byId('app-dialog-msg');
-    dom.appDialogOk = byId('app-dialog-ok');
-    dom.appDialogCancel = byId('app-dialog-cancel');
-
-    // Update progress.
-    dom.progressDialog = byId('update-progress');
-    dom.progressTitle = byId('progress-title');
-    dom.progressLive = byId('progress-live');
-    dom.progressTrack = byId('progress-track');
-    dom.progressFill = byId('progress-fill');
-    dom.progressPhase = byId('progress-phase');
-    dom.progressPct = byId('progress-pct');
-    dom.progressUrl = byId('progress-url');
-    dom.progressResult = byId('progress-result');
-    dom.progressOk = byId('progress-ok');
-    dom.progressClose = byId('progress-close');
 
     // Settings shell and the panels it hosts.
     dom.settingsView = byId('view-settings');

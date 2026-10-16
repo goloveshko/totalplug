@@ -1,27 +1,22 @@
+import { writable } from 'svelte/store';
 import { t } from './i18n.js';
-import { dom } from './dom.js';
-import { escapeHtml, linkify, interceptLinks } from './text.js';
+import { escapeHtml, linkify } from './text.js';
 
 // The in-app replacement for native confirm()/alert(): those render with the
 // "wails" origin header and cannot be styled. One modal dialog serves both the
 // yes/no confirmations and the error messages, and it resolves as a promise.
+// Dialog.svelte draws it; this module owns the answer, because the caller of
+// showConfirm() waits on a promise and the dialog cannot hand one back from a
+// component.
 
-// Element that opened the current dialog; focus goes back to it on close so
-// keyboard users do not land at the top of the document.
-let opener = null;
+// What the dialog shows and whether it asks a question. `open` is the only way
+// in or out of the top layer: a <dialog> has to be asked with showModal().
+export const dialogState = writable({ open: false, html: '', isConfirm: false });
+
+// The pending answer, and the element that opened the dialog so focus can go
+// back to it on close — keyboard users must not land at the top of the document.
 let resolve = null;
-
-export const dialogMarkup = () => `
-      <dialog id="app-dialog">
-        <button type="button" class="dlg-close" id="app-dialog-close" title="${t('dialog.close')}" aria-label="${t('dialog.close')}">
-          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <div class="dlg-message" id="app-dialog-msg"></div>
-        <div class="editor-actions">
-          <button type="button" class="btn-save" id="app-dialog-ok">${t('dialog.ok')}</button>
-          <button type="button" id="app-dialog-cancel">${t('dialog.cancel')}</button>
-        </div>
-      </dialog>`;
+let opener = null;
 
 // Raw Go errors are technical English; show the localized friendly sentence
 // with a named link and hide the exact error behind a disclosure. The link
@@ -54,11 +49,7 @@ export function openAppDialog(html, isConfirm) {
     return new Promise((done) => {
         resolve = done;
         opener = document.activeElement;
-        dom.appDialogMsg.innerHTML = html;
-        dom.appDialogCancel.style.display = isConfirm ? '' : 'none';
-        dom.appDialog.showModal();
-        // Enter must never confirm an update by accident: focus the safe button.
-        (isConfirm ? dom.appDialogCancel : dom.appDialogOk).focus();
+        dialogState.set({ open: true, html, isConfirm: Boolean(isConfirm) });
     });
 }
 
@@ -66,34 +57,22 @@ const textToDialogHtml = (message) => linkify(escapeHtml(message));
 
 export const showConfirm = (message) => openAppDialog(textToDialogHtml(message), true);
 
-function settle(result) {
+// Every way out of the dialog ends here with the answer it means. The pending
+// promise is settled first, so a second call — the close event that follows the
+// store change — finds nothing to answer and cannot turn a yes into a no.
+export function answerDialog(result) {
     if (resolve) {
         resolve(result);
         resolve = null;
     }
+    dialogState.update((state) => (state.open ? { ...state, open: false } : state));
 }
 
-export function bindDialog() {
-    dom.appDialogOk.addEventListener('click', () => {
-        settle(true);
-        dom.appDialog.close();
-    });
-    dom.appDialogCancel.addEventListener('click', () => {
-        settle(false);
-        dom.appDialog.close();
-    });
-    document.getElementById('app-dialog-close').addEventListener('click', () => {
-        settle(false);
-        dom.appDialog.close();
-    });
-    // Links in dialog messages open in the system browser, never in the webview.
-    interceptLinks(dom.appDialogMsg);
-    // Esc or any other dismissal path must resolve a pending confirm as "no".
-    dom.appDialog.addEventListener('close', () => {
-        settle(false);
-        if (opener) {
-            opener.focus?.();
-            opener = null;
-        }
-    });
+// Runs on the dialog's own close event, after it has really left the top layer:
+// while it was open the rest of the document was inert and could not take focus.
+export function restoreOpener() {
+    if (opener) {
+        opener.focus?.();
+        opener = null;
+    }
 }

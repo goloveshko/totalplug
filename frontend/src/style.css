@@ -76,6 +76,7 @@ body {
    directly. */
 #chrome,
 #table,
+#overlays,
 #screens {
     display: contents;
 }

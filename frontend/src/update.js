@@ -1,12 +1,17 @@
 import { UpdatePlugin } from '../wailsjs/go/gui/App';
 import { t, tp } from './i18n.js';
 import { get } from 'svelte/store';
-import { dom } from './dom.js';
 import { plugins, progressRunning } from './state.js';
 import { isUpdatable } from './plugin.js';
 import { escapeHtml, linkify } from './text.js';
 import { showConfirm, errorDialogHtml } from './dialog.js';
-import { beginProgress, beginProgressItem, finishProgress, waitProgressDismissed } from './progress.js';
+import {
+    beginProgress,
+    beginProgressItem,
+    finishProgress,
+    setProgressTitle,
+    waitProgressDismissed,
+} from './progress.js';
 import { runScan } from './catalog.js';
 
 // What one updater call does, and the two ways it gets called: the button in a
@@ -101,11 +106,7 @@ export async function handleUpdateAll() {
     beginProgress(t('update_all.title'));
     for (let i = 0; i < queue.length; i++) {
         const plugin = queue[i];
-        dom.progressTitle.textContent = t('update_all.item', {
-            current: i + 1,
-            total: queue.length,
-            name: plugin.name,
-        });
+        setProgressTitle(t('update_all.item', { current: i + 1, total: queue.length, name: plugin.name }));
         beginProgressItem();
 
         const outcome = await updateOnePlugin(plugin);
