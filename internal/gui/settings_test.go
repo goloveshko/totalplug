@@ -146,7 +146,7 @@ func TestLoadSettingsRejectsUnreadableFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv(config.DataDirEnv, dir)
 
-	path := filepath.Join(dir, settingsFileName)
+	path := filepath.Join(dir, config.SettingsFileName)
 	if err := os.WriteFile(path, []byte(`{"window": `), 0644); err != nil {
 		t.Fatal(err)
 	}

@@ -29,9 +29,20 @@ const webviewFolder = "webview2"
 // without touching the database or the overrides next to it.
 const cacheFolder = "cache"
 
+// backupFolder holds the copies of plugin directories taken before an update.
+// They live here rather than beside the plugin because Total Commander's tree is
+// the user's, and a folder of dead copies left in it is pollution he has to
+// notice and clean up by hand.
+const backupFolder = "backups"
+
 // ScratchEnv pins the throwaway folder. Tests set it to keep a downloaded
 // package out of the machine's real %TEMP%.
 const ScratchEnv = "TOTALPLUG_SCRATCH_DIR"
+
+// SettingsFileName is the small file that has to be readable before a window
+// exists. Its name is exported because both the GUI, which writes it, and the
+// CLI, which reads the backup policy out of it, have to look at the same path.
+const SettingsFileName = "settings.json"
 
 // runPrefix names a run's folder inside the scratch root.
 const runPrefix = "run-"
@@ -83,6 +94,30 @@ func CacheDir() (string, error) {
 		return "", fmt.Errorf("create cache dir %s: %w", dir, err)
 	}
 	return dir, nil
+}
+
+// BackupSpace returns the folder the pre-update copies of plugin directories
+// live in. Like the cache folder it is created on demand, and a user who wants
+// to reclaim the space can delete the whole folder: an update simply makes new
+// copies in it.
+func BackupSpace() (string, error) {
+	dir := BackupSpacePath()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("create backup space %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
+// BackupSpacePath names the backup folder without creating it, for the settings
+// panel that has to show where copies go without having made one yet.
+func BackupSpacePath() string {
+	return filepath.Join(DataDir(), backupFolder)
+}
+
+// SettingsPath names the settings file without creating anything, so a reader
+// can say what is missing instead of making an empty data folder on the way.
+func SettingsPath() string {
+	return filepath.Join(DataDir(), SettingsFileName)
 }
 
 // ScratchRoot returns the one %TEMP% folder this app writes outside its data

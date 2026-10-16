@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/goloveshko/totalplug/internal/config"
@@ -15,7 +14,10 @@ import (
 // The window is frameless and drawn by the frontend, but its geometry has to be
 // known before wails.Run creates the HWND, so it lives in a settings file next
 // to the other data instead of the frontend's localStorage.
-const settingsFileName = "settings.json"
+//
+// The file is shared with the CLI, which reads the backup retention policy from
+// it before any window exists — hence the policy type comes from internal/config
+// instead of being copied into this package.
 
 // Default geometry only applies before a settings file exists.
 const (
@@ -51,10 +53,26 @@ type settings struct {
 	// localStorage because the scanner reads it before any page exists, and a
 	// portable install then carries the choice along with the data.
 	TcIni string `json:"tc_ini,omitempty"`
+	// Backup is the retention policy the updater applies. It rides in this file
+	// because the CLI has to honour the same answer, and the CLI has no window to
+	// read a GUI-only settings struct through. It is a pointer so that a file
+	// written before these keys existed stays distinguishable from one where the
+	// user deliberately chose 0 days — the first means defaults, the second means
+	// no age limit.
+	Backup *config.BackupPolicy `json:"backup,omitempty"`
+}
+
+// backupPolicy answers with the stored policy, or the defaults when the file has
+// no opinion yet.
+func (s settings) backupPolicy() config.BackupPolicy {
+	if s.Backup == nil {
+		return config.DefaultBackupPolicy()
+	}
+	return *s.Backup
 }
 
 func settingsPath() string {
-	return filepath.Join(config.DataDir(), settingsFileName)
+	return config.SettingsPath()
 }
 
 // loadSettings returns the saved settings and whether a readable file existed.
@@ -119,6 +137,18 @@ func (a *App) setWindowEffect(effect string) error {
 func (a *App) setTcIni(path string) error {
 	a.settingsMu.Lock()
 	a.state.TcIni = path
+	s := a.state
+	a.settingsMu.Unlock()
+	return writeSettings(s)
+}
+
+// setBackupPolicy stores the retention choice and persists it right away,
+// because the next updater — which may be a CLI run, not this window — reads it
+// from the file rather than from anything the frontend knows.
+func (a *App) setBackupPolicy(policy config.BackupPolicy) error {
+	policy = config.NormalizeBackupPolicy(policy)
+	a.settingsMu.Lock()
+	a.state.Backup = &policy
 	s := a.state
 	a.settingsMu.Unlock()
 	return writeSettings(s)
