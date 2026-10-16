@@ -49,9 +49,21 @@ TotalPlug keeps its data in one folder, picked at every start:
 
 Inside that folder the plugin database, the overrides, the update history and
 the window settings sit at the top level, the downloaded catalog and GitHub
-release snapshots go to `cache\`, and the WebView2 profile to `webview2\`.
-Deleting `cache\` only costs the next download; deleting `webview2\` resets the
-theme, language and font size.
+release snapshots go to `cache\`, the pre-update copies of your plugin folders go
+to `backups\`, and the WebView2 profile to `webview2\`. Deleting `cache\` costs
+the next download; deleting `webview2\` resets the theme, language and font size;
+deleting `backups\` removes your route back to an older version, so look at
+Settings → Backups first.
+
+`backups\` is grouped by the folder Total Commander keeps each plugin in, so a
+CudaLister file system plugin reads as `backups\wfx\CudaLister.bak_<unix>`. The
+copies stay out of your Total Commander tree on purpose: a dead folder beside a
+plugin is yours to notice and clean up by hand. Settings → Backups decides how
+long they survive — the newest few are always kept, and past them a copy goes once
+it is older than the day limit you set (0 days deletes nothing). The same file
+holds that answer for the command line, so `--update-all` prunes by the same rule.
+Versions before this one wrote the copies next to the plugin; updating a plugin
+carries whatever is still there into `backups\`.
 
 An update also needs somewhere to hold its download while it is unpacked — the
 only place TotalPlug writes that is neither your plugins folder nor its own data

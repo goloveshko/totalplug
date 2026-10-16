@@ -30,10 +30,14 @@ next release (v2), and the accepted debt we deliberately postponed.
 
 ### Safe updates
 
-- Download + extract to temp first, side-by-side copy backup
-  (`<plugin-dir>.bak_<unix>`), then apply over the live directory.
+- Download + extract to temp first, then a copy backup of the plugin directory into
+  the data folder (`<data>\backups\<type folder>\<plugin>.bak_<unix>`) and the apply
+  over the live directory. Total Commander's tree is not written to.
 - Automatic rollback of exactly the files touched before a failure;
   backup removed after a successful rollback, kept for manual recovery otherwise.
+- Retention from `settings.json`, read by CLI and GUI alike: the newest N copies per
+  plugin are never deleted, and past them a copy goes once older than the day limit
+  (0 days deletes nothing). Defaults: 3 copies, 30 days.
 - Windows file-lock detection (error codes 5/32/33) with a
   "close Total Commander and run again" hint.
 - Downloads restricted to https (loopback http allowed for tests) and capped at 256 MiB.
@@ -410,7 +414,15 @@ next release (v2), and the accepted debt we deliberately postponed.
   cache if per-plugin github sources become popular.
 - ~~**Backup prune** — `.bak_*` directories accumulate after successful updates;
   add "keep last N per plugin" cleanup.~~ Shipped in `3cb2a96` (keep newest 3 per
-  plugin, pruned best-effort after each successful update).
+  plugin, pruned best-effort after each successful update). Now a policy in the
+  settings file — count plus age — and the copies live in the data folder instead of
+  the Total Commander tree, with the old siblings carried over when a plugin updates.
+- **Backup in the update history** — `UpdateEntry` stores no `BackupPath`, so the
+  history dialog cannot show which copy belongs to which applied update, and there is
+  no way to delete one from there. Needs a new field (older entries have nothing to
+  show), an existence check on a path the user may have cleaned, and the first
+  destructive action in the GUI, so a confirm. Decided as its own slice after the
+  move settles: worth it only if pruning by hand turns out to be real work.
 - **`FileHash` verification** — field exists on records but nothing computes or checks it.
 - ~~**Non-ZIP plugin archives** — totalcmd.net serves many plugins as RAR; since `b332687`
   they are rejected with a clear "unsupported archive format" hint instead of a cryptic

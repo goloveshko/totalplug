@@ -981,6 +981,34 @@ dialog input:focus {
 .tc-warn {
     color: var(--badge-err);
 }
+/* Two short numbers and one long path: the fields take the same width the
+   selects do, the path is allowed to break anywhere because it is the longest
+   value in the app after a wincmd.ini. */
+.settings-panel input[type='number'] {
+    display: block;
+    width: 100%;
+    max-width: 280px;
+    margin-top: 4px;
+    box-sizing: border-box;
+    background: var(--input-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+}
+.settings-panel input[type='number']:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.backup-path {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    user-select: text;
+    overflow-wrap: anywhere;
+}
 .about-name {
     font-size: 1.05rem;
     font-weight: 700;

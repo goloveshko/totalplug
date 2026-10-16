@@ -13,6 +13,7 @@ import { progressMarkup, initProgressEvents, bindProgress } from './progress.js'
 import { historyMarkup, bindHistory } from './history.js';
 import { settingsMarkup, refreshSettingsState, bindSettings } from './settings.js';
 import { bindTc } from './tc.js';
+import { bindBackups } from './backups.js';
 import { renderAbout, loadAppInfo, bindAbout } from './about.js';
 import { bindUpdate, handleUpdate } from './update.js';
 
@@ -46,6 +47,7 @@ function buildScreens() {
     bindHistory();
     bindAbout();
     bindTc();
+    bindBackups();
     bindSettings();
     bindShell();
 

@@ -103,6 +103,14 @@ const STRINGS = {
         'settings.tc.gone': 'This file no longer opens, so a scan would fail.',
         'settings.tc.back_auto': 'Use auto-detection',
         'settings.tc.not_saved': 'the change was not saved',
+        'settings.nav.backups': 'Backups',
+        'settings.backups': 'What an update leaves behind, and for how long.',
+        'settings.backups.keep': 'Newest copies always kept',
+        'settings.backups.days': 'Delete copies older than, days',
+        'settings.backups.hint':
+            'A copy is deleted only once it is past both numbers, so the newest ones survive however old they get. 0 days deletes nothing.',
+        'settings.backups.location': 'Copies are kept in',
+        'settings.backups.not_saved': 'the change was not saved',
         'settings.language': 'Interface language',
         'about.desc':
             'TotalPlug keeps your Total Commander plugins up to date: it finds what is installed, compares it with the community catalog and updates safely, with a backup and rollback behind every change.',
@@ -233,6 +241,14 @@ const STRINGS = {
         'settings.tc.gone': 'Файл больше не открывается, поэтому сканирование не удастся.',
         'settings.tc.back_auto': 'Вернуть автопоиск',
         'settings.tc.not_saved': 'изменение не сохранено',
+        'settings.nav.backups': 'Резервные копии',
+        'settings.backups': 'Что остаётся после обновления и сколько это хранится.',
+        'settings.backups.keep': 'Сколько последних копий всегда хранить',
+        'settings.backups.days': 'Удалять копии старше, дней',
+        'settings.backups.hint':
+            'Копия удаляется, только когда не проходит оба условия: самые новые остаются независимо от возраста. 0 дней — не удалять ничего.',
+        'settings.backups.location': 'Копии хранятся в',
+        'settings.backups.not_saved': 'изменение не сохранено',
         'settings.language': 'Язык интерфейса',
         'about.desc':
             'TotalPlug держит плагины Total Commander в актуальном состоянии: находит установленные, сверяет их с каталогом сообщества и обновляет безопасно — с резервной копией и откатом.',

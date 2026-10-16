@@ -119,6 +119,25 @@ function installMockBackend() {
             return Promise.resolve(null);
         },
 
+        // Settings > Backups. The settings file holds these numbers in the real
+        // app, so the mock just keeps whatever the panel last stored.
+        _backup: { keep_newest: 3, max_age_days: 30 },
+
+        GetBackupPolicy() {
+            return Promise.resolve({ ...app._backup });
+        },
+        SetBackupPolicy(policy) {
+            app._backup = {
+                keep_newest: Number(policy?.keep_newest ?? 0),
+                max_age_days: Number(policy?.max_age_days ?? 0),
+            };
+            console.log('[mock] SetBackupPolicy', app._backup);
+            return Promise.resolve(null);
+        },
+        BackupLocation() {
+            return Promise.resolve('C:\\Users\\demo\\AppData\\Roaming\\totalplug\\backups');
+        },
+
         // Settings > Total Commander. A folder holding the word "gone" stands in
         // for a path whose file disappeared, which is the state the panel exists
         // to show, so it can be demoed by typing it.

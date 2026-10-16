@@ -1,3 +1,22 @@
+export namespace config {
+	
+	export class BackupPolicy {
+	    keep_newest: number;
+	    max_age_days: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BackupPolicy(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.keep_newest = source["keep_newest"];
+	        this.max_age_days = source["max_age_days"];
+	    }
+	}
+
+}
+
 export namespace domain {
 	
 	export class AppInfo {

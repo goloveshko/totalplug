@@ -3,6 +3,7 @@ import { dom } from './dom.js';
 import { settingsOpen } from './state.js';
 import { currentTheme, setTheme, currentScale, setScale } from './theme.js';
 import { tcMarkup, renderTcPanel, loadTcConfig } from './tc.js';
+import { backupMarkup, renderBackupPanel, loadBackupSettings, bindBackups } from './backups.js';
 import { aboutMarkup } from './about.js';
 
 // Settings is a full-window view, not a dialog: it replaces the plugin list and
@@ -22,6 +23,7 @@ export const settingsMarkup = () => `
           <div class="settings-nav">
             <button type="button" data-panel="appearance">${t('settings.nav.appearance')}</button>
             <button type="button" data-panel="tc">${t('settings.nav.tc')}</button>
+            <button type="button" data-panel="backups">${t('settings.nav.backups')}</button>
             <button type="button" data-panel="language">${t('settings.nav.language')}</button>
             <button type="button" data-panel="about">${t('settings.nav.about')}</button>
           </div>
@@ -53,6 +55,7 @@ export const settingsMarkup = () => `
             </div>
           </div>
           ${tcMarkup()}
+          ${backupMarkup()}
           <div class="settings-panel" id="panel-language">
             <h3>${t('settings.nav.language')}</h3>
             <p class="section-desc">${t('settings.language')}</p>
@@ -83,6 +86,7 @@ export function refreshSettingsState() {
     // The DOM rebuilds on a language switch, which empties the path field; this
     // is what puts the stored answer back into it.
     renderTcPanel();
+    renderBackupPanel();
 }
 
 export function openSettings() {
@@ -91,6 +95,7 @@ export function openSettings() {
     dom.settingsView.hidden = false;
     refreshSettingsState();
     if (settingsSection === 'tc') loadTcConfig();
+    if (settingsSection === 'backups') loadBackupSettings();
 }
 
 export function closeSettings() {
@@ -108,6 +113,7 @@ export function bindSettings() {
             // install uninstalled), and asking is two stat calls, so the panel
             // is refreshed on entry rather than trusted from the last visit.
             if (settingsSection === 'tc') loadTcConfig();
+            if (settingsSection === 'backups') loadBackupSettings();
             refreshSettingsState();
         });
     });

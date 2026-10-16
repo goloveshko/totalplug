@@ -172,6 +172,25 @@ func (a *App) SetWindowEffect(effect string) error {
 	return a.setWindowEffect(effect)
 }
 
+// GetBackupPolicy returns the retention the updater applies to the copies it
+// leaves behind.
+func (a *App) GetBackupPolicy() config.BackupPolicy {
+	return a.snapshotSettings().backupPolicy()
+}
+
+// SetBackupPolicy stores the retention choice. It reaches the settings file at
+// once because the updater that reads it may be a CLI run rather than this
+// window.
+func (a *App) SetBackupPolicy(policy config.BackupPolicy) error {
+	return a.setBackupPolicy(policy)
+}
+
+// BackupLocation is the folder the copies live in. It is shown so the user knows
+// where to look before deleting anything, and it is not created by being named.
+func (a *App) BackupLocation() string {
+	return config.BackupSpacePath()
+}
+
 // UpdatePlugin installs the latest version for the specified plugin. A locked
 // target (Total Commander still running) is reported through the structured
 // result instead of an error so the frontend can show recovery guidance.
