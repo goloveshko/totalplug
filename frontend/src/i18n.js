@@ -1,3 +1,5 @@
+import { derived, writable } from 'svelte/store';
+
 // Minimal frontend i18n: EN is the default, the choice persists in localStorage.
 const STRINGS = {
     en: {
@@ -257,26 +259,31 @@ const STRINGS = {
 
 const LANG_KEY = 'totalplug.lang';
 
-let lang = localStorage.getItem(LANG_KEY);
-if (lang !== 'ru' && lang !== 'en') {
-    lang = 'en';
-}
+const savedLang = localStorage.getItem(LANG_KEY);
+
+// Svelte screens subscribe to the store; the vanilla ones keep using the mirror
+// below so t() stays a plain object lookup.
+export const lang = writable(savedLang === 'ru' ? 'ru' : 'en');
+
+let activeLang = 'en';
+
+// A writable store runs a new subscriber immediately, so this is also the
+// startup path: it seeds activeLang and tags the document before first render.
+lang.subscribe((value) => {
+    activeLang = value;
+    localStorage.setItem(LANG_KEY, value);
+    // Screen readers and hyphenation follow the document language, not CSS.
+    document.documentElement.lang = value;
+});
 
 const pluralRules = { en: new Intl.PluralRules('en'), ru: new Intl.PluralRules('ru') };
 
 export function currentLang() {
-    return lang;
-}
-
-// Screen readers and hyphenation follow the document language, not CSS.
-function applyLangAttribute() {
-    document.documentElement.lang = lang;
+    return activeLang;
 }
 
 export function setLang(next) {
-    lang = next === 'ru' ? 'ru' : 'en';
-    localStorage.setItem(LANG_KEY, lang);
-    applyLangAttribute();
+    lang.set(next === 'ru' ? 'ru' : 'en');
 }
 
 // A replacement string would interpret "$&" etc., and plugin names come from
@@ -289,15 +296,15 @@ function interpolate(s, vars) {
     return out;
 }
 
-export function t(key, vars) {
-    return interpolate(STRINGS[lang][key] ?? STRINGS.en[key] ?? key, vars);
+function translate(value, key, vars) {
+    return interpolate(STRINGS[value][key] ?? STRINGS.en[key] ?? key, vars);
 }
 
 // Countable strings live as `${key}.one|few|many|other` (CLDR categories), so
 // Russian gets «2 плагина» instead of a fixed «плагинов».
-export function tp(key, n, vars) {
-    const category = pluralRules[lang].select(n);
-    const table = STRINGS[lang];
+function pluralize(value, key, n, vars) {
+    const category = pluralRules[value].select(n);
+    const table = STRINGS[value];
     const s =
         table[`${key}.${category}`] ??
         STRINGS.en[`${key}.${category}`] ??
@@ -307,4 +314,17 @@ export function tp(key, n, vars) {
     return interpolate(s, { ...vars, n });
 }
 
-applyLangAttribute();
+export function t(key, vars) {
+    return translate(activeLang, key, vars);
+}
+
+export function tp(key, n, vars) {
+    return pluralize(activeLang, key, n, vars);
+}
+
+// A Svelte component cannot see the mirror above, so it would never re-label
+// itself on a language switch. These two read the store instead: the function
+// they hand out changes identity with the language, which is what makes the
+// component re-render. Vanilla screens keep calling t() and tp().
+export const tr = derived(lang, (value) => (key, vars) => translate(value, key, vars));
+export const trp = derived(lang, (value) => (key, n, vars) => pluralize(value, key, n, vars));
