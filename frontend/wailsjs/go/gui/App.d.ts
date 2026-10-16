@@ -19,6 +19,8 @@ export function GetUpdateHistory():Promise<Array<domain.UpdateEntry>>;
 
 export function GetWindowEffect():Promise<string>;
 
+export function RollbackUpdate(arg1:domain.UpdateEntry):Promise<domain.UpdateResult>;
+
 export function SaveOverride(arg1:string,arg2:domain.Override):Promise<void>;
 
 export function ScanPlugins(arg1:boolean):Promise<Array<domain.Plugin>>;

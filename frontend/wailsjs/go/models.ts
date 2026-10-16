@@ -142,6 +142,10 @@ export namespace domain {
 	    plugin_name: string;
 	    version: string;
 	    applied_at: string;
+	    plugin_dir?: string;
+	    backup_path?: string;
+	    replaced_version?: string;
+	    restored?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateEntry(source);
@@ -153,6 +157,10 @@ export namespace domain {
 	        this.plugin_name = source["plugin_name"];
 	        this.version = source["version"];
 	        this.applied_at = source["applied_at"];
+	        this.plugin_dir = source["plugin_dir"];
+	        this.backup_path = source["backup_path"];
+	        this.replaced_version = source["replaced_version"];
+	        this.restored = source["restored"];
 	    }
 	}
 	export class UpdateResult {

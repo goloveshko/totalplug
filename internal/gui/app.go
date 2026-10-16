@@ -128,12 +128,69 @@ func (a *App) SaveOverride(pluginID string, override domain.Override) error {
 	return a.db.SetUserOverride(pluginID, override)
 }
 
-// GetUpdateHistory returns successfully applied updates, newest first.
+// GetUpdateHistory returns the changes the updater applied, newest first.
+//
+// Only the newest line about a plugin still describes the folder as it stands, so
+// only that one keeps the copy it names: rolling an older line back would either
+// undo something the user has since moved past or put back what is already there.
+// A rollback line keeps nothing either — the way back from it is to update the
+// plugin again, which the table already offers.
 func (a *App) GetUpdateHistory() ([]domain.UpdateEntry, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	return a.db.UpdateHistory(), nil
+	entries := a.db.UpdateHistory()
+	seen := make(map[string]bool, len(entries))
+	for i, entry := range entries {
+		if entry.BackupPath == "" {
+			continue
+		}
+		last := !seen[entry.PluginID]
+		seen[entry.PluginID] = true
+		if !last || entry.Restored || !updater.BackupStillKept(entry.BackupPath) {
+			entries[i].BackupPath = ""
+		}
+	}
+	return entries, nil
+}
+
+// RollbackUpdate puts the copy one history line kept back into its plugin folder
+// and logs the change. It takes the lock an update takes, so a rollback cannot
+// cross an install in progress, and a folder Total Commander still holds reports
+// through the structured result the same way an update does.
+func (a *App) RollbackUpdate(entry domain.UpdateEntry) (domain.UpdateResult, error) {
+	a.updateMu.Lock()
+	defer a.updateMu.Unlock()
+
+	if a.db == nil {
+		return domain.UpdateResult{}, fmt.Errorf("database not initialized")
+	}
+	// The panel can only offer the line this matches, but a second window or an
+	// edited log should not be able to reach past the last change to the folder.
+	newest, found := domain.UpdateEntry{}, false
+	for _, logged := range a.db.UpdateHistory() {
+		if logged.PluginID != entry.PluginID {
+			continue
+		}
+		newest, found = logged, true
+		break
+	}
+	if !found || newest.Restored || !newest.AppliedAt.Equal(entry.AppliedAt) {
+		return domain.UpdateResult{}, fmt.Errorf("only the last change to %s can be rolled back", entry.PluginName)
+	}
+
+	snapshot, err := a.updater.RestoreEntry(entry)
+	if err != nil {
+		if errors.Is(err, updater.ErrFileLocked) {
+			return domain.UpdateResult{Locked: true}, nil
+		}
+		return domain.UpdateResult{}, err
+	}
+
+	if err := a.db.RecordChange(storage.ChangeFromRestore(entry, snapshot)); err != nil {
+		fmt.Printf("[!] Could not log the rollback of %s: %v\n", entry.PluginID, err)
+	}
+	return domain.UpdateResult{BackupPath: snapshot}, nil
 }
 
 // AppInfo returns what the About panel shows without touching the network:

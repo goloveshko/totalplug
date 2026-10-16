@@ -34,6 +34,10 @@ export function GetWindowEffect() {
   return window['go']['gui']['App']['GetWindowEffect']();
 }
 
+export function RollbackUpdate(arg1) {
+  return window['go']['gui']['App']['RollbackUpdate'](arg1);
+}
+
 export function SaveOverride(arg1, arg2) {
   return window['go']['gui']['App']['SaveOverride'](arg1, arg2);
 }

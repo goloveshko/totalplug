@@ -417,12 +417,16 @@ next release (v2), and the accepted debt we deliberately postponed.
   plugin, pruned best-effort after each successful update). Now a policy in the
   settings file — count plus age — and the copies live in the data folder instead of
   the Total Commander tree, with the old siblings carried over when a plugin updates.
-- **Backup in the update history** — `UpdateEntry` stores no `BackupPath`, so the
+- ~~**Backup in the update history** — `UpdateEntry` stores no `BackupPath`, so the
   history dialog cannot show which copy belongs to which applied update, and there is
-  no way to delete one from there. Needs a new field (older entries have nothing to
-  show), an existence check on a path the user may have cleaned, and the first
-  destructive action in the GUI, so a confirm. Decided as its own slice after the
-  move settles: worth it only if pruning by hand turns out to be real work.
+  no way to delete one from there.~~ Shipped: a line now names the folder it changed,
+  the copy it kept and the version that copy held, so it can put that copy back — the
+  first destructive action in the GUI, confirmed in the row it is about instead of in a
+  second dialog over this one. Only the newest line about a plugin offers it, and only
+  when that line was an update: rolling a rollback back is what the update button does,
+  and an older line no longer describes the folder. A copy retention already deleted
+  stops offering it, and lines written by older versions have nothing to roll back to.
+  The delete button was dropped: with a rollback there is nothing left to clean by hand.
 - **`FileHash` verification** — field exists on records but nothing computes or checks it.
 - ~~**Non-ZIP plugin archives** — totalcmd.net serves many plugins as RAR; since `b332687`
   they are rejected with a clear "unsupported archive format" hint instead of a cryptic

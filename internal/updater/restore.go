@@ -10,9 +10,9 @@ import (
 )
 
 // RestoreEntry puts the copy one history line kept back into the plugin folder it
-// came from, and returns the copy of the version that was installed until now.
-// That second copy is what makes the rollback undoable in turn, and what the
-// history line about it points at.
+// came from, and returns a copy of the version that was installed until now.
+// Nothing offers rolling a rollback back — updating again is the way forward — but
+// that second copy is what makes the answer hold even after the catalog moved on.
 //
 // The folder is taken away before the copy is written back instead of being
 // merged into: the files a newer version added have no counterpart in the copy,
@@ -49,6 +49,15 @@ func (u *Updater) RestoreEntry(entry domain.UpdateEntry) (string, error) {
 	return snapshot, nil
 }
 
+// BackupStillKept reports whether a copy named by a history line is still on
+// disk. Retention deletes copies on its own schedule and the data folder can be
+// cleaned by hand, so this is asked when the line is shown, not when it was
+// written.
+func BackupStillKept(backupPath string) bool {
+	info, err := os.Stat(backupPath)
+	return err == nil && info.IsDir()
+}
+
 // restoreSource checks the two claims a history line makes about where to put
 // what back. The line comes out of a JSON file, so neither is taken on trust: the
 // folder it names has to be one this tool may work on, and the copy has to be one
@@ -76,8 +85,7 @@ func restoreSource(entry domain.UpdateEntry) (string, error) {
 	if filepath.Dir(entry.BackupPath) != space {
 		return "", fmt.Errorf("%w: %s is not where the copies of %s live", ErrBackupGone, entry.BackupPath, space)
 	}
-	info, err := os.Stat(entry.BackupPath)
-	if err != nil || !info.IsDir() {
+	if !BackupStillKept(entry.BackupPath) {
 		return "", fmt.Errorf("%w: %s", ErrBackupGone, entry.BackupPath)
 	}
 	return entry.BackupPath, nil

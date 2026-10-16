@@ -65,6 +65,12 @@ holds that answer for the command line, so `--update-all` prunes by the same rul
 Versions before this one wrote the copies next to the plugin; updating a plugin
 carries whatever is still there into `backups\`.
 
+You do not need those folders to go back: the newest line in the update history
+about a plugin offers to put its copy back into the plugin folder — the last change
+and nothing older, so the log cannot walk you backwards through itself. The version
+a rollback displaces is kept as a copy of its own, and the way forward from a
+rollback is to update the plugin again.
+
 An update also needs somewhere to hold its download while it is unpacked — the
 only place TotalPlug writes that is neither your plugins folder nor its own data
 folder: `%TEMP%\totalplug`, with one subfolder per running instance so two copies

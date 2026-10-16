@@ -511,6 +511,38 @@ a.dlg-link:focus-visible {
     text-align: left;
     border-bottom: 1px solid var(--border);
 }
+/* The rollback is the one action a line in this log takes, so the column is as
+   wide as its button and never wraps the label. */
+.history-action {
+    width: 1%;
+    white-space: nowrap;
+}
+/* A rolled-back line has to say so beside the version it brought back, or the
+   log reads as if the older version were the newer one. */
+.history-kind {
+    margin-left: 6px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+/* The confirm replaces the row it is about, so it takes the whole width and the
+   quiet background of a row that is not data any more. */
+.history-confirm td {
+    background: var(--row-hover);
+}
+.history-confirm p {
+    margin: 0 0 6px;
+}
+.history-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+/* The reason a rollback failed is the one red this dialog spends. */
+.history-failed {
+    color: var(--badge-err);
+}
+.history-confirm .editor-actions {
+    margin-top: 10px;
+}
 
 /* Update progress dialog */
 #update-progress {

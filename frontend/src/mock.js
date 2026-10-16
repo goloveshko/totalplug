@@ -9,6 +9,29 @@ if (import.meta.env.DEV) {
 function installMockBackend() {
     const plugins = makePlugins();
     const handlers = new Map();
+    // Update history, newest first, in the shape the Go side gives it. The 7-Zip
+    // line has no kept copy left, so it offers no rollback.
+    const history = [
+        {
+            plugin_id: 'wlx_CudaLister',
+            plugin_name: 'CudaLister',
+            version: '3.1.6',
+            replaced_version: '3.1.5',
+            plugin_dir: 'C:\\TC\\wlx\\CudaLister',
+            backup_path: 'C:\\TC\\backups\\wlx\\CudaLister.bak_1700000000',
+            applied_at: iso(-2, 9),
+        },
+        { plugin_id: 'wdx_7zip', plugin_name: '7-Zip', version: '24.08', applied_at: iso(-9, 14) },
+        {
+            plugin_id: 'wfx_DeviceLocker',
+            plugin_name: 'DeviceLocker',
+            version: '0.9.3',
+            replaced_version: '0.9.2',
+            plugin_dir: 'C:\\TC\\wfx\\DeviceLocker',
+            backup_path: 'C:\\TC\\backups\\wfx\\DeviceLocker.bak_1700000000',
+            applied_at: iso(-30, 11),
+        },
+    ];
 
     function emit(name, ...args) {
         const set = handlers.get(name);
@@ -99,16 +122,29 @@ function installMockBackend() {
         },
 
         GetUpdateHistory() {
-            return Promise.resolve([
-                { plugin_id: 'wlx_CudaLister', plugin_name: 'CudaLister', version: '3.1.6', applied_at: iso(-2, 9) },
-                { plugin_id: 'wdx_7zip', plugin_name: '7-Zip', version: '24.08', applied_at: iso(-9, 14) },
-                {
-                    plugin_id: 'wfx_DeviceLocker',
-                    plugin_name: 'DeviceLocker',
-                    version: '0.9.3',
-                    applied_at: iso(-30, 11),
-                },
-            ]);
+            return Promise.resolve(clone(history));
+        },
+
+        // A rollback logs a line of its own and takes the offer away from the line
+        // it undid: only the newest change to a plugin describes the folder, and
+        // going forward again is what the update button is for.
+        RollbackUpdate(entry) {
+            if (!entry.backup_path) return Promise.reject('mock: ' + entry.plugin_id + ' has no kept copy');
+            const last = history.findIndex((h) => h.plugin_id === entry.plugin_id);
+            if (last >= 0) history[last].backup_path = '';
+            history.unshift({
+                plugin_id: entry.plugin_id,
+                plugin_name: entry.plugin_name,
+                version: entry.replaced_version,
+                replaced_version: entry.version,
+                plugin_dir: entry.plugin_dir,
+                restored: true,
+                applied_at: new Date().toISOString(),
+            });
+            return Promise.resolve({
+                locked: false,
+                backup_path: 'C:\\TC\\backups\\wlx\\' + entry.plugin_name + '.bak_' + Date.now(),
+            });
         },
 
         GetWindowEffect() {
