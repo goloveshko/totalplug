@@ -11,8 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -61,13 +59,6 @@ const DefaultMaxDownloadBytes int64 = 256 << 20
 // catch because such an archive is small until it is unpacked.
 const DefaultMaxExtractBytes int64 = 1 << 30
 
-// DefaultBackupsKept is how many newest backup directories remain per plugin
-// after a successful update.
-const DefaultBackupsKept = 3
-
-// backupSuffix separates a plugin directory name from its backup timestamp.
-const backupSuffix = ".bak_"
-
 // updateSpace is the folder inside the run's scratch that one download unpacks
 // into. It is emptied before each plugin rather than recreated, so a run reuses
 // one path for every update it makes.
@@ -77,53 +68,6 @@ const updateSpace = "update"
 // next run treats it as the leftover of a process that died, and removes it.
 // Long enough for the largest download in the catalog to finish on a slow link.
 const staleScratchAfter = time.Hour
-
-// PruneOldBackups deletes all but the newest `keep` backup directories of
-// pluginDir (named "<pluginDir>.bak_<unix>"). Entries with an unparseable
-// timestamp are left alone because they were not created by this tool.
-// It returns the paths that were removed.
-func PruneOldBackups(pluginDir string, keep int) ([]string, error) {
-	if keep < 0 {
-		return nil, fmt.Errorf("invalid backup keep count %d", keep)
-	}
-
-	type backup struct {
-		path string
-		ts   int64
-	}
-
-	entries, err := os.ReadDir(filepath.Dir(pluginDir))
-	if err != nil {
-		return nil, fmt.Errorf("reading backup parent dir: %w", err)
-	}
-
-	prefix := filepath.Base(pluginDir) + backupSuffix
-	var backups []backup
-	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
-			continue
-		}
-		ts, err := strconv.ParseInt(strings.TrimPrefix(e.Name(), prefix), 10, 64)
-		if err != nil {
-			continue
-		}
-		backups = append(backups, backup{path: filepath.Join(filepath.Dir(pluginDir), e.Name()), ts: ts})
-	}
-
-	if len(backups) <= keep {
-		return nil, nil
-	}
-
-	sort.Slice(backups, func(i, j int) bool { return backups[i].ts > backups[j].ts })
-	var removed []string
-	for _, b := range backups[keep:] {
-		if err := os.RemoveAll(b.path); err != nil {
-			return removed, fmt.Errorf("removing old backup %s: %w", b.path, err)
-		}
-		removed = append(removed, b.path)
-	}
-	return removed, nil
-}
 
 // validateDownloadURL requires https; plain http is only accepted for loopback
 // hosts so automated tests can serve archives from a local server.
@@ -531,17 +475,6 @@ func (u *Updater) Extract7z(sevenzPath, targetDir string) error {
 	return nil
 }
 
-// BackupPlugin creates a timestamped copy of the plugin directory. The original
-// directory is left in place so the update can be applied on top of it and the
-// backup stays available for manual recovery.
-func (u *Updater) BackupPlugin(pluginDir string) (string, error) {
-	backupDir := fmt.Sprintf("%s.bak_%d", pluginDir, time.Now().Unix())
-	if err := copyTree(pluginDir, backupDir); err != nil {
-		return "", fmt.Errorf("creating backup of %s: %w", pluginDir, err)
-	}
-	return backupDir, nil
-}
-
 // copyTree recursively copies srcDir into dstDir, merging with any existing files.
 func copyTree(srcDir, dstDir string) error {
 	return filepath.Walk(srcDir, func(path string, info os.FileInfo, walkErr error) error {
@@ -717,7 +650,8 @@ func isTotalCommanderRoot(dir string) bool {
 // UpdatePlugin downloads an update, backs up the current plugin directory, and
 // applies the new files. If applying fails, the files touched so far are rolled
 // back from the backup. On success the backup directory is kept and returned,
-// and older backups beyond DefaultBackupsKept are pruned.
+// and the copies the retention policy in the settings file no longer wants are
+// pruned from the app's backup space.
 //
 // Every candidate URL (primary + catalog mirrors) is tried until one yields a
 // usable archive; backup and apply happen only after a good package is secured.
@@ -822,7 +756,10 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 
 	// Best-effort cleanup: the update already succeeded, so old backups must
 	// not turn a good update into a reported failure.
-	_, _ = PruneOldBackups(pluginDir, DefaultBackupsKept)
+	// The policy is read here rather than when the Updater was built, so a
+	// settings change made while this process runs — by this window or by a CLI
+	// run — is what the next update honours.
+	_, _ = pruneBackupSpace(pluginDir, config.LoadBackupPolicy())
 
 	return backupDir, nil
 }

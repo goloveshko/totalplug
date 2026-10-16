@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,13 +21,18 @@ import (
 )
 
 // TestMain keeps every update test's download inside the test's own scratch
-// folder, so the package neither writes to nor sweeps the machine's %TEMP%.
+// folder, and its backups inside a data folder of its own, so the package
+// neither writes to nor sweeps the machine's %TEMP% nor touches the data folder
+// of whatever install happens to be running.
 func TestMain(m *testing.M) {
 	scratch, err := os.MkdirTemp("", "totalplug_scratch_test_*")
 	if err != nil {
 		panic(err)
 	}
 	if err := os.Setenv(config.ScratchEnv, filepath.Join(scratch, "scratch")); err != nil {
+		panic(err)
+	}
+	if err := os.Setenv(config.DataDirEnv, filepath.Join(scratch, "data")); err != nil {
 		panic(err)
 	}
 	code := m.Run()
@@ -101,6 +107,15 @@ func TestBackupPluginCopiesTreeKeepingOriginal(t *testing.T) {
 		t.Errorf("backup dir name = %q, want prefix demo.bak_", filepath.Base(backupDir))
 	}
 
+	// The copy belongs to the data folder, not to the Total Commander tree: a
+	// dead copy left beside the plugin is pollution in the user's own directory.
+	if want := filepath.Join(config.BackupSpacePath(), "wcx"); filepath.Dir(backupDir) != want {
+		t.Errorf("backup dir = %q, want it inside %q", filepath.Dir(backupDir), want)
+	}
+	if siblings, _ := filepath.Glob(filepath.Join(filepath.Dir(pluginDir), "demo.bak_*")); len(siblings) != 0 {
+		t.Errorf("no backup may be written next to the plugin, found %v", siblings)
+	}
+
 	for rel, want := range map[string]string{
 		"demo.wdx":                       "binary",
 		"readme.txt":                     "readme",
@@ -109,6 +124,35 @@ func TestBackupPluginCopiesTreeKeepingOriginal(t *testing.T) {
 		if got := readTestFile(t, filepath.Join(backupDir, rel)); got != want {
 			t.Errorf("backup content %q = %q, want %q", rel, got, want)
 		}
+	}
+}
+
+// The version that wrote backups beside the plugin left them there, and updating
+// that plugin is what moves them out — retention cannot reach a folder it does
+// not own.
+func TestBackupPluginMovesLegacyCopiesIntoTheSpace(t *testing.T) {
+	root := t.TempDir()
+	pluginDir := filepath.Join(root, "Legacy", "demo")
+	writeTestFile(t, filepath.Join(pluginDir, "demo.wdx"), "binary")
+	space := backupSpaceFor(t, pluginDir)
+
+	legacy := filepath.Join(root, "Legacy", "demo.bak_"+strconv.FormatInt(time.Now().Add(-24*time.Hour).Unix(), 10))
+	writeTestFile(t, filepath.Join(legacy, "demo.wdx"), "ancient")
+	notOurs := filepath.Join(root, "Legacy", "demo.bak_manual")
+	writeTestFile(t, filepath.Join(notOurs, "keep.txt"), "mine")
+
+	if _, err := NewUpdater().BackupPlugin(pluginDir); err != nil {
+		t.Fatalf("BackupPlugin: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(space, filepath.Base(legacy), "demo.wdx")); err != nil {
+		t.Errorf("old copy should be readable in %s: %v", space, err)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Error("the Total Commander tree should be rid of the old copy")
+	}
+	if _, err := os.Stat(notOurs); err != nil {
+		t.Errorf("a copy this tool did not write must stay where it is: %v", err)
 	}
 }
 
@@ -191,7 +235,11 @@ func TestUpdatePluginRollsBackOnApplyFailure(t *testing.T) {
 		t.Errorf("new.txt should have been removed by rollback")
 	}
 
-	leftovers, _ := filepath.Glob(pluginDir + ".bak_*")
+	space, err := backupNamespace(pluginDir)
+	if err != nil {
+		t.Fatalf("backupNamespace: %v", err)
+	}
+	leftovers, _ := filepath.Glob(filepath.Join(space, "*"))
 	if len(leftovers) != 0 {
 		t.Errorf("backup dir should be removed after successful rollback, found %v", leftovers)
 	}
@@ -358,100 +406,140 @@ func TestDownloadFileEnforcesSizeCap(t *testing.T) {
 	}
 }
 
-func TestPruneOldBackups(t *testing.T) {
-	dir := t.TempDir()
-	pluginDir := filepath.Join(dir, "MyPlugin")
-	if err := os.MkdirAll(pluginDir, 0755); err != nil {
-		t.Fatal(err)
+// backupSpaceFor returns the namespace folder the updater writes pluginDir's
+// copies into, emptied so a test starts from the copies it names. The package
+// pins TOTALPLUG_DATA_DIR in TestMain, so this is a folder inside the test's own
+// temp tree.
+func backupSpaceFor(t *testing.T, pluginDir string) string {
+	t.Helper()
+	space, err := backupNamespace(pluginDir)
+	if err != nil {
+		t.Fatalf("backupNamespace: %v", err)
 	}
+	if err := os.RemoveAll(space); err != nil {
+		t.Fatalf("clearing %s: %v", space, err)
+	}
+	return space
+}
+
+func TestPruneBackupSpaceDropsOldCopiesBeyondTheFloor(t *testing.T) {
+	pluginDir := filepath.Join(t.TempDir(), "MyGroup", "MyPlugin")
+	space := backupSpaceFor(t, pluginDir)
 
 	names := []string{
 		"MyPlugin.bak_1001", "MyPlugin.bak_1003", "MyPlugin.bak_1002",
 		"MyPlugin.bak_manual", "Other.bak_9999", "MyPlugin.bak_plain",
 	}
 	for _, n := range names {
-		if err := os.MkdirAll(filepath.Join(dir, n), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(space, n), 0755); err != nil {
 			t.Fatal(err)
 		}
 	}
 	writeTestFile(t, filepath.Join(pluginDir, "plugin.dll"), "core")
 
-	removed, err := PruneOldBackups(pluginDir, 2)
+	// Every seeded copy is from 1970, so all of them are past a 30-day limit and
+	// only the floor of two protects the newest.
+	removed, err := pruneBackupSpace(pluginDir, config.BackupPolicy{KeepNewest: 2, MaxAgeDays: 30})
 	if err != nil {
-		t.Fatalf("PruneOldBackups: %v", err)
+		t.Fatalf("pruneBackupSpace: %v", err)
 	}
 	if len(removed) != 1 || filepath.Base(removed[0]) != "MyPlugin.bak_1001" {
 		t.Errorf("removed = %v, want only MyPlugin.bak_1001", removed)
 	}
 
 	for _, keep := range []string{"MyPlugin.bak_1003", "MyPlugin.bak_1002", "MyPlugin.bak_manual", "Other.bak_9999", "MyPlugin.bak_plain"} {
-		if _, err := os.Stat(filepath.Join(dir, keep)); err != nil {
+		if _, err := os.Stat(filepath.Join(space, keep)); err != nil {
 			t.Errorf("%s must survive pruning: %v", keep, err)
 		}
-	}
-	if _, err := os.Stat(filepath.Join(dir, "MyPlugin.bak_1001")); !os.IsNotExist(err) {
-		t.Error("oldest backup was not deleted")
 	}
 	if _, err := os.Stat(filepath.Join(pluginDir, "plugin.dll")); err != nil {
 		t.Errorf("plugin dir must stay untouched: %v", err)
 	}
 }
 
-func TestPruneOldBackupsNoopWithinKeepLimit(t *testing.T) {
-	dir := t.TempDir()
-	pluginDir := filepath.Join(dir, "P")
-	if err := os.MkdirAll(filepath.Join(pluginDir), 0755); err != nil {
-		t.Fatal(err)
+func TestPruneBackupSpaceKeepsYoungCopies(t *testing.T) {
+	pluginDir := filepath.Join(t.TempDir(), "YoungGroup", "P")
+	space := backupSpaceFor(t, pluginDir)
+
+	ago := func(d time.Duration) string {
+		return fmt.Sprintf("P.bak_%d", time.Now().Add(-d).Unix())
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "P.bak_1"), 0755); err != nil {
-		t.Fatal(err)
+	recent1, recent2, stale := ago(time.Hour), ago(2*time.Hour), ago(40*24*time.Hour)
+	for _, n := range []string{recent1, recent2, stale} {
+		if err := os.MkdirAll(filepath.Join(space, n), 0755); err != nil {
+			t.Fatal(err)
+		}
 	}
-	removed, err := PruneOldBackups(pluginDir, 3)
+
+	// A one-copy floor plus a 30-day limit: the second copy is past the floor but
+	// an hour old, so it stays. Age is what deletes, the floor is what protects.
+	removed, err := pruneBackupSpace(pluginDir, config.BackupPolicy{KeepNewest: 1, MaxAgeDays: 30})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("pruneBackupSpace: %v", err)
+	}
+	if len(removed) != 1 || filepath.Base(removed[0]) != filepath.Base(stale) {
+		t.Errorf("removed = %v, want only the 40-day copy", removed)
+	}
+	for _, n := range []string{recent1, recent2} {
+		if _, err := os.Stat(filepath.Join(space, n)); err != nil {
+			t.Errorf("%s must survive: %v", n, err)
+		}
+	}
+}
+
+func TestPruneBackupSpaceWithoutAgeLimitDeletesNothing(t *testing.T) {
+	pluginDir := filepath.Join(t.TempDir(), "NoLimit", "P")
+	space := backupSpaceFor(t, pluginDir)
+
+	for _, n := range []string{"P.bak_1", "P.bak_2", "P.bak_3"} {
+		if err := os.MkdirAll(filepath.Join(space, n), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	removed, err := pruneBackupSpace(pluginDir, config.BackupPolicy{KeepNewest: 2, MaxAgeDays: 0})
+	if err != nil {
+		t.Fatalf("pruneBackupSpace: %v", err)
 	}
 	if removed != nil {
-		t.Errorf("removed = %v, want nil", removed)
+		t.Errorf("removed = %v, want nothing deleted without an age limit", removed)
 	}
 }
 
 func TestUpdatePluginPrunesOldBackups(t *testing.T) {
 	pluginDir := filepath.Join(t.TempDir(), "WCX", "test")
-	dir := filepath.Dir(pluginDir)
 	pluginFile := filepath.Join(pluginDir, "test.wcx")
 	writeTestFile(t, pluginFile, "old")
+	space := backupSpaceFor(t, pluginDir)
 
-	// Backups are siblings of the plugin directory; seeded ones use old
-	// timestamps so the fresh backup always sorts newest.
-	bakOld1 := fmt.Sprintf("test.bak_%d", time.Now().Add(-4*time.Hour).Unix())
-	bakOld2 := fmt.Sprintf("test.bak_%d", time.Now().Add(-3*time.Hour).Unix())
-	bakOld3 := fmt.Sprintf("test.bak_%d", time.Now().Add(-2*time.Hour).Unix())
-	for _, n := range []string{bakOld1, bakOld2, bakOld3} {
-		if err := os.MkdirAll(filepath.Join(dir, n), 0755); err != nil {
+	// The copies the policy judges live in the data folder, not beside the
+	// plugin; these timestamps are decades old, so the default 30-day limit
+	// reaches the oldest of them while the floor of three keeps the rest.
+	for _, n := range []string{"test.bak_1001", "test.bak_1002", "test.bak_1003"} {
+		if err := os.MkdirAll(filepath.Join(space, n), 0755); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	archive := buildTestZip(t, map[string]string{"test.wcx": "new"})
-	p := domain.Plugin{
+	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
 		Path:        pluginFile,
 		DownloadURL: serveTestZip(t, archive),
-	}
-	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), p)
+	})
 	if err != nil {
 		t.Fatalf("UpdatePlugin: %v", err)
 	}
 
-	// keep=3 out of 4 backups: the oldest seeded one must be pruned while the
-	// fresh backup returned to the caller survives.
+	// Three old copies plus the fresh one are four, so the oldest goes and the
+	// backup returned to the caller survives.
 	if _, err := os.Stat(backupDir); err != nil {
 		t.Errorf("fresh backup must survive pruning: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, bakOld1)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(space, "test.bak_1001")); !os.IsNotExist(err) {
 		t.Error("oldest seeded backup should have been pruned")
 	}
-	for _, n := range []string{bakOld2, bakOld3} {
-		if _, err := os.Stat(filepath.Join(dir, n)); err != nil {
+	for _, n := range []string{"test.bak_1002", "test.bak_1003"} {
+		if _, err := os.Stat(filepath.Join(space, n)); err != nil {
 			t.Errorf("%s must survive pruning: %v", n, err)
 		}
 	}
