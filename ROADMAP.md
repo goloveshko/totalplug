@@ -447,15 +447,24 @@ next release (v2), and the accepted debt we deliberately postponed.
   re-resolves the entry by stable id after the confirm and drops what is no longer offerable.
 - ~~**Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
   read nowhere; the About panel renders its labels from other keys.~~ Removed in `4a9f6de`.
-- **Frontend migration (Wails v3 + Svelte 5)** — planned for after v1, with no schedule
-  for the framework move itself. The cheap half is stage 16: `main.js` is now a composition
-  root over one module per screen, with no new dependency and no change to the stage 13
-  policy. That policy, not taste, is what decides the framework: `style-src 'self'` without
-  `'unsafe-inline'` rules out CSS-in-JS, `script-src 'self'` without `'unsafe-eval'` rules
-  out Vue's runtime template compiler, and what survives is the compiled-template group —
-  Svelte being the pick there. If it happens, Wails v2 to v3 and the framework move are one
-  migration and not two, because the generated bindings, the embed path and the
-  verification pass all change either way. Wails v3 is still beta.
+- **Frontend migration (Svelte 5, then Wails v3)** — planned for after v1. The cheap half is
+  stage 16: `main.js` is now a composition root over one module per screen, with no new
+  dependency and no change to the stage 13 policy. That policy, not taste, is what decides the
+  framework: `style-src 'self'` without `'unsafe-inline'` rules out CSS-in-JS, `script-src 'self'`
+  without `'unsafe-eval'` rules out Vue's runtime template compiler, and what survives is the
+  compiled-template group — Svelte being the pick there. This reverses what this bullet used to
+  say, that the framework move and the Wails move are one migration: the spike below ran a Svelte
+  island inside the v2 shell with the Go side and the generated bindings untouched, so v2 to v3
+  changes only the bindings, the embed path and the verification pass — on a frontend that no
+  longer has to be rewritten at the same time.
+- **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
+  `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
+  `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
+  rendered under the page CSP with no `eval` in the bundle and no runtime-injected `<style>`,
+  cost +12 kB gzip, and survived the `buildDom()` rebuild only because the spike unmounted and
+  remounted it by hand — which is exactly the dance the i18n store is meant to delete. Not
+  covered by the spike: a real WebView2 window, deferred to the first slice's build. Wails v3
+  itself was at `beta.29` (2026-10-13) with its GA milestone already a month overdue.
 
 Nits the final review pass found and deliberately left alone — each is real, none changes
 behaviour a user can reach today:
