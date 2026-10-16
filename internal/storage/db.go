@@ -161,44 +161,95 @@ func writeJSONAtomic(path string, value any) error {
 	return os.Rename(tmpFile, path)
 }
 
-// RememberVersion stores the version applied by a successful update so later
-// scans start from a known value instead of "Unknown", and appends the event
-// to the capped update history log. A stale manual CustomVersion written
-// before the update would otherwise shadow the new record in ApplyOverrides,
-// so it is cleared here (CustomName and CustomSource are kept).
-func (db *Database) RememberVersion(pluginID, pluginName, version string) error {
-	if pluginID == "" || version == "" {
+// AppliedChange is one change the updater applied, as the history log records it.
+type AppliedChange struct {
+	PluginID        string
+	PluginName      string
+	Version         string
+	ReplacedVersion string
+	PluginDir       string
+	BackupPath      string
+	Restored        bool
+}
+
+// ChangeFromUpdate describes a successful update the way RecordChange wants it:
+// the folder that changed, the copy the updater left behind and the version that
+// copy holds. Both the CLI and the GUI apply an update and then log it, and the
+// mapping is the same answer in both places.
+func ChangeFromUpdate(plugin domain.Plugin, backupPath string) AppliedChange {
+	return AppliedChange{
+		PluginID:        plugin.ID,
+		PluginName:      plugin.Name,
+		Version:         plugin.LatestVersion,
+		ReplacedVersion: plugin.InstalledVersion,
+		PluginDir:       filepath.Dir(plugin.Path),
+		BackupPath:      backupPath,
+	}
+}
+
+// ChangeFromRestore describes a rollback of one logged change: the version now in
+// the folder is the one the kept copy held, and the snapshot taken of what was
+// there until a moment ago is the copy that makes this line undoable in turn.
+func ChangeFromRestore(entry domain.UpdateEntry, snapshotPath string) AppliedChange {
+	return AppliedChange{
+		PluginID:        entry.PluginID,
+		PluginName:      entry.PluginName,
+		Version:         entry.ReplacedVersion,
+		ReplacedVersion: entry.Version,
+		PluginDir:       entry.PluginDir,
+		BackupPath:      snapshotPath,
+		Restored:        true,
+	}
+}
+
+// RecordChange stores the version applied by a successful update so later scans
+// start from a known value instead of "Unknown", and appends the event to the
+// capped update history log. A stale manual CustomVersion written before the
+// update would otherwise shadow the new record in ApplyOverrides, so it is
+// cleared here (CustomName and CustomSource are kept).
+//
+// An update that replaced a version the scanner never read has nothing to
+// report as the new one, so it is logged without a version and leaves the
+// remembered record alone — the next scan is what fills it in.
+func (db *Database) RecordChange(change AppliedChange) error {
+	if change.PluginID == "" || (change.Version == "" && !change.Restored) {
 		return nil
 	}
 
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	db.records[pluginID] = Record{
-		ID:        pluginID,
-		Version:   version,
-		UpdatedAt: time.Now().UTC(),
-	}
-	if err := db.saveRecordsLocked(); err != nil {
-		return err
+	if change.Version != "" {
+		db.records[change.PluginID] = Record{
+			ID:        change.PluginID,
+			Version:   change.Version,
+			UpdatedAt: time.Now().UTC(),
+		}
+		if err := db.saveRecordsLocked(); err != nil {
+			return err
+		}
 	}
 
 	overridesChanged := false
-	if ov, ok := db.overrides[pluginID]; ok && ov.CustomVersion != "" {
+	if ov, ok := db.overrides[change.PluginID]; ok && ov.CustomVersion != "" {
 		ov.CustomVersion = ""
 		if ov.CustomName == "" && ov.CustomSource == "" {
-			delete(db.overrides, pluginID)
+			delete(db.overrides, change.PluginID)
 		} else {
-			db.overrides[pluginID] = ov
+			db.overrides[change.PluginID] = ov
 		}
 		overridesChanged = true
 	}
 
 	db.history = append([]domain.UpdateEntry{{
-		PluginID:   pluginID,
-		PluginName: pluginName,
-		Version:    version,
-		AppliedAt:  time.Now().UTC(),
+		PluginID:        change.PluginID,
+		PluginName:      change.PluginName,
+		Version:         change.Version,
+		AppliedAt:       time.Now().UTC(),
+		PluginDir:       change.PluginDir,
+		BackupPath:      change.BackupPath,
+		ReplacedVersion: change.ReplacedVersion,
+		Restored:        change.Restored,
 	}}, db.history...)
 	if len(db.history) > MaxHistoryEntries {
 		db.history = db.history[:MaxHistoryEntries]

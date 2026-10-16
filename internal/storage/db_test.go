@@ -21,6 +21,19 @@ func newTestDb(t *testing.T) string {
 	return dir
 }
 
+// remember logs a plain update — the shape most of these tests care about, where
+// the copy the updater kept and the version it replaced are not the point.
+func remember(t *testing.T, db *Database, pluginID, pluginName, version string) {
+	t.Helper()
+	if err := db.RecordChange(AppliedChange{
+		PluginID:   pluginID,
+		PluginName: pluginName,
+		Version:    version,
+	}); err != nil {
+		t.Fatalf("RecordChange(%s %s): %v", pluginID, version, err)
+	}
+}
+
 func TestNewDatabaseMissingFilesAreNotErrors(t *testing.T) {
 	newTestDb(t)
 
@@ -121,19 +134,20 @@ func TestOverrideRoundtripThroughDisk(t *testing.T) {
 	}
 }
 
-func TestRememberVersionRoundtripAppliesAsManual(t *testing.T) {
+func TestRecordChangeRoundtripAppliesAsManual(t *testing.T) {
 	newTestDb(t)
 
 	db, err := NewDatabase("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.RememberVersion("wlx_Demo", "Demo", "2.0"); err != nil {
-		t.Fatal(err)
-	}
+	remember(t, db, "wlx_Demo", "Demo", "2.0")
 	// Empty inputs must be no-ops, not junk records.
-	if err := db.RememberVersion("", "n", "9"); err != nil || db.RememberVersion("x", "n", "") != nil {
-		t.Fatalf("empty RememberVersion inputs should be ignored: %v %v", err, err)
+	if err := db.RecordChange(AppliedChange{PluginID: "", PluginName: "n", Version: "9"}); err != nil {
+		t.Fatalf("empty plugin id should be ignored: %v", err)
+	}
+	if err := db.RecordChange(AppliedChange{PluginID: "x", PluginName: "n", Version: ""}); err != nil {
+		t.Fatalf("empty version should be ignored: %v", err)
 	}
 	if _, exists := db.records["x"]; exists {
 		t.Error("empty version must not create a record")
@@ -163,9 +177,7 @@ func TestMigrateLegacyIDs(t *testing.T) {
 	if err := db.SetUserOverride("WLX_CudaLister", domain.Override{CustomSource: "github:Alexey-T/CudaLister"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.RememberVersion("WCX_Total7zip", "Total7zip", "3.16"); err != nil {
-		t.Fatal(err)
-	}
+	remember(t, db, "WCX_Total7zip", "Total7zip", "3.16")
 
 	moved, err := db.MigrateLegacyIDs(map[string]string{
 		"WLX_CudaLister":  "WLX:plugins/wlx/cudalister/cuda.wlx",
@@ -239,19 +251,15 @@ func TestMigrateLegacyIDsNoopWhenTargetExists(t *testing.T) {
 	}
 }
 
-func TestRememberVersionAppendsHistoryNewestFirst(t *testing.T) {
+func TestRecordChangeAppendsHistoryNewestFirst(t *testing.T) {
 	newTestDb(t)
 	db, err := NewDatabase("")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := db.RememberVersion("WCX:a", "Alpha", "1.0"); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.RememberVersion("WLX:b", "Beta", "2.0"); err != nil {
-		t.Fatal(err)
-	}
+	remember(t, db, "WCX:a", "Alpha", "1.0")
+	remember(t, db, "WLX:b", "Beta", "2.0")
 
 	hist := db.UpdateHistory()
 	if len(hist) != 2 {
@@ -273,7 +281,106 @@ func TestRememberVersionAppendsHistoryNewestFirst(t *testing.T) {
 	}
 }
 
-func TestRememberVersionClearsStaleManualVersion(t *testing.T) {
+// Both callers log the plugin they just updated the same way, so the mapping from
+// a scanned plugin to a change is tested once, here.
+func TestChangeFromUpdateMapsTheAppliedPlugin(t *testing.T) {
+	got := ChangeFromUpdate(domain.Plugin{
+		ID:               "WLX:c",
+		Name:             "CudaLister",
+		Path:             filepath.Join("C:", "TC", "wlx", "CudaLister", "cuda.wlx"),
+		InstalledVersion: "1.8",
+		LatestVersion:    "1.9",
+	}, filepath.Join("C:", "data", "backups", "wlx", "CudaLister.bak_1700000000"))
+
+	want := AppliedChange{
+		PluginID:        "WLX:c",
+		PluginName:      "CudaLister",
+		Version:         "1.9",
+		ReplacedVersion: "1.8",
+		PluginDir:       filepath.Join("C:", "TC", "wlx", "CudaLister"),
+		BackupPath:      filepath.Join("C:", "data", "backups", "wlx", "CudaLister.bak_1700000000"),
+	}
+	if got != want {
+		t.Errorf("ChangeFromUpdate() = %+v, want %+v", got, want)
+	}
+}
+
+// A rollback is a change like any other: it names the copy it put back and the
+// version that copy held, so the line that was rolled back and the line that
+// rolled it back describe the same two states from opposite ends.
+func TestRecordChangeLogsRestoreWithItsSnapshot(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	update := AppliedChange{
+		PluginID:        "WLX:c",
+		PluginName:      "CudaLister",
+		Version:         "1.9",
+		ReplacedVersion: "1.8",
+		PluginDir:       `C:\TC\wlx\CudaLister`,
+		BackupPath:      `C:\data\backups\wlx\CudaLister.bak_1700000000`,
+	}
+	if err := db.RecordChange(update); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := `C:\data\backups\wlx\CudaLister.bak_1700000100`
+	if err := db.RecordChange(ChangeFromRestore(db.UpdateHistory()[0], snapshot)); err != nil {
+		t.Fatal(err)
+	}
+
+	hist := db.UpdateHistory()
+	if len(hist) != 2 {
+		t.Fatalf("history len = %d, want 2", len(hist))
+	}
+	restored := hist[0]
+	if !restored.Restored || restored.Version != "1.8" || restored.ReplacedVersion != "1.9" {
+		t.Errorf("restore line = %+v, want 1.8 replacing 1.9", restored)
+	}
+	if restored.PluginID != "WLX:c" || restored.PluginDir != update.PluginDir {
+		t.Errorf("restore line lost the plugin it belongs to: %+v", restored)
+	}
+	if restored.BackupPath != snapshot {
+		t.Errorf("restore line points at %q, want the snapshot of what it replaced", restored.BackupPath)
+	}
+	if got := db.records["WLX:c"].Version; got != "1.8" {
+		t.Errorf("remembered version = %q, want the one now in the folder", got)
+	}
+}
+
+// A plugin the scanner never read a version for has no version to report after a
+// rollback either. The line still belongs in the log; the remembered record is
+// left as it was, which is what lets the next scan fill it in.
+func TestRecordChangeRestoreWithoutVersionKeepsTheRecord(t *testing.T) {
+	newTestDb(t)
+	db, err := NewDatabase("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	remember(t, db, "WCX:u", "Uncertain", "2.0")
+	if err := db.RecordChange(AppliedChange{
+		PluginID:   "WCX:u",
+		PluginName: "Uncertain",
+		PluginDir:  `C:\TC\wcx\Uncertain`,
+		BackupPath: `C:\data\backups\wcx\Uncertain.bak_1700000000`,
+		Restored:   true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := db.records["WCX:u"].Version; got != "2.0" {
+		t.Errorf("remembered version = %q, want it left alone", got)
+	}
+	hist := db.UpdateHistory()
+	if len(hist) != 2 || !hist[0].Restored || hist[0].Version != "" {
+		t.Errorf("history = %+v, want the restore logged without a version", hist)
+	}
+}
+
+func TestRecordChangeClearsStaleManualVersion(t *testing.T) {
 	newTestDb(t)
 	db, err := NewDatabase("")
 	if err != nil {
@@ -290,12 +397,8 @@ func TestRememberVersionClearsStaleManualVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := db.RememberVersion("WLX:c", "CudaLister", "1.8.6.3"); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.RememberVersion("WLX:d", "Delta", "1.0"); err != nil {
-		t.Fatal(err)
-	}
+	remember(t, db, "WLX:c", "CudaLister", "1.8.6.3")
+	remember(t, db, "WLX:d", "Delta", "1.0")
 
 	reloaded, err := NewDatabase("")
 	if err != nil {
@@ -328,9 +431,7 @@ func TestHistoryIsCapped(t *testing.T) {
 	}
 
 	db.history = make([]domain.UpdateEntry, MaxHistoryEntries)
-	if err := db.RememberVersion("WCX:new", "New", "9.9"); err != nil {
-		t.Fatal(err)
-	}
+	remember(t, db, "WCX:new", "New", "9.9")
 	hist := db.UpdateHistory()
 	if len(hist) != MaxHistoryEntries {
 		t.Fatalf("history len = %d, want cap %d", len(hist), MaxHistoryEntries)

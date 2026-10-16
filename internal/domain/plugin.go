@@ -89,12 +89,27 @@ type UpdateResult struct {
 	BackupPath string `json:"backup_path,omitempty"`
 }
 
-// UpdateEntry is one append-only record of a successfully applied update.
+// UpdateEntry is one append-only record of a change the updater applied: either
+// an update it installed or a rollback it put back.
 type UpdateEntry struct {
 	PluginID   string    `json:"plugin_id"`
 	PluginName string    `json:"plugin_name"`
 	Version    string    `json:"version"`
 	AppliedAt  time.Time `json:"applied_at" ts_type:"string"`
+	// PluginDir is the folder that was changed, as it was at the time. The
+	// stable id cannot stand in for it: it lowercases and normalises the path,
+	// and a rollback has to hand the real one to the filesystem.
+	PluginDir string `json:"plugin_dir,omitempty"`
+	// BackupPath is the copy of what that folder held *before* this change, so
+	// rolling the line back puts that state there. It is empty for entries
+	// written before the copies moved into the data folder, and the GUI drops
+	// it once retention has deleted the copy.
+	BackupPath string `json:"backup_path,omitempty"`
+	// ReplacedVersion is the version BackupPath holds — what a rollback puts
+	// back, and what the next scan then compares against.
+	ReplacedVersion string `json:"replaced_version,omitempty"`
+	// Restored marks a line written by a rollback instead of an update.
+	Restored bool `json:"restored,omitempty"`
 }
 
 // AppInfo is what the About panel can show without a network round trip.
