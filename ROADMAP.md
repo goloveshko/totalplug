@@ -95,9 +95,10 @@ next release (v2), and the accepted debt we deliberately postponed.
 - GitHub Actions CI: Windows job (`npm ci` + `npm run build` first, because the root
   `main.go` embeds `frontend/dist` and a fresh checkout has none, then `go mod verify`,
   vet, `go test -race -cover ./...`, CLI build) plus an ubuntu job that checks the
-  formatting and builds the frontend on its own (`f6702e3`, `e201d1a`). Neither has run
-  yet: `origin` is still a local Gitea, so the workflow is unverified until the first
-  push to GitHub.
+  formatting and builds the frontend on its own (`f6702e3`, `e201d1a`). Both jobs have
+  been green on every push to GitHub since the first one (`59618d3`), the formatting
+  gate included, so the workflow is no longer the untested layer it was while `origin`
+  pointed at a local Gitea.
 - Prettier over the whole tree, not just the frontend: `.prettierrc` keeps 4 spaces and
   single quotes for JS/CSS/HTML/Markdown (how `frontend/src` is written by hand) and
   overrides JSON/YAML back to 2 spaces and double quotes (how npm, Wails and a pasted
@@ -479,8 +480,13 @@ next release (v2), and the accepted debt we deliberately postponed.
   Slice 1 is in. `#app` now splits into `#chrome` (the mounted island, `display: contents` so the
   flex column does not move a pixel) and `#screens`, the language is a store, and the window
   chrome is `frontend/src/Titlebar.svelte` — which is what lets a language switch leave the search
-  box, its text and the keyboard focus alone. Next slices: the screens, one per slice, and only as
-  far as each one's state has to leave the DOM.
+  box, its text and the keyboard focus alone. The rest now goes ahead of any new feature
+  (2026-10-16), so that no screen is rewritten twice: the table, then the shared dialog and the
+  progress overlay, then the plugin card together with the keyboard pass below (focus is a
+  component's job), then the update queue and the history, and settings with its subviews last —
+  those forms already keep their values in `settings.json` and localStorage, so a rebuild costs
+  them nothing. Done means `buildScreens()` is deleted: every label comes from a store, so a
+  language switch has nothing left to rebuild.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
   `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
   `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
