@@ -477,22 +477,29 @@ next release (v2), and the accepted debt we deliberately postponed.
   embed path and the verification pass — on a frontend that no longer has to be rewritten at the
   same time. Stage 16 was the other half of that prep: `main.js` is a composition root over one
   module per screen, so a screen can become a component without touching the others.
-  Two slices are in. `#app` now splits into `#chrome` and `#table` (mounted islands, both
-  `display: contents` so the flex column does not move a pixel) plus `#screens` (still rebuilt
-  vanilla), the language is a store, and the window chrome is `frontend/src/Titlebar.svelte` —
-  which is what lets a language switch leave the search box, its text and the keyboard focus
-  alone. Slice 2 made `frontend/src/PluginTable.svelte` out of the table (`7cb9d76`): the plugin
-  list and the in-flight update flag became stores, so `catalog.js` is now only stores plus the
-  scan plus the event registration, and the rows, the batch bar and the placeholder are derived
-  rather than written into a `tbody`. Two things that file has to keep doing: import the i18n
-  store under another name (a component rendering `<tr>` cannot also hold a binding called `tr`),
-  and ignore the a11y complaint about the delegated `tbody` click until the keyboard pass below
-  gives the row a real button. The rest now goes ahead of any new feature (2026-10-16), so that
-  no screen is rewritten twice: the shared dialog and the progress overlay, then the plugin card
-  together with the keyboard pass below (focus is a component's job), then the update queue and
-  the history, and settings with its subviews last — those forms already keep their values in
-  `settings.json` and localStorage, so a rebuild costs them nothing. Done means `buildScreens()`
-  is deleted: every label comes from a store, so a language switch has nothing left to rebuild.
+  Three slices are in. `#app` now splits into `#chrome`, `#table` and `#overlays`
+  (mounted islands, all `display: contents` so the flex column does not move a pixel) plus
+  `#screens` (still rebuilt vanilla), the language is a store, and the window chrome is
+  `frontend/src/Titlebar.svelte` — which is what lets a language switch leave the search box,
+  its text and the keyboard focus alone. Slice 2 made `frontend/src/PluginTable.svelte` out of
+  the table (`7cb9d76`): the plugin list and the in-flight update flag became stores, so
+  `catalog.js` is now only stores plus the scan plus the event registration, and the rows, the
+  batch bar and the placeholder are derived rather than written into a `tbody`. Two things that
+  file has to keep doing: import the i18n store under another name (a component rendering `<tr>`
+  cannot also hold a binding called `tr`), and ignore the a11y complaint about the delegated
+  `tbody` click until the keyboard pass below gives the row a real button. Slice 3 put both
+  dialogs in islands (`54052ff`): `dialog.js` and `progress.js` kept their exported API — callers
+  still await `showConfirm()` and drive `beginProgress()` — and gave up every DOM write, while
+  `Dialog.svelte` and `ProgressOverlay.svelte` own the markup. One thing stays imperative: the
+  top layer has no attribute to set, so each component runs a single effect that maps the
+  store's open flag onto `showModal()` and `close()`, and the three focus rules survive — safe
+  button on open, opener on close, acknowledgement when the bar becomes a result. The rest now
+  goes ahead of any new feature (2026-10-16), so that no screen is rewritten twice: the plugin
+  card together with the keyboard pass below (focus is a component's job), then the update queue
+  and the history, and settings with its subviews last — those forms already keep their values
+  in `settings.json` and localStorage, so a rebuild costs them nothing. Done means
+  `buildScreens()` is deleted: every label comes from a store, so a language switch has nothing
+  left to rebuild.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
   `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
   `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
