@@ -1,7 +1,8 @@
 import { UpdatePlugin } from '../wailsjs/go/gui/App';
 import { t, tp } from './i18n.js';
+import { get } from 'svelte/store';
 import { dom } from './dom.js';
-import { state } from './state.js';
+import { plugins, progressRunning } from './state.js';
 import { isUpdatable } from './plugin.js';
 import { escapeHtml, linkify } from './text.js';
 import { showConfirm, errorDialogHtml } from './dialog.js';
@@ -24,14 +25,14 @@ async function updateOnePlugin(plugin) {
     }
 }
 
-// Reached only through the delegated tbody click handler (no inline onclick, so
-// a future script-src CSP stays possible).
+// Reached only from the table's delegated click handler — one listener for every
+// row, so a re-render cannot leave a button wired to a stale index.
 export async function handleUpdate(index) {
     // The confirm and the progress dialog are separate modals: without this
     // guard a second click starts a parallel UpdatePlugin for the same plugin.
-    if (state.progressRunning) return;
+    if (get(progressRunning)) return;
 
-    const clicked = state.plugins[index];
+    const clicked = get(plugins)[index];
     if (!clicked) return;
 
     if (!(await showConfirm(t('update.confirm', { name: clicked.name, version: clicked.latest_version })))) {
@@ -42,7 +43,7 @@ export async function handleUpdate(index) {
     // plugin list, so the object captured above may now carry a stale
     // download_url/version. Re-resolve by the stable id and update the live
     // record; if the refresh dropped the plugin, there is nothing to update.
-    const plugin = state.plugins.find((p) => p.id === clicked.id);
+    const plugin = get(plugins).find((p) => p.id === clicked.id);
     if (!plugin) return;
 
     // One dialog shows progress, then the final result in the same place.
@@ -71,9 +72,9 @@ const summaryRow = (glyph, className, text) =>
     `<div class="ua-row ${className}"><span class="ua-glyph" aria-hidden="true">${glyph}</span><span>${escapeHtml(text)}</span></div>`;
 
 export async function handleUpdateAll() {
-    if (state.progressRunning) return;
+    if (get(progressRunning)) return;
 
-    const offered = state.plugins.filter(isUpdatable);
+    const offered = get(plugins).filter(isUpdatable);
     if (offered.length === 0) return;
 
     // The count is the whole queue, not the visible rows: the search filter is a
@@ -88,7 +89,7 @@ export async function handleUpdateAll() {
     // queue from the live records by stable id, so the batch never downloads from a
     // superseded download_url and drops whatever is no longer offerable.
     const queue = offered
-        .map((stale) => state.plugins.find((p) => p.id === stale.id))
+        .map((stale) => get(plugins).find((p) => p.id === stale.id))
         .filter((p) => p && isUpdatable(p));
     if (queue.length === 0) return;
 
@@ -148,8 +149,4 @@ export async function handleUpdateAll() {
 
     await waitProgressDismissed();
     if (done.length) runScan(false);
-}
-
-export function bindUpdate() {
-    dom.btnUpdateAll.addEventListener('click', handleUpdateAll);
 }

@@ -4,10 +4,11 @@ import { mount } from 'svelte';
 import { get } from 'svelte/store';
 import { setLang } from './i18n.js';
 import Titlebar from './Titlebar.svelte';
+import PluginTable from './PluginTable.svelte';
 import { dom, collect } from './dom.js';
-import { state, settingsOpen } from './state.js';
-import { catalogMarkup, runScan, renderTable, initCatalogEvents } from './catalog.js';
-import { cardMarkup, openCard, bindCard } from './card.js';
+import { settingsOpen } from './state.js';
+import { runScan, initCatalogEvents } from './catalog.js';
+import { cardMarkup, bindCard } from './card.js';
 import { dialogMarkup, bindDialog } from './dialog.js';
 import { progressMarkup, initProgressEvents, bindProgress } from './progress.js';
 import { historyMarkup, bindHistory } from './history.js';
@@ -15,20 +16,19 @@ import { settingsMarkup, refreshSettingsState, bindSettings } from './settings.j
 import { bindTc } from './tc.js';
 import { bindBackups } from './backups.js';
 import { renderAbout, loadAppInfo, bindAbout } from './about.js';
-import { bindUpdate, handleUpdate } from './update.js';
 
-// Composition root: the window chrome is a Svelte island that stays mounted, the
-// screens below it are rebuilt from markup functions, and the wires that actually
-// cross screens are a table row opening the plugin card and a language switch
-// re-rendering the screens. Each screen owns its markup, state and bindings in
-// the module named after it.
+// Composition root: the titlebar and the plugin table are Svelte islands that
+// stay mounted, the screens below them are still rebuilt from markup functions,
+// and the wires that cross screens are a store per shared value plus a language
+// switch that re-renders the vanilla ones. Each screen owns its markup, state and
+// bindings in the module named after it.
 
 const chrome = document.getElementById('chrome');
+const tableRoot = document.getElementById('table');
 const screens = document.getElementById('screens');
 
 function buildScreens() {
     screens.innerHTML = `
-      ${catalogMarkup()}
       ${settingsMarkup()}
       ${cardMarkup()}
       ${historyMarkup()}
@@ -43,7 +43,6 @@ function buildScreens() {
     bindDialog();
     bindProgress();
     bindCard();
-    bindUpdate();
     bindHistory();
     bindAbout();
     bindTc();
@@ -52,38 +51,21 @@ function buildScreens() {
     bindShell();
 
     // Restore the visible view after a rebuild (language switch happens inside
-    // settings, which must stay open). The titlebar hides its own search box and
-    // action icons by watching the same store.
+    // settings, which must stay open). The table and the titlebar hide parts of
+    // themselves from the same store; this view still ships `hidden` in its
+    // markup, so the rebuild has to lift it back.
     const open = get(settingsOpen);
     dom.settingsView.hidden = !open;
-    dom.mainView.hidden = open;
     if (open) refreshSettingsState();
 
     // Re-render the state-backed parts of the panel after the DOM rebuild.
     renderAbout();
-
-    if (state.plugins.length > 0) {
-        renderTable();
-    }
 }
 
 function bindShell() {
-    // One delegated handler for the table: the update button keeps its own
-    // action, a click anywhere else in the row opens the plugin card.
-    dom.tbody.addEventListener('click', (e) => {
-        const updateBtn = e.target.closest('button.btn-update');
-        if (updateBtn) {
-            handleUpdate(Number(updateBtn.dataset.update));
-            return;
-        }
-        if (e.target.closest('button')) return;
-        const tr = e.target.closest('tr[data-idx]');
-        if (tr) openCard(Number(tr.dataset.idx), tr);
-    });
-
     dom.langSelect.addEventListener('change', () => {
         setLang(dom.langSelect.value);
-        // Rebuild the labels; the island re-labels itself and buildScreens()
+        // Rebuild the labels; the islands re-label themselves and buildScreens()
         // below keeps the settings view open.
         buildScreens();
     });
@@ -92,9 +74,10 @@ function bindShell() {
 initCatalogEvents();
 initProgressEvents();
 
-// The chrome before the screens: mounting the island is what puts the titlebar
-// on screen, and the screens have to exist before anything can call renderTable.
+// The islands before the screens: mounting them is what puts the titlebar and the
+// table on screen, and the table reads the plugin list a scan writes next.
 mount(Titlebar, { target: chrome });
+mount(PluginTable, { target: tableRoot });
 buildScreens();
 
 // The About panel needs only local values, so ask for them once up front

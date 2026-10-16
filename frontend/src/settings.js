@@ -91,7 +91,8 @@ export function refreshSettingsState() {
 
 export function openSettings() {
     settingsOpen.set(true);
-    dom.mainView.hidden = true;
+    // The table hides itself from the same store; only this view's own node is
+    // written here, because it is still rebuilt by buildScreens().
     dom.settingsView.hidden = false;
     refreshSettingsState();
     if (settingsSection === 'tc') loadTcConfig();
@@ -101,7 +102,6 @@ export function openSettings() {
 export function closeSettings() {
     settingsOpen.set(false);
     dom.settingsView.hidden = true;
-    dom.mainView.hidden = false;
 }
 
 export function bindSettings() {

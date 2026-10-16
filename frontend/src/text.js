@@ -15,9 +15,6 @@ export const escapeHtml = (s) =>
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-// Placeholder row for the plugin table (scanning / empty / no search hits).
-export const emptyRow = (message) => `<tr class="table-empty"><td colspan="6">${message}</td></tr>`;
-
 // Turn http(s) URLs in already-escaped text into clickable links. Plain anchors
 // would navigate the webview, so clicks are intercepted and routed to the
 // system browser (see interceptLinks).

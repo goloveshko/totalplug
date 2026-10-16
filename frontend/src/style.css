@@ -71,9 +71,11 @@ body {
     height: 100vh;
 }
 
-/* The island and the screens each have their own container, but neither adds a
-   box: #app's flex column still lays out the titlebar and the views directly. */
+/* Each island and the screens have their own container, but none adds a box:
+   #app's flex column still lays out the titlebar, the table and the views
+   directly. */
 #chrome,
+#table,
 #screens {
     display: contents;
 }
@@ -330,15 +332,17 @@ tr:hover {
     background-color: var(--row-hover);
 }
 
-/* Only real plugin rows open the card; placeholder rows are inert. */
-#plugins-body tr[data-idx] {
+/* Only real plugin rows open the card; placeholder rows are inert. Anchored on
+   #view-main because that is what separates them — the tbody has no id now that
+   the table is a component. */
+#view-main tr[data-idx] {
     cursor: pointer;
 }
 /* A row becomes focusable only after it opened the plugin card (see cardOpener),
    and then it has to show it: that is where the keyboard comes back to. The
    offset is negative so the ring stays inside the row instead of spending the
    gap on its neighbour. */
-#plugins-body tr[data-idx]:focus-visible {
+#view-main tr[data-idx]:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
 }

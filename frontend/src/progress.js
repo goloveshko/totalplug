@@ -1,8 +1,8 @@
 import { EventsOn } from '../wailsjs/runtime';
+import { get } from 'svelte/store';
 import { t } from './i18n.js';
 import { dom } from './dom.js';
-import { state } from './state.js';
-import { renderUpdateAllBar } from './catalog.js';
+import { progressRunning } from './state.js';
 import { escapeHtml, interceptLinks } from './text.js';
 
 // One dialog shows the updater's progress stream and then the final result in
@@ -41,7 +41,7 @@ function setProgressPhase(text) {
 // renderUpdateProgress maps one updater event onto the dialog. Events arriving
 // outside a running update (stale listener, closed dialog) are ignored.
 export function renderUpdateProgress(p) {
-    if (!dom.progressDialog || !dom.progressDialog.open || !state.progressRunning) return;
+    if (!dom.progressDialog || !dom.progressDialog.open || !get(progressRunning)) return;
 
     const percent = Number(p?.percent ?? -1);
     const phase = p?.phase || 'download';
@@ -70,8 +70,7 @@ export function beginProgress(titleText) {
     dom.progressOk.hidden = true;
     dom.progressClose.hidden = true;
     dom.progressLive.hidden = false;
-    state.progressRunning = true;
-    renderUpdateAllBar();
+    progressRunning.set(true);
     if (!dom.progressDialog.open) dom.progressDialog.showModal();
     beginProgressItem();
 }
@@ -85,14 +84,13 @@ export function beginProgressItem() {
 }
 
 export function finishProgress(html) {
-    state.progressRunning = false;
+    progressRunning.set(false);
     dom.progressLive.hidden = true;
     dom.progressResult.innerHTML = html;
     dom.progressResult.hidden = false;
     dom.progressOk.hidden = false;
     dom.progressClose.hidden = false;
     dom.progressOk.focus();
-    renderUpdateAllBar();
 }
 
 function settle() {
@@ -110,8 +108,8 @@ export function waitProgressDismissed() {
     });
 }
 
-// Registered once at startup: a language switch rebuilds the DOM and must not
-// add a second listener to the same event.
+// Registered once at startup: the listeners survive a language switch, which is
+// why the progress state is read through the store instead of cached in a closure.
 export function initProgressEvents() {
     EventsOn('update:progress', (p) => {
         renderUpdateProgress(p);
@@ -128,7 +126,7 @@ export function bindProgress() {
         dom.progressDialog.close();
     });
     dom.progressDialog.addEventListener('cancel', (e) => {
-        if (state.progressRunning) e.preventDefault();
+        if (get(progressRunning)) e.preventDefault();
     });
     dom.progressDialog.addEventListener('close', settle);
     interceptLinks(dom.progressResult);

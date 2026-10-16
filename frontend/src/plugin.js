@@ -10,19 +10,26 @@ import { escapeHtml } from './text.js';
 // in the CLI.
 export const isUpdatable = (p) => p.status === 'update_avail' && !!p.download_url;
 
-export function getStatusBadge(status) {
+// One source for how a status looks: the table asks for the parts and labels the
+// key through its own store, the card still interpolates a string.
+export function badgeFor(status) {
     // Monochrome glyphs only: color emoji render differently in WebView2, do not
     // follow the theme and get read out by screen readers.
     switch (status) {
         case 'up_to_date':
-            return `<span class="badge badge-up">✓ ${t('badge.up')}</span>`;
+            return { cls: 'badge-up', glyph: '✓', key: 'badge.up' };
         case 'update_avail':
-            return `<span class="badge badge-update">↑ ${t('badge.avail')}</span>`;
+            return { cls: 'badge-update', glyph: '↑', key: 'badge.avail' };
         case 'not_found':
-            return `<span class="badge badge-err">✗ ${t('badge.missing')}</span>`;
+            return { cls: 'badge-err', glyph: '✗', key: 'badge.missing' };
         default:
-            return `<span class="badge badge-muted">? ${t('badge.unknown')}</span>`;
+            return { cls: 'badge-muted', glyph: '?', key: 'badge.unknown' };
     }
+}
+
+export function getStatusBadge(status) {
+    const { cls, glyph, key } = badgeFor(status);
+    return `<span class="badge ${cls}">${glyph} ${t(key)}</span>`;
 }
 
 // Which provider resolved the latest version, shown as a glyph beside it. It

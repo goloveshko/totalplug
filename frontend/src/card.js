@@ -1,7 +1,8 @@
 import { SaveOverride } from '../wailsjs/go/gui/App';
+import { get } from 'svelte/store';
 import { t } from './i18n.js';
 import { dom } from './dom.js';
-import { state } from './state.js';
+import { plugins } from './state.js';
 import { escapeHtml, shortUrl, safeHttpUrl, interceptLinks } from './text.js';
 import { getStatusBadge, sourceIcon, normalizeSource, displaySource } from './plugin.js';
 import { openAppDialog, errorDialogHtml } from './dialog.js';
@@ -42,7 +43,7 @@ export const cardMarkup = () => `
       </dialog>`;
 
 export function openCard(index, opener) {
-    const plugin = state.plugins[index];
+    const plugin = get(plugins)[index];
     if (!plugin) return;
 
     // Remembered before the dialog opens: closing must put the keyboard back on
