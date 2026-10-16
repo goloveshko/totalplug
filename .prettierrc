@@ -3,6 +3,7 @@
   "tabWidth": 4,
   "printWidth": 120,
   "endOfLine": "lf",
+  "plugins": ["./frontend/node_modules/prettier-plugin-svelte/plugin.js"],
   "overrides": [
     {
       "files": ["*.json", "*.yml", "*.yaml", ".prettierrc"],

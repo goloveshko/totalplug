@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 // index.html carries a strict CSP for the bundle Wails serves. In dev, Vite
 // injects imported CSS as inline <style> tags, so the same policy would strip
@@ -14,5 +15,5 @@ const stripCspInDev = {
 export default defineConfig({
     // Pinned to the port documented in README.md.
     server: { port: 5199, strictPort: true },
-    plugins: [stripCspInDev],
+    plugins: [svelte(), stripCspInDev],
 });
