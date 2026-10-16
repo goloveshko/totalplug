@@ -71,6 +71,13 @@ body {
     height: 100vh;
 }
 
+/* The island and the screens each have their own container, but neither adds a
+   box: #app's flex column still lays out the titlebar and the views directly. */
+#chrome,
+#screens {
+    display: contents;
+}
+
 /* Frameless window: the titlebar is the drag region, caption buttons are
    drawn by the frontend (Wails hides native ones). */
 .titlebar {

@@ -57,5 +57,4 @@ export async function openHistory() {
 
 export function bindHistory() {
     dom.historyClose.addEventListener('click', () => dom.historyDialog.close());
-    document.getElementById('btn-history').addEventListener('click', openHistory);
 }

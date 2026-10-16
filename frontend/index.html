@@ -15,7 +15,12 @@
         <script src="/boot.js"></script>
     </head>
     <body>
-        <div id="app"></div>
+        <div id="app">
+            <!-- Two owners, one column: the Svelte island never rebuilds, the
+                 vanilla screens are rewritten from markup functions on a language switch. -->
+            <div id="chrome"></div>
+            <div id="screens"></div>
+        </div>
         <script src="./src/main.js" type="module"></script>
     </body>
 </html>

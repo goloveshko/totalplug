@@ -270,7 +270,7 @@ totalplug/
 │   ├── scanner/              # Plugin discovery, PE / INF version extraction
 │   ├── storage/              # installed_plugins.json, user overrides, update history
 │   └── updater/              # Download, archive extract, backup, lock-aware install
-├── frontend/                 # Wails GUI: plain HTML/CSS/JS built by Vite (no framework)
+├── frontend/                 # Wails GUI: Svelte islands over plain HTML/CSS/JS, built by Vite
 ├── scripts/                  # build.ps1 plus the .cmd wrappers listed above
 └── wails.json
 ```

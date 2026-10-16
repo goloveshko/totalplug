@@ -1,5 +1,6 @@
 import { ScanPlugins } from '../wailsjs/go/gui/App';
 import { EventsOn } from '../wailsjs/runtime';
+import { get, writable } from 'svelte/store';
 import { t, tp } from './i18n.js';
 import { dom } from './dom.js';
 import { state } from './state.js';
@@ -7,25 +8,26 @@ import { isUpdatable, getStatusBadge } from './plugin.js';
 import { escapeHtml, emptyRow } from './text.js';
 import { openAppDialog, errorDialogHtml } from './dialog.js';
 
-// The plugin view: the table, the toolbar buttons that refetch it, the
-// plugin-count chip and the batch bar. Also the only screen that receives
-// backend pushes, which is why its event registration lives here.
+// The plugin view: the table, the batch bar, and the toolbar state the titlebar
+// island shows (count chip, search query, refresh dot, in-flight scan). Also the
+// only screen that receives backend pushes, which is why its event registration
+// lives here.
 
-// Case-insensitive name filter from the toolbar search box; survives the DOM
-// rebuild on language switch because it is module state, not markup.
-let searchQuery = '';
+// Case-insensitive name filter from the toolbar search box. A store because the
+// search box lives in the island, which never rebuilds, while the table below it
+// is rewritten on every language switch.
+export const searchQuery = writable('');
 
 // Catalog freshness shown as a colored dot on the refresh icon: cache (amber),
-// fresh (green), error (red). Survives the buildDom rebuild on language switch.
-let catalogState = '';
-let catalogStateDetail = '';
-const catalogStateLabels = { cache: 'refresh.state.cache', fresh: 'refresh.state.fresh', error: 'refresh.state.error' };
+// fresh (green), error (red). `{ state: '' }` means no dot at all.
+export const catalogStatus = writable({ state: '', detail: '' });
 
 // Plugin-count chip next to the app title: visible rows, or shown/total while
-// the search filter hides some. Kept as state so the language-switch rebuild
-// and the settings view (chrome hidden) restore it correctly.
-let countShown = 0;
-let countTotal = 0;
+// the search filter hides some.
+export const pluginCount = writable({ shown: 0, total: 0 });
+
+// True while a scan is in flight; the island disables both toolbar buttons.
+export const scanRunning = writable(false);
 
 export const catalogMarkup = () => `
       <div id="view-main">
@@ -52,38 +54,14 @@ export const catalogMarkup = () => `
         </div>
       </div>`;
 
-// `detail` (the raw background-refresh error) is appended to the tooltip —
-// there is no status bar left to show it.
+// `detail` (the raw background-refresh error) is appended to the tooltip by the
+// island — there is no status bar left to show it.
 export function setCatalogState(catalog, detail) {
-    catalogState = catalog || '';
-    catalogStateDetail = detail || '';
-    // The state lives in title + aria-label: a tooltip alone is mouse-only.
-    if (!catalogState) {
-        delete dom.btnRefresh.dataset.catalog;
-        dom.btnRefresh.title = t('btn.refresh');
-        dom.btnRefresh.setAttribute('aria-label', t('btn.refresh'));
-        return;
-    }
-    dom.btnRefresh.dataset.catalog = catalogState;
-    const label = t(catalogStateLabels[catalogState]);
-    dom.btnRefresh.title = catalogStateDetail
-        ? `${t('btn.refresh')} — ${label}: ${catalogStateDetail}`
-        : `${t('btn.refresh')} — ${label}`;
-    dom.btnRefresh.setAttribute('aria-label', `${t('btn.refresh')} — ${label}`);
+    catalogStatus.set({ state: catalog || '', detail: detail || '' });
 }
 
 function setCount(shown, total) {
-    countShown = shown;
-    countTotal = total;
-    renderPluginCount();
-}
-
-export function renderPluginCount() {
-    const filtered = searchQuery.trim() && countShown !== countTotal;
-    // A filtered pair is language-neutral; the plain count needs the localized
-    // plural form («2 плагина», not «2 плагинов»).
-    dom.pluginCount.textContent = filtered ? `${countShown}/${countTotal}` : tp('count.plugins', countTotal);
-    dom.pluginCount.hidden = countTotal === 0 || state.settingsOpen;
+    pluginCount.set({ shown, total });
 }
 
 // The batch bar is contextual: it exists only while an update is actually
@@ -98,7 +76,7 @@ export function renderUpdateAllBar() {
 }
 
 export function renderTable() {
-    const q = searchQuery.trim().toLowerCase();
+    const q = get(searchQuery).trim().toLowerCase();
     const rows = state.plugins.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || p.name.toLowerCase().includes(q));
     setCount(rows.length, state.plugins.length);
     renderUpdateAllBar();
@@ -130,8 +108,7 @@ export function renderTable() {
 
 export async function runScan(forceRefresh = false) {
     try {
-        dom.btnScan.disabled = true;
-        dom.btnRefresh.disabled = true;
+        scanRunning.set(true);
 
         state.plugins = await ScanPlugins(forceRefresh);
         // Whatever the scan returned is cache-first; the network refresh lands
@@ -162,13 +139,12 @@ export async function runScan(forceRefresh = false) {
         openAppDialog(errorDialogHtml(err, t('scan.error_friendly'), t('about.catalog')));
         console.error(err);
     } finally {
-        dom.btnScan.disabled = false;
-        dom.btnRefresh.disabled = false;
+        scanRunning.set(false);
     }
 }
 
-// Registered once, at startup, before the first render: a language switch
-// rebuilds the DOM but must not add a second listener to the same event.
+// Registered once, at startup: the Wails event handlers survive both a
+// language switch and the scan that first fills the table.
 export function initCatalogEvents() {
     EventsOn('plugins:refreshed', (plugins) => {
         if (!plugins || plugins.length === 0) return;
@@ -183,18 +159,9 @@ export function initCatalogEvents() {
     });
 }
 
-export function bindCatalog() {
-    // The refresh dot is state, not markup: restore it after the rebuild.
-    if (catalogState) setCatalogState(catalogState, catalogStateDetail);
-    // The count chip is state too (language switch rebuilds the titlebar).
-    renderPluginCount();
-
-    dom.btnScan.addEventListener('click', () => runScan(false));
-    dom.btnRefresh.addEventListener('click', () => runScan(true));
-
-    dom.search.value = searchQuery;
-    dom.search.addEventListener('input', () => {
-        searchQuery = dom.search.value;
-        renderTable();
-    });
+// The titlebar island owns the search box; this is the only call that turns a
+// keystroke into a redrawn table.
+export function setSearchQuery(query) {
+    searchQuery.set(query);
+    renderTable();
 }

@@ -439,32 +439,44 @@ next release (v2), and the accepted debt we deliberately postponed.
   open a card with the keyboard. The pass that fixes it also owes the dialogs their accessible
   names: the four `<dialog>`s carry no `aria-label`/`aria-labelledby`, and neither
   `#lang-select` nor `#font-scale` has one, while every icon button and the search box do.
-- **Stale state across a concurrent refresh** — one known race left: a language switch rebuilds
+- ~~**Stale state across a concurrent refresh** — one known race left: a language switch rebuilds
   the DOM, so the `finally` in `runScan` enables buttons that the in-flight scan never disabled
-  (harmless, but a second scan starts while the first is running). The two races where a
-  `plugins:refreshed` landing inside an open confirm meant acting on a superseded record are
-  both closed: `handleUpdate` in `0f53feb`, `handleUpdateAll` in the review pass above — each
+  (harmless, but a second scan starts while the first is running).~~ Closed by the titlebar
+  island: the toolbar buttons now read the `scanRunning` store instead of being DOM nodes that a
+  rebuild replaces, so there is nothing left to enable behind a running scan. The two races where
+  a `plugins:refreshed` landing inside an open confirm meant acting on a superseded record were
+  already closed: `handleUpdate` in `0f53feb`, `handleUpdateAll` in the review pass above — each
   re-resolves the entry by stable id after the confirm and drops what is no longer offerable.
 - ~~**Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
   read nowhere; the About panel renders its labels from other keys.~~ Removed in `4a9f6de`.
-- **Frontend migration (Svelte 5, then Wails v3)** — planned for after v1. The cheap half is
-  stage 16: `main.js` is now a composition root over one module per screen, with no new
-  dependency and no change to the stage 13 policy. That policy, not taste, is what decides the
-  framework: `style-src 'self'` without `'unsafe-inline'` rules out CSS-in-JS, `script-src 'self'`
-  without `'unsafe-eval'` rules out Vue's runtime template compiler, and what survives is the
-  compiled-template group — Svelte being the pick there. This reverses what this bullet used to
-  say, that the framework move and the Wails move are one migration: the spike below ran a Svelte
-  island inside the v2 shell with the Go side and the generated bindings untouched, so v2 to v3
-  changes only the bindings, the embed path and the verification pass — on a frontend that no
-  longer has to be rewritten at the same time.
+- **Frontend migration (Svelte 5, then Wails v3)** — in progress, one slice at a time, each slice
+  merged into `main` as a working app: no long-lived port branch and no double bugfixes. What
+  decides the framework is the stage 13 policy, not taste: `style-src 'self'` without
+  `'unsafe-inline'` rules out CSS-in-JS, `script-src 'self'` without `'unsafe-eval'` rules out
+  Vue's runtime template compiler, and what survives is the compiled-template group — Svelte
+  being the pick there. This reverses what this bullet used to say, that the framework move and
+  the Wails move are one migration: the spike below ran a Svelte island inside the v2 shell with
+  the Go side and the generated bindings untouched, so v2 to v3 changes only the bindings, the
+  embed path and the verification pass — on a frontend that no longer has to be rewritten at the
+  same time. Stage 16 was the other half of that prep: `main.js` is a composition root over one
+  module per screen, so a screen can become a component without touching the others.
+  Slice 1 is in. `#app` now splits into `#chrome` (the mounted island, `display: contents` so the
+  flex column does not move a pixel) and `#screens`, the language is a store, and the window
+  chrome is `frontend/src/Titlebar.svelte` — which is what lets a language switch leave the search
+  box, its text and the keyboard focus alone. Next slices: the screens, one per slice, and only as
+  far as each one's state has to leave the DOM.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
   `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
   `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
   rendered under the page CSP with no `eval` in the bundle and no runtime-injected `<style>`,
   cost +12 kB gzip, and survived the `buildDom()` rebuild only because the spike unmounted and
-  remounted it by hand — which is exactly the dance the i18n store is meant to delete. Not
-  covered by the spike: a real WebView2 window, deferred to the first slice's build. Wails v3
-  itself was at `beta.29` (2026-10-13) with its GA milestone already a month overdue.
+  remounted it by hand — the dance slice 1 deleted together with the rebuild. Price measured on
+  the real chrome: 46.94 → 76.58 kB JS, gzip 13.82 → 25.82, CSS unchanged but for the two
+  `display: contents` rules. What the spike could not cover — a live WebView2 window — is covered
+  now, on a built `totalplug.exe`. Formatting is gated too: `prettier --check` only sees `.svelte`
+  once `prettier-plugin-svelte` is listed in `.prettierrc` by path, because the house scripts run
+  prettier from the repo root, not from `frontend/`. Wails v3 itself was at `beta.29` (2026-10-13)
+  with its GA milestone already a month overdue.
 
 Nits the final review pass found and deliberately left alone — each is real, none changes
 behaviour a user can reach today:

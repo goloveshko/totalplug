@@ -1,3 +1,5 @@
+import { writable } from 'svelte/store';
+
 // Only what two or more screens truly share lives here. Everything else stays
 // module-local in the screen that owns it, so a screen can be read — and later
 // replaced by a component — without hunting for who mutates its state.
@@ -11,7 +13,10 @@ export const state = {
     // makes a second update click a no-op, and keeps the progress dialog from
     // being dismissed.
     progressRunning: false,
-    // Which full-window view is on screen. The plugin-count chip in the titlebar
-    // belongs to the plugin view, so it reads this instead of being told.
-    settingsOpen: false,
 };
+
+// Which full-window view is on screen. A store, not a field, because the
+// titlebar island reads it to hide the search box, the action icons and the
+// plugin-count chip while settings is open — and that chrome no longer gets
+// rebuilt when the view changes.
+export const settingsOpen = writable(false);

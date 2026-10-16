@@ -1,7 +1,8 @@
 // Every element the screens reach for, re-queried as one batch after each
-// (re)render. A language switch rebuilds the whole DOM from main.js, so refs
+// (re)render. A language switch rebuilds the screens from main.js, so refs
 // cached at module scope would point at detached nodes; collect() is the single
 // place that has to run again, and no screen can keep a stale one by accident.
+// The titlebar is not here: it is a Svelte island that never rebuilds.
 export const dom = {};
 
 const byId = (id) => document.getElementById(id);
@@ -9,15 +10,10 @@ const byId = (id) => document.getElementById(id);
 export function collect() {
     // Plugin view (table, toolbar, batch bar).
     dom.tbody = byId('plugins-body');
-    dom.btnScan = byId('btn-scan');
-    dom.btnRefresh = byId('btn-refresh');
-    dom.search = byId('plugin-search');
-    dom.pluginCount = byId('plugin-count');
     dom.updateAll = byId('update-all');
     dom.updateAllCount = byId('update-all-count');
     dom.btnUpdateAll = byId('btn-update-all');
     dom.mainView = byId('view-main');
-    dom.titlebarActions = byId('titlebar-actions');
 
     // Plugin card and its version editor.
     dom.cardDialog = byId('plugin-card');

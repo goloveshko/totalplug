@@ -1,8 +1,7 @@
 import { t, currentLang } from './i18n.js';
 import { dom } from './dom.js';
-import { state } from './state.js';
+import { settingsOpen } from './state.js';
 import { currentTheme, setTheme, currentScale, setScale } from './theme.js';
-import { renderPluginCount } from './catalog.js';
 import { tcMarkup, renderTcPanel, loadTcConfig } from './tc.js';
 import { aboutMarkup } from './about.js';
 
@@ -86,32 +85,21 @@ export function refreshSettingsState() {
     renderTcPanel();
 }
 
-// The titlebar search box and action icons belong to the plugin view only;
-// they hide while the full-window settings view is open.
-export function setMainChromeVisible(visible) {
-    dom.search.hidden = !visible;
-    dom.titlebarActions.hidden = !visible;
-    renderPluginCount();
-}
-
 export function openSettings() {
-    state.settingsOpen = true;
+    settingsOpen.set(true);
     dom.mainView.hidden = true;
     dom.settingsView.hidden = false;
-    setMainChromeVisible(false);
     refreshSettingsState();
     if (settingsSection === 'tc') loadTcConfig();
 }
 
 export function closeSettings() {
-    state.settingsOpen = false;
+    settingsOpen.set(false);
     dom.settingsView.hidden = true;
     dom.mainView.hidden = false;
-    setMainChromeVisible(true);
 }
 
 export function bindSettings() {
-    document.getElementById('btn-settings').addEventListener('click', openSettings);
     document.getElementById('settings-back').addEventListener('click', closeSettings);
     dom.settingsView.querySelectorAll('.settings-nav button').forEach((btn) => {
         btn.addEventListener('click', () => {
