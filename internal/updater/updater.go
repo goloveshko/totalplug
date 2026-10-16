@@ -48,6 +48,15 @@ var (
 	// ErrExtractTooLarge aborts extraction whose cumulative decompressed output
 	// exceeds the configured cap, so a small crafted archive cannot fill the disk.
 	ErrExtractTooLarge = errors.New("archive expands beyond the decompressed size limit")
+	// ErrBackupGone is what a rollback reports when the copy its history line
+	// names is no longer on disk — retention caught up with it, or the data
+	// folder was cleaned by hand.
+	ErrBackupGone = errors.New("the kept copy of the plugin folder is gone")
+	// ErrPluginOutsideTCRoot refuses a rollback whose target folder is not inside
+	// a Total Commander install. The folder comes from a JSON file the user can
+	// edit, and a rollback deletes it before writing the copy back, so "it is a
+	// path" is not enough to trust it.
+	ErrPluginOutsideTCRoot = errors.New("plugin folder is not inside a Total Commander install")
 )
 
 // DefaultMaxDownloadBytes caps archive size (256 MiB) to bound disk usage.
@@ -105,6 +114,15 @@ func isLockedErr(err error) bool {
 		}
 	}
 	return false
+}
+
+// asLocked turns a failed filesystem call into the answer the UI has advice for:
+// a file held by a running Total Commander is not a disk error.
+func asLocked(err error) error {
+	if isLockedErr(err) {
+		return fmt.Errorf("%w: %v", ErrFileLocked, err)
+	}
+	return err
 }
 
 // Updater handles downloading and applying plugin updates safely.
@@ -647,6 +665,41 @@ func isTotalCommanderRoot(dir string) bool {
 	return false
 }
 
+// pluginInsideTCRoot reports whether dir sits under a Total Commander install,
+// which is what bounds the folders an update or a rollback may write to.
+func pluginInsideTCRoot(dir string) bool {
+	for parent := filepath.Dir(dir); ; parent = filepath.Dir(parent) {
+		if isTotalCommanderRoot(parent) {
+			return true
+		}
+		next := filepath.Dir(parent)
+		if next == parent {
+			return false
+		}
+	}
+}
+
+// validatePluginFolder is what both an update and a rollback check the target
+// against before either copies a tree over it.
+//
+// A wincmd.ini entry can point straight at a file rather than into a folder of
+// its own, and then the whole of the folder is what gets backed up and
+// overwritten — so the two ways that goes wrong are refused: the entry naming the
+// Total Commander install itself, and one naming a shared type folder like wfx
+// that holds every plugin of that kind.
+func validatePluginFolder(pluginDir string) error {
+	if _, err := os.Stat(pluginDir); os.IsNotExist(err) {
+		return ErrPluginNotFound
+	}
+	if isTotalCommanderRoot(pluginDir) {
+		return fmt.Errorf("%w: %s is the Total Commander install directory", ErrPluginNeedsOwnFolder, pluginDir)
+	}
+	if config.IsGenericPluginDir(filepath.Base(pluginDir)) {
+		return fmt.Errorf("%w: %s holds every plugin of its type", ErrPluginNeedsOwnFolder, pluginDir)
+	}
+	return nil
+}
+
 // UpdatePlugin downloads an update, backs up the current plugin directory, and
 // applies the new files. If applying fails, the files touched so far are rolled
 // back from the backup. On success the backup directory is kept and returned,
@@ -662,17 +715,8 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	}
 
 	pluginDir := filepath.Dir(plugin.Path)
-	if _, err := os.Stat(pluginDir); os.IsNotExist(err) {
-		return "", ErrPluginNotFound
-	}
-	// The backup and the unpack both take the whole of pluginDir, so a wincmd.ini
-	// entry pointing straight at a file rather than into a folder of its own would
-	// have the update replace whatever else lives beside it.
-	if isTotalCommanderRoot(pluginDir) {
-		return "", fmt.Errorf("%w: %s is the Total Commander install directory", ErrPluginNeedsOwnFolder, pluginDir)
-	}
-	if config.IsGenericPluginDir(filepath.Base(pluginDir)) {
-		return "", fmt.Errorf("%w: %s holds every plugin of its type", ErrPluginNeedsOwnFolder, pluginDir)
+	if err := validatePluginFolder(pluginDir); err != nil {
+		return "", err
 	}
 
 	tmpDir, err := config.RunScratch()

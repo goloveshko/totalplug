@@ -85,6 +85,19 @@ func sanitizeName(name string) string {
 	}, name)
 }
 
+// backupStamp parses one name out of a plugin's namespace folder. A stamp is
+// returned only for "<plugin>.bak_<unix>" — a copy this tool wrote for this
+// plugin directory — so nothing here claims to know what a folder the user made
+// beside it holds.
+func backupStamp(name, pluginDir string) (int64, bool) {
+	prefix := filepath.Base(pluginDir) + backupSuffix
+	if !strings.HasPrefix(name, prefix) {
+		return 0, false
+	}
+	ts, err := strconv.ParseInt(strings.TrimPrefix(name, prefix), 10, 64)
+	return ts, err == nil
+}
+
 // legacyBackups lists the "<pluginDir>.bak_<unix>" folders left beside a plugin
 // by the version that wrote them there. Names with an unparseable timestamp are
 // skipped: they were not made by this tool, so nothing here claims to know what
@@ -95,13 +108,12 @@ func legacyBackups(pluginDir string) []string {
 	if err != nil {
 		return nil
 	}
-	prefix := filepath.Base(pluginDir) + backupSuffix
 	var found []string
 	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
+		if !e.IsDir() {
 			continue
 		}
-		if _, err := strconv.ParseInt(strings.TrimPrefix(e.Name(), prefix), 10, 64); err != nil {
+		if _, ok := backupStamp(e.Name(), pluginDir); !ok {
 			continue
 		}
 		found = append(found, filepath.Join(parent, e.Name()))
@@ -161,14 +173,13 @@ func pruneBackupSpace(pluginDir string, policy config.BackupPolicy) ([]string, e
 		ts   int64
 	}
 
-	prefix := filepath.Base(pluginDir) + backupSuffix
 	var backups []backup
 	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
+		if !e.IsDir() {
 			continue
 		}
-		ts, err := strconv.ParseInt(strings.TrimPrefix(e.Name(), prefix), 10, 64)
-		if err != nil {
+		ts, ok := backupStamp(e.Name(), pluginDir)
+		if !ok {
 			continue
 		}
 		backups = append(backups, backup{path: filepath.Join(space, e.Name()), ts: ts})
