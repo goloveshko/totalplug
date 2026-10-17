@@ -16,12 +16,12 @@
     </head>
     <body>
         <div id="app">
-            <!-- Four owners, one column: the Svelte islands never rebuild, the
-                 vanilla screens are rewritten from markup functions on a language switch. -->
+            <!-- Four roots, one column: each holds the islands that own it, and
+                 none of them is ever rebuilt. -->
             <div id="chrome"></div>
             <div id="table"></div>
             <div id="overlays"></div>
-            <div id="screens"></div>
+            <div id="settings"></div>
         </div>
         <script src="./src/main.js" type="module"></script>
     </body>

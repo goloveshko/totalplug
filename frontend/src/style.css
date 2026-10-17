@@ -71,13 +71,12 @@ body {
     height: 100vh;
 }
 
-/* Each island and the screens have their own container, but none adds a box:
-   #app's flex column still lays out the titlebar, the table and the views
-   directly. */
+/* Every island has its own container, but none adds a box: #app's flex column
+   still lays out the titlebar, the table and the views directly. */
 #chrome,
 #table,
 #overlays,
-#screens {
+#settings {
     display: contents;
 }
 

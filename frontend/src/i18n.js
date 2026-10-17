@@ -292,8 +292,8 @@ const LANG_KEY = 'totalplug.lang';
 
 const savedLang = localStorage.getItem(LANG_KEY);
 
-// Svelte screens subscribe to the store; the vanilla ones keep using the mirror
-// below so t() stays a plain object lookup.
+// Svelte screens subscribe to the store; the modules that still build a dialog or
+// a progress line by hand read the mirror below, so t() stays a plain lookup.
 export const lang = writable(savedLang === 'ru' ? 'ru' : 'en');
 
 let activeLang = 'en';
@@ -308,14 +308,6 @@ lang.subscribe((value) => {
 });
 
 const pluralRules = { en: new Intl.PluralRules('en'), ru: new Intl.PluralRules('ru') };
-
-export function currentLang() {
-    return activeLang;
-}
-
-export function setLang(next) {
-    lang.set(next === 'ru' ? 'ru' : 'en');
-}
 
 // A replacement string would interpret "$&" etc., and plugin names come from
 // an untrusted wincmd.ini — the function form inserts the value literally.
