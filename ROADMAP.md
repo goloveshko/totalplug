@@ -477,7 +477,7 @@ next release (v2), and the accepted debt we deliberately postponed.
   embed path and the verification pass — on a frontend that no longer has to be rewritten at the
   same time. Stage 16 was the other half of that prep: `main.js` is a composition root over one
   module per screen, so a screen can become a component without touching the others.
-  Four slices are in. `#app` now splits into `#chrome`, `#table` and `#overlays`
+  Five slices are in. `#app` now splits into `#chrome`, `#table` and `#overlays`
   (mounted islands, all `display: contents` so the flex column does not move a pixel) plus
   `#screens` (still rebuilt vanilla), the language is a store, and the window chrome is
   `frontend/src/Titlebar.svelte` — which is what lets a language switch leave the search box,
@@ -501,10 +501,24 @@ next release (v2), and the accepted debt we deliberately postponed.
   last `{@html}` the card needed for itself is gone. The keyboard pass came with it — the name
   cell is a `.row-open` button now, which is where the keyboard enters a row and where focus
   returns on the dialog's `close` event, and a `<tr>` needs no `tabindex` to be handed back,
-  because a row is not a control. The rest goes ahead of any new feature (2026-10-16), so that no
-  screen is rewritten twice: the update queue with the history, then settings with its subviews
-  last — those forms already keep their values in `settings.json` and localStorage, so a rebuild
-  costs them nothing. Done means
+  because a row is not a control. Slice 5 took the last two screens that wrote into a DOM tree
+  (`32a3643`, `347418f`). `finishProgress()` gets the result as data now — the line the user scans,
+  the batch's one row per plugin, the address worth naming, a warning and the raw errors — and
+  `ProgressOverlay.svelte` draws all five, so `update.js` stopped concatenating markup and the
+  message gives up the `pre-wrap` its string used to need: the breaks come from the elements, only
+  the disclosure body keeps the line breaks of a Go error. `history.js` kept its three round trips
+  and handed the entries, the row under discussion, the failed attempt and the busy flag to one
+  store, so `HistoryDialog.svelte` renders the table, the question that replaces a row and the
+  dates, which it formats from the language store — a log that is already open re-formats with the
+  rest of the screen. Every button there carries its own handler, so the delegated `tbody` listener
+  left with `bindHistory()` and `buildScreens()` is down to the settings view. What the module still
+  decides: `openHistory()` reads the log before the dialog opens, because a data folder it cannot
+  reach belongs in the error dialog rather than in an empty window, and focus goes to Close on open
+  — the browser would hand it to the first rollback otherwise — and to the confirm button whenever
+  the question is on screen, including after an attempt that dropped focus by passing through a
+  disabled button. The rest goes ahead of any new feature (2026-10-16), so that no screen is
+  rewritten twice: settings with its subviews last — those forms already keep their values in
+  `settings.json` and localStorage, so a rebuild costs them nothing. Done means
   `buildScreens()` is deleted: every label comes from a store, so a language switch has nothing
   left to rebuild.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
