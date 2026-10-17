@@ -67,7 +67,7 @@
         </svg>
     </button>
     <h2 id="progress-title">{$progressState.title}</h2>
-    <div id="progress-live" hidden={$progressRunning}>
+    <div id="progress-live" hidden={!$progressRunning}>
         <div class="progress-track" id="progress-track" class:indeterminate={$progressState.indeterminate}>
             <div class="progress-fill" id="progress-fill" style:width="{$progressState.width}%"></div>
         </div>
@@ -81,7 +81,9 @@
         </div>
         <div class="progress-url" id="progress-url" title={$progressState.url}>{source}</div>
     </div>
-    <div class="dlg-message progress-result" role="status" hidden={!$progressRunning}>
+    <!-- The bar and the result are the two halves of this dialog: `$progressRunning`
+         is true for exactly as long as the bar is the thing worth showing. -->
+    <div class="dlg-message progress-result" role="status" hidden={$progressRunning}>
         {#if result}
             {#if result.rows.length}
                 <p class="ua-head">{result.text}</p>
