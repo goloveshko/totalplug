@@ -333,17 +333,32 @@ tr:hover {
     background-color: var(--row-hover);
 }
 
-/* Only real plugin rows open the card; placeholder rows are inert. Anchored on
-   #view-main because that is what separates them — the tbody has no id now that
-   the table is a component. */
+/* Anywhere in a real plugin row opens the card; placeholder rows are inert.
+   Anchored on #view-main because that is what separates them — the tbody has no
+   id now that the table is a component. */
 #view-main tr[data-idx] {
     cursor: pointer;
 }
-/* A row becomes focusable only after it opened the plugin card (see cardOpener),
-   and then it has to show it: that is where the keyboard comes back to. The
-   offset is negative so the ring stays inside the row instead of spending the
-   gap on its neighbour. */
-#view-main tr[data-idx]:focus-visible {
+/* The plugin name is the keyboard way into the card, so it is a real button — but
+   it must still read as the row's text, not as a second control per row. The base
+   `button` rule out-specifies `td`, so every part of it is undone here. */
+.row-open {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    border-radius: 0;
+    white-space: normal;
+}
+.row-open:hover {
+    background: none;
+    color: inherit;
+    text-decoration: underline;
+}
+/* Negative offset so the ring stays inside the cell instead of spending the gap on
+   its neighbour — the same rule the row used to carry before it became a button. */
+.row-open:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
 }

@@ -28,7 +28,9 @@
     const offered = derived(plugins, ($plugins) => $plugins.filter(isUpdatable).length);
 
     // One delegated handler, as the table had before: the update button keeps its
-    // own action, a click anywhere else in the row opens the plugin card.
+    // own action, a click anywhere else in the row opens the plugin card. The name
+    // cell is a button, so its own handler gets there first and the guard below
+    // keeps this listener from opening the card a second time.
     function onTableClick(event) {
         const updateBtn = event.target.closest('button.btn-update');
         if (updateBtn) {
@@ -37,7 +39,9 @@
         }
         if (event.target.closest('button')) return;
         const row = event.target.closest('tr[data-idx]');
-        if (row) openCard(Number(row.dataset.idx), row);
+        if (!row) return;
+        // Focus goes back to the button, not to a row that cannot hold it.
+        openCard(Number(row.dataset.idx), row.querySelector('.row-open'));
     }
 
     // A failed scan outranks everything: the dialog about it gets dismissed, and
@@ -82,10 +86,11 @@
                     {/each}
                 </tr>
             </thead>
-            <!-- The whole row opens the card, which is a mouse shortcut over the
-                 buttons in it rather than the only way in — the checker is right,
-                 and the keyboard pass is owed in ROADMAP. Ignored here so the
-                 delegation stays one listener for every row. -->
+            <!-- Anywhere in a row opens the card, but as a mouse shortcut over the
+                 name button in it rather than the only way in — that button is what
+                 the keyboard uses. The checker is right about the row, so this
+                 delegation stays ignored: one listener for every row is what keeps
+                 a scan cheap. -->
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
             <tbody onclick={onTableClick}>
                 {#if notice}
@@ -105,7 +110,15 @@
                         {@const mark = badge(plugin.status)}
                         <tr data-idx={index}>
                             <td class="cell-type">{plugin.type}</td>
-                            <td>{plugin.name}</td>
+                            <td>
+                                <button
+                                    type="button"
+                                    class="row-open"
+                                    onclick={(event) => openCard(index, event.currentTarget)}
+                                >
+                                    {plugin.name}
+                                </button>
+                            </td>
                             <td><code>{plugin.installed_version}</code></td>
                             <td><code>{plugin.latest_version || '—'}</code></td>
                             <td>
