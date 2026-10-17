@@ -506,21 +506,24 @@ next release (v2), and the accepted debt we deliberately postponed.
   the batch's one row per plugin, the address worth naming, a warning and the raw errors — and
   `ProgressOverlay.svelte` draws all five, so `update.js` stopped concatenating markup and the
   message gives up the `pre-wrap` its string used to need: the breaks come from the elements, only
-  the disclosure body keeps the line breaks of a Go error. `history.js` kept its three round trips
-  and handed the entries, the row under discussion, the failed attempt and the busy flag to one
-  store, so `HistoryDialog.svelte` renders the table, the question that replaces a row and the
-  dates, which it formats from the language store — a log that is already open re-formats with the
-  rest of the screen. Every button there carries its own handler, so the delegated `tbody` listener
-  left with `bindHistory()` and `buildScreens()` is down to the settings view. What the module still
-  decides: `openHistory()` reads the log before the dialog opens, because a data folder it cannot
-  reach belongs in the error dialog rather than in an empty window, and focus goes to Close on open
-  — the browser would hand it to the first rollback otherwise — and to the confirm button whenever
-  the question is on screen, including after an attempt that dropped focus by passing through a
-  disabled button. The rest goes ahead of any new feature (2026-10-16), so that no screen is
-  rewritten twice: settings with its subviews last — those forms already keep their values in
-  `settings.json` and localStorage, so a rebuild costs them nothing. Done means
-  `buildScreens()` is deleted: every label comes from a store, so a language switch has nothing
-  left to rebuild.
+  the disclosure body keeps the line breaks of a Go error. The live window then caught a swap slice
+  3 had made (`7883e8a`) — the bar's `hidden` and the result's were written the wrong way round, so
+  an update showed an empty dialog and afterwards a frozen bar with no outcome in it; the update
+  itself was fine, only the two halves of the dialog were exchanged, and the two flags now read as
+  the DOM writes they replaced. `history.js` kept its three round trips and handed the entries, the
+  row under discussion, the failed attempt and the busy flag to one store, so `HistoryDialog.svelte`
+  renders the table, the question that replaces a row and the dates, which it formats from the
+  language store — a log that is already open re-formats with the rest of the screen. Every button
+  there carries its own handler, so the delegated `tbody` listener left with `bindHistory()` and
+  `buildScreens()` is down to the settings view. What the module still decides: `openHistory()`
+  reads the log before the dialog opens, because a data folder it cannot reach belongs in the error
+  dialog rather than in an empty window, and focus goes to Close on open — the browser would hand it
+  to the first rollback otherwise — and to the confirm button whenever the question is on screen,
+  including after an attempt that dropped focus by passing through a disabled button. The rest goes
+  ahead of any new feature (2026-10-16), so that no screen is rewritten twice: settings with its
+  subviews last — those forms already keep their values in `settings.json` and localStorage, so a
+  rebuild costs them nothing. Done means `buildScreens()` is deleted: every label comes from a
+  store, so a language switch has nothing left to rebuild.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
   `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
   `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
