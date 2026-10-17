@@ -9,11 +9,6 @@ export const dom = {};
 const byId = (id) => document.getElementById(id);
 
 export function collect() {
-    // History.
-    dom.historyDialog = byId('history-dialog');
-    dom.historyBody = byId('history-body');
-    dom.historyClose = byId('history-close');
-
     // Settings shell and the panels it hosts.
     dom.settingsView = byId('view-settings');
     dom.langSelect = byId('lang-select');
