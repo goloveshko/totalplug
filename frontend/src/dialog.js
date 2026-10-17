@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import { t } from './i18n.js';
-import { escapeHtml, linkify } from './text.js';
+import { escapeHtml, firstHttpUrl, linkify } from './text.js';
 
 // The in-app replacement for native confirm()/alert(): those render with the
 // "wails" origin header and cannot be styled. One modal dialog serves both the
@@ -23,19 +23,10 @@ let opener = null;
 // label depends on where the URL came from (plugin page vs catalog).
 export function errorDialogHtml(err, friendlyMessage, linkLabel) {
     const raw = String(err?.message ?? err);
-    const urlMatch = raw.match(/https?:\/\/[^\s]+/);
-    let html = escapeHtml(friendlyMessage);
-    if (urlMatch) {
-        // Go quotes URLs in errors: Get "https://host/x": EOF — the closing
-        // quote and trailing punctuation are not part of the address.
-        const url = urlMatch[0].replace(/[.,;:!?)\]»"']+$/, '');
-        html +=
-            '\n<a href="' +
-            escapeHtml(url) +
-            '" class="dlg-link">' +
-            escapeHtml(linkLabel || t('dialog.plugin_page')) +
-            '</a>';
-    }
+    const url = firstHttpUrl(raw);
+    const label = linkLabel || t('dialog.plugin_page');
+    const link = url ? `\n<a href="${escapeHtml(url)}" class="dlg-link">${escapeHtml(label)}</a>` : '';
+    let html = escapeHtml(friendlyMessage) + link;
     html +=
         '<details class="dlg-tech"><summary>' +
         escapeHtml(t('dialog.tech_details')) +

@@ -3,7 +3,7 @@
     import { tr } from './i18n.js';
     import { closeProgress, progressState, settleProgress } from './progress.js';
     import { progressRunning } from './state.js';
-    import { interceptLinks } from './text.js';
+    import { escapeHtml, interceptLinks, linkify } from './text.js';
 
     // The updater's progress bar and its final result, in the same dialog, as an
     // island that never rebuilds: every value it shows is a store field, so the
@@ -15,6 +15,13 @@
     // The source line is built here rather than stored: «from» is a translation,
     // so an update still in flight re-labels it when the language changes.
     const source = $derived($progressState.url ? `${$tr('update.progress.source')}: ${$progressState.url}` : '');
+
+    // The result reaches this component as data, so the batch rows, the named link
+    // and the disclosure are drawn here — and a language switch re-labels a result
+    // that is still on screen. Raw errors keep their line breaks only in the
+    // disclosure body, which is why the message itself is not a pre-wrap block.
+    const result = $derived($progressState.result);
+    const tech = $derived(result ? linkify(escapeHtml(result.tech)) : '');
 
     // The same pair of DOM-only calls as the other dialog: `open` puts the
     // progress on screen, and closing it is how the caller learns the result was read.
@@ -74,7 +81,37 @@
         </div>
         <div class="progress-url" id="progress-url" title={$progressState.url}>{source}</div>
     </div>
-    <div class="dlg-message" role="status" hidden={!$progressRunning}>{@html $progressState.resultHtml}</div>
+    <div class="dlg-message progress-result" role="status" hidden={!$progressRunning}>
+        {#if result}
+            {#if result.rows.length}
+                <p class="ua-head">{result.text}</p>
+                <div class="ua-summary">
+                    {#each result.rows as row}
+                        <div class="ua-row {row.cls}">
+                            <span class="ua-glyph" aria-hidden="true">{row.glyph}</span>
+                            <span>{row.text}</span>
+                        </div>
+                    {/each}
+                </div>
+            {:else}
+                {result.text}
+                {#if result.link}
+                    <!-- A block is what puts the link under the sentence: the markup that
+                         reached this dialog before carried the break as a newline. -->
+                    <div><a href={result.link} class="dlg-link">{$tr('dialog.plugin_page')}</a></div>
+                {/if}
+            {/if}
+            {#if result.note}
+                <p class="ua-note">{result.note}</p>
+            {/if}
+            {#if result.tech}
+                <details class="dlg-tech">
+                    <summary>{$tr('dialog.tech_details')}</summary>
+                    <div class="dlg-tech-body">{@html tech}</div>
+                </details>
+            {/if}
+        {/if}
+    </div>
     <div class="editor-actions">
         <button
             type="button"

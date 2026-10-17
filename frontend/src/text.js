@@ -30,6 +30,14 @@ export const safeHttpUrl = (url) => (/^https?:\/\//i.test(url || '') ? url : '')
 // "https://" is noise in a narrow dialog and costs a line wrap; the href keeps it.
 export const shortUrl = (url) => url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 
+// The first address inside a raw Go error is the one worth naming: it says where
+// the failing request went. Go quotes it — Get "https://host/x": EOF — so the
+// closing quote and any trailing punctuation are cut off, they are not the address.
+export const firstHttpUrl = (text) => {
+    const match = String(text || '').match(/https?:\/\/[^\s]+/);
+    return match ? match[0].replace(/[.,;:!?)\]»"']+$/, '') : '';
+};
+
 // A timestamp this browser cannot parse has to cost one cell, not the whole view:
 // Intl.DateTimeFormat throws RangeError on an Invalid Date, and in the history
 // dialog that meant one bad entry took every other row down with it. The raw

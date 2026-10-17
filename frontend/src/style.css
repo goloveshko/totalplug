@@ -500,6 +500,12 @@ td code,
 .dlg-message a.dlg-link {
     color: var(--accent);
 }
+/* The updater's result is drawn from data, so its line breaks come from the
+   elements rather than from newlines in a string. Only the disclosure body keeps
+   the raw error's own line breaks, through the rule below. */
+.dlg-message.progress-result {
+    white-space: normal;
+}
 /* The one control this app left to the browser's guess: a keyboard reaching a
    link drew the UA's black rectangle, next to the accent ring every other target
    here paints. Inline, so the ring hugs the text rather than the row. */
@@ -519,6 +525,9 @@ a.dlg-link:focus-visible {
 .dlg-tech .dlg-tech-body {
     margin-top: 6px;
     user-select: text;
+}
+.progress-result .dlg-tech-body {
+    white-space: pre-wrap;
 }
 #history-dialog table {
     width: 100%;

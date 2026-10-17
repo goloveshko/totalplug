@@ -3,8 +3,8 @@ import { t, tp } from './i18n.js';
 import { get } from 'svelte/store';
 import { plugins, progressRunning } from './state.js';
 import { isUpdatable } from './plugin.js';
-import { escapeHtml, linkify } from './text.js';
-import { showConfirm, errorDialogHtml } from './dialog.js';
+import { firstHttpUrl } from './text.js';
+import { showConfirm } from './dialog.js';
 import {
     beginProgress,
     beginProgressItem,
@@ -56,25 +56,27 @@ export async function handleUpdate(index) {
     const outcome = await updateOnePlugin(plugin);
 
     if (outcome.kind === 'locked') {
-        finishProgress(escapeHtml(t('update.locked', { name: plugin.name })));
+        finishProgress({ text: t('update.locked', { name: plugin.name }) });
     } else if (outcome.kind === 'error') {
-        finishProgress(errorDialogHtml(outcome.err, t('update.error_friendly')));
+        const raw = String(outcome.err?.message ?? outcome.err);
+        finishProgress({
+            text: t('update.error_friendly'),
+            // The address the failing request went to is the one action this error
+            // offers, so it is handed over as data and the component names it.
+            link: firstHttpUrl(raw),
+            tech: raw,
+        });
     } else {
-        finishProgress(
-            escapeHtml(
-                outcome.backupPath
-                    ? t('update.done_backup', { name: plugin.name, path: outcome.backupPath })
-                    : t('update.done', { name: plugin.name }),
-            ),
-        );
+        finishProgress({
+            text: outcome.backupPath
+                ? t('update.done_backup', { name: plugin.name, path: outcome.backupPath })
+                : t('update.done', { name: plugin.name }),
+        });
     }
 
     await waitProgressDismissed();
     if (outcome.kind === 'ok') runScan(false);
 }
-
-const summaryRow = (glyph, className, text) =>
-    `<div class="ua-row ${className}"><span class="ua-glyph" aria-hidden="true">${glyph}</span><span>${escapeHtml(text)}</span></div>`;
 
 export async function handleUpdateAll() {
     if (get(progressRunning)) return;
@@ -124,29 +126,20 @@ export async function handleUpdateAll() {
     }
 
     const skipped = lockedAt >= 0 ? queue.slice(lockedAt + 1) : [];
+    // One row per plugin the queue touched, in the order they were worked on:
+    // updated first, then the failures, then whatever a lock cut off.
     const rows = [
-        ...done.map((p) => summaryRow('✓', 'ua-ok', `${p.name} — ${p.latest_version}`)),
-        ...failed.map((p) => summaryRow('✗', 'ua-err', p.name)),
-        ...skipped.map((p) => summaryRow('—', 'ua-skip', p.name)),
+        ...done.map((p) => ({ glyph: '✓', cls: 'ua-ok', text: `${p.name} — ${p.latest_version}` })),
+        ...failed.map((p) => ({ glyph: '✗', cls: 'ua-err', text: p.name })),
+        ...skipped.map((p) => ({ glyph: '—', cls: 'ua-skip', text: p.name })),
     ];
-    // Head line first, then one line per plugin: the count is what the user
-    // scans for, the rows are what they act on.
-    let html = `<p class="ua-head">${escapeHtml(
-        done.length ? tp('update_all.updated', done.length) : t('update_all.none'),
-    )}</p>`;
-    html += `<div class="ua-summary">${rows.join('')}</div>`;
-    if (lockedAt >= 0) {
-        html += `<p class="ua-note">${escapeHtml(t('update_all.locked_stop', { name: queue[lockedAt].name }))}</p>`;
-    }
-    if (rawErrors.length) {
-        html +=
-            '<details class="dlg-tech"><summary>' +
-            escapeHtml(t('dialog.tech_details')) +
-            '</summary><div class="dlg-tech-body">' +
-            linkify(escapeHtml(rawErrors.join('\n'))) +
-            '</div></details>';
-    }
-    finishProgress(html);
+    finishProgress({
+        // The count is the headline, the rows below it are what the user acts on.
+        text: done.length ? tp('update_all.updated', done.length) : t('update_all.none'),
+        rows,
+        note: lockedAt >= 0 ? t('update_all.locked_stop', { name: queue[lockedAt].name }) : '',
+        tech: rawErrors.join('\n'),
+    });
 
     await waitProgressDismissed();
     if (done.length) runScan(false);

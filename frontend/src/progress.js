@@ -21,7 +21,12 @@ export const progressState = writable({
     // is styled from the track's class, and the width is left where it was.
     width: 0,
     url: '',
-    resultHtml: '',
+    // The result that takes the bar's place, as data: `text` is the line the user
+    // scans for, `rows` the one-per-plugin summary of a batch, `link` the address
+    // worth naming, `note` a warning under it and `tech` the raw errors behind a
+    // disclosure. ProgressOverlay.svelte draws all five, so no caller concatenates
+    // markup on the way here.
+    result: null,
 });
 
 // While an update runs, the dialog cannot be dismissed.
@@ -62,7 +67,7 @@ export function renderUpdateProgress(p) {
 
 export function beginProgress(titleText) {
     progressRunning.set(true);
-    patchProgress({ open: true, title: titleText, resultHtml: '' });
+    patchProgress({ open: true, title: titleText, result: null });
     beginProgressItem();
 }
 
@@ -74,9 +79,11 @@ export function beginProgressItem() {
     patchProgress({ pct: '…', indeterminate: true, width: 0, url: '' });
 }
 
-export function finishProgress(html) {
+// Missing parts stay empty, so each caller hands over only what it has and the
+// component can read every field without guarding.
+export function finishProgress(result) {
     progressRunning.set(false);
-    patchProgress({ resultHtml: html });
+    patchProgress({ result: { text: '', rows: [], link: '', note: '', tech: '', ...result } });
 }
 
 // The caller waits for the user to acknowledge the result before the plugin list
