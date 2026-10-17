@@ -1,5 +1,8 @@
 <script>
-    import { lang, tr } from './i18n.js';
+    // Aliased, not `tr` like the other dialogs: a component that renders table rows
+    // cannot import a binding named `tr`, because Svelte then has to guess whether
+    // `<tr>` is the element or a component.
+    import { lang, tr as msg } from './i18n.js';
     import { cancelRollback, closeHistory, confirmRollback, historyState, offerRollback } from './history.js';
     import { formatStamp } from './text.js';
 
@@ -19,8 +22,8 @@
 
     const question = (entry) =>
         entry.replaced_version
-            ? $tr('history.confirm', { version: entry.replaced_version, current: entry.version })
-            : $tr('history.confirm_unknown');
+            ? $msg('history.confirm', { version: entry.replaced_version, current: entry.version })
+            : $msg('history.confirm_unknown');
 
     // A <dialog> has no attribute that opens it, so the store's flag drives the
     // two DOM-only calls. The browser would give focus to the first rollback
@@ -46,20 +49,20 @@
 </script>
 
 <dialog id="history-dialog" bind:this={el} onclose={closeHistory}>
-    <h2>{$tr('history.title')}</h2>
+    <h2>{$msg('history.title')}</h2>
     <table>
         <thead>
             <tr>
-                <th>{$tr('history.col.plugin')}</th>
-                <th>{$tr('history.col.version')}</th>
-                <th>{$tr('history.col.date')}</th>
-                <th>{$tr('history.col.action')}</th>
+                <th>{$msg('history.col.plugin')}</th>
+                <th>{$msg('history.col.version')}</th>
+                <th>{$msg('history.col.date')}</th>
+                <th>{$msg('history.col.action')}</th>
             </tr>
         </thead>
         <tbody>
             {#if state.entries.length === 0}
                 <tr class="table-empty">
-                    <td colspan="4">{$tr('history.empty')}</td>
+                    <td colspan="4">{$msg('history.empty')}</td>
                 </tr>
             {:else}
                 {#each state.entries as entry, idx}
@@ -68,7 +71,7 @@
                             <td colspan="4">
                                 <p>{question(entry)}</p>
                                 <p class="history-note{state.failure ? ' history-failed' : ''}">
-                                    {state.failure || $tr('history.confirm_note')}
+                                    {state.failure || $msg('history.confirm_note')}
                                 </p>
                                 <div class="editor-actions">
                                     <button
@@ -78,10 +81,10 @@
                                         disabled={state.busy}
                                         onclick={() => confirmRollback(idx)}
                                     >
-                                        {$tr('history.rollback')}
+                                        {$msg('history.rollback')}
                                     </button>
                                     <button type="button" disabled={state.busy} onclick={cancelRollback}>
-                                        {$tr('dialog.cancel')}
+                                        {$msg('dialog.cancel')}
                                     </button>
                                 </div>
                             </td>
@@ -92,14 +95,14 @@
                             <td>
                                 <code>{entry.version}</code>
                                 {#if entry.restored}
-                                    <span class="history-kind">{$tr('history.restored')}</span>
+                                    <span class="history-kind">{$msg('history.restored')}</span>
                                 {/if}
                             </td>
                             <td>{formatStamp(fmt, entry.applied_at)}</td>
                             <td class="history-action">
                                 {#if entry.backup_path}
                                     <button type="button" class="btn-update" onclick={() => offerRollback(idx)}>
-                                        {$tr('history.rollback')}
+                                        {$msg('history.rollback')}
                                     </button>
                                 {/if}
                             </td>
@@ -111,7 +114,7 @@
     </table>
     <div class="editor-actions">
         <button type="button" id="history-close" bind:this={closeBtn} onclick={closeHistory}>
-            {$tr('dialog.close')}
+            {$msg('dialog.close')}
         </button>
     </div>
 </dialog>
