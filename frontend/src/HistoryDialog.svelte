@@ -33,7 +33,9 @@
         if (state.open) {
             if (!el.open) {
                 el.showModal();
-                closeBtn?.focus();
+                // The dialog itself scrolls, and the way out is its last control,
+                // so plain focus() dragged the log to its end on open.
+                closeBtn?.focus({ preventScroll: true });
             }
         } else if (el.open) {
             el.close();
