@@ -108,6 +108,13 @@ type UpdateEntry struct {
 	// ReplacedVersion is the version BackupPath holds — what a rollback puts
 	// back, and what the next scan then compares against.
 	ReplacedVersion string `json:"replaced_version,omitempty"`
+	// AppliedFiles lists, relative to PluginDir, the files this change wrote into
+	// the folder. A rollback may take away only what is named here: the rest of the
+	// folder is the plugin's own — it writes its settings next to its DLL — or
+	// belongs to whoever installed the plugin by hand. Entries written before the
+	// list existed carry nothing, and rolling one of those back puts the copy back
+	// without removing anything.
+	AppliedFiles []string `json:"applied_files,omitempty"`
 	// Restored marks a line written by a rollback instead of an update.
 	Restored bool `json:"restored,omitempty"`
 }

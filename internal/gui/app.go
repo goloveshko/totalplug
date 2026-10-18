@@ -179,16 +179,23 @@ func (a *App) RollbackUpdate(entry domain.UpdateEntry) (domain.UpdateResult, err
 		return domain.UpdateResult{}, fmt.Errorf("only the last change to %s can be rolled back", entry.PluginName)
 	}
 
-	snapshot, err := a.updater.RestoreEntry(entry)
+	restored, err := a.updater.RestoreEntry(entry)
 	if err != nil {
 		if errors.Is(err, updater.ErrFileLocked) {
 			return domain.UpdateResult{Locked: true}, nil
 		}
 		return domain.UpdateResult{}, err
 	}
+	snapshot := restored.SnapshotPath
 
 	if err := a.db.RecordChange(storage.ChangeFromRestore(entry, snapshot)); err != nil {
 		fmt.Printf("[!] Could not log the rollback of %s: %v\n", entry.PluginID, err)
+	}
+	// The folder holds the older version again either way. A file the newer one
+	// brought that another process still holds stays where it is until that process
+	// lets go, which is no reason to report a rollback that finished as a failure.
+	for _, name := range restored.LeftBehind {
+		fmt.Printf("[!] Could not take %s out of %s: it is still held open\n", name, entry.PluginDir)
 	}
 	return domain.UpdateResult{BackupPath: snapshot}, nil
 }
@@ -260,7 +267,7 @@ func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
 	})
 	defer a.updater.SetProgressListener(nil)
 
-	backupDir, err := a.updater.UpdatePlugin(a.ctx, plugin)
+	outcome, err := a.updater.UpdatePlugin(a.ctx, plugin)
 	if err != nil {
 		if errors.Is(err, updater.ErrFileLocked) {
 			return domain.UpdateResult{Locked: true}, nil
@@ -271,10 +278,10 @@ func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
 	// Remember the applied version so blind (unknown-installed) plugins do not
 	// resurface as uncertain on the next scan.
 	if a.db != nil {
-		if err := a.db.RecordChange(storage.ChangeFromUpdate(plugin, backupDir)); err != nil {
+		if err := a.db.RecordChange(storage.ChangeFromUpdate(plugin, outcome.BackupPath, outcome.AppliedFiles)); err != nil {
 			fmt.Printf("[!] Could not remember version %s for %s: %v\n", plugin.LatestVersion, plugin.ID, err)
 		}
 	}
 
-	return domain.UpdateResult{BackupPath: backupDir}, nil
+	return domain.UpdateResult{BackupPath: outcome.BackupPath}, nil
 }

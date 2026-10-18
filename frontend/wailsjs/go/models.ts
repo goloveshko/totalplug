@@ -145,6 +145,7 @@ export namespace domain {
 	    plugin_dir?: string;
 	    backup_path?: string;
 	    replaced_version?: string;
+	    applied_files?: string[];
 	    restored?: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -160,6 +161,7 @@ export namespace domain {
 	        this.plugin_dir = source["plugin_dir"];
 	        this.backup_path = source["backup_path"];
 	        this.replaced_version = source["replaced_version"];
+	        this.applied_files = source["applied_files"];
 	        this.restored = source["restored"];
 	    }
 	}

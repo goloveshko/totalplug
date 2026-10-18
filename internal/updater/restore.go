@@ -9,44 +9,77 @@ import (
 	"github.com/goloveshko/totalplug/internal/domain"
 )
 
+// RestoreOutcome is what a rollback leaves: the copy of the version it took away,
+// which is what makes the same route lead forward again, and the files the update
+// named but this run could not take out of the folder.
+type RestoreOutcome struct {
+	SnapshotPath string
+	LeftBehind   []string
+}
+
 // RestoreEntry puts the copy one history line kept back into the plugin folder it
 // came from, and returns a copy of the version that was installed until now.
 // Nothing offers rolling a rollback back — updating again is the way forward — but
 // that second copy is what makes the answer hold even after the catalog moved on.
 //
-// The folder is taken away before the copy is written back instead of being
-// merged into: the files a newer version added have no counterpart in the copy,
-// so a merge would leave them sitting in a plugin that is supposed to be the
-// older one again.
-func (u *Updater) RestoreEntry(entry domain.UpdateEntry) (string, error) {
+// The copy is written over the folder with the same rename-into-place an update
+// uses rather than by emptying the folder first: Total Commander holds a loaded
+// plugin, and while replacing its file works, removing the folder around it does
+// not — an update has never had to. What the update added on top of the copy is
+// then taken away, but only by the names that line recorded, because a plugin
+// writes its settings next to its DLL and the folder can hold a file the user put
+// there himself. A line written before the tool recorded names removes nothing.
+func (u *Updater) RestoreEntry(entry domain.UpdateEntry) (RestoreOutcome, error) {
 	backupDir, err := restoreSource(entry)
 	if err != nil {
-		return "", err
+		return RestoreOutcome{}, err
 	}
 	pluginDir := entry.PluginDir
 
 	snapshot, err := u.BackupPlugin(pluginDir)
 	if err != nil {
-		return "", fmt.Errorf("backing up the version being replaced: %w", err)
+		return RestoreOutcome{}, fmt.Errorf("backing up the version being replaced: %w", err)
 	}
 
-	if err := os.RemoveAll(pluginDir); err != nil {
-		return snapshot, asLocked(fmt.Errorf("clearing %s: %w", pluginDir, err))
-	}
 	if err := copyTree(backupDir, pluginDir); err != nil {
 		// The folder now holds part of one version, so put back the whole of what
 		// the snapshot held rather than leaving the plugin in neither.
 		if again := copyTree(snapshot, pluginDir); again != nil {
-			return snapshot, fmt.Errorf("restoring %s: %v; what was there before is in %s and has to be put back by hand: %v",
+			return RestoreOutcome{SnapshotPath: snapshot}, fmt.Errorf("restoring %s: %v; what was there before is in %s and has to be put back by hand: %v",
 				backupDir, err, snapshot, again)
 		}
-		return snapshot, asLocked(fmt.Errorf("restoring %s: %w", backupDir, err))
+		return RestoreOutcome{SnapshotPath: snapshot}, asLocked(fmt.Errorf("restoring %s: %w", backupDir, err))
 	}
+
+	left := removeAddedFiles(pluginDir, entry.AppliedFiles, backupDir)
 
 	// Best-effort, exactly as after an update: the rollback already succeeded, so
 	// old copies must not turn it into a reported failure.
 	_, _ = pruneBackupSpace(pluginDir, config.LoadBackupPolicy())
-	return snapshot, nil
+	return RestoreOutcome{SnapshotPath: snapshot, LeftBehind: left}, nil
+}
+
+// removeAddedFiles takes out of the folder the files the named update wrote there
+// and the copy just restored has no answer to. A name outside the folder is not
+// a file this tool added, so it is left alone, and so is anything the list does
+// not mention. What will not go — Total Commander can be holding a file the newer
+// version brought — comes back in left rather than failing a rollback that did
+// happen.
+func removeAddedFiles(pluginDir string, applied []string, backupDir string) []string {
+	var left []string
+	for _, name := range applied {
+		target, err := sanitizeEntryPath(pluginDir, name)
+		if err != nil {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(backupDir, filepath.Clean(name))); err == nil {
+			continue // the copy restored this one itself, so it belongs to the older version
+		}
+		if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+			left = append(left, name)
+		}
+	}
+	return left
 }
 
 // BackupStillKept reports whether a copy named by a history line is still on
@@ -69,9 +102,9 @@ func restoreSource(entry domain.UpdateEntry) (string, error) {
 	if err := validatePluginFolder(entry.PluginDir); err != nil {
 		return "", err
 	}
-	// A rollback deletes its target, so the folder has to be inside the install
-	// this tool was pointed at; a stale or edited path must not be a way to empty
-	// some other part of the disk.
+	// A rollback writes into its target and takes named files out of it, so the
+	// folder has to be inside the install this tool was pointed at; a stale or
+	// edited path must not be a way to overwrite some other part of the disk.
 	if !pluginInsideTCRoot(entry.PluginDir) {
 		return "", fmt.Errorf("%w: %s", ErrPluginOutsideTCRoot, entry.PluginDir)
 	}

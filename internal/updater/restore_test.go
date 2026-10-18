@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/goloveshko/totalplug/internal/domain"
@@ -22,21 +23,25 @@ func TestRestoreEntryPutsTheKeptCopyBack(t *testing.T) {
 	root := tcFixture(t)
 	pluginDir := filepath.Join(root, "wfx", "CudaLister")
 	writeTestFile(t, filepath.Join(pluginDir, "cuda.wlx"), "the newer build")
-	// A file only the newer version has: nothing in the copy can overwrite it, so
-	// a rollback that merges would leave it behind in an older plugin.
+	// The three kinds of file a plugin folder holds besides the version itself:
+	// one the update brought, one the plugin wrote for its own settings, and one
+	// the user put there. Only the first is this tool's to take away.
 	writeTestFile(t, filepath.Join(pluginDir, "added-by-the-update.txt"), "extra")
+	writeTestFile(t, filepath.Join(pluginDir, "CudaLister.ini"), "the settings the newer build saved")
+	writeTestFile(t, filepath.Join(pluginDir, "notes.txt"), "a file the user placed here")
 
 	space := backupSpaceFor(t, pluginDir)
 	kept := filepath.Join(space, "CudaLister.bak_1001")
 	writeTestFile(t, filepath.Join(kept, "cuda.wlx"), "the older build")
 
-	snapshot, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
+	outcome, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
 		PluginID:        "WFX:c",
 		PluginName:      "CudaLister",
 		Version:         "1.9",
 		ReplacedVersion: "1.8",
 		PluginDir:       pluginDir,
 		BackupPath:      kept,
+		AppliedFiles:    []string{"cuda.wlx", "added-by-the-update.txt"},
 	})
 	if err != nil {
 		t.Fatalf("RestoreEntry: %v", err)
@@ -46,16 +51,151 @@ func TestRestoreEntryPutsTheKeptCopyBack(t *testing.T) {
 		t.Errorf("plugin file = %q, want the copy put back", got)
 	}
 	if _, err := os.Stat(filepath.Join(pluginDir, "added-by-the-update.txt")); !os.IsNotExist(err) {
-		t.Errorf("a file only the newer version had survived the rollback: %v", err)
+		t.Errorf("a file the update named survived the rollback: %v", err)
+	}
+	for _, name := range []string{"CudaLister.ini", "notes.txt"} {
+		if _, err := os.Stat(filepath.Join(pluginDir, name)); err != nil {
+			t.Errorf("%s was not in the update's list and should have been left alone: %v", name, err)
+		}
+	}
+	if outcome.LeftBehind != nil {
+		t.Errorf("LeftBehind = %v, want nothing left behind", outcome.LeftBehind)
 	}
 
 	// The version that was just removed has to be recoverable by the same route,
 	// which means the snapshot is a copy of its own in the same namespace.
-	if _, ok := backupStamp(filepath.Base(snapshot), pluginDir); !ok {
-		t.Fatalf("snapshot %q is not a copy of %s", snapshot, pluginDir)
+	if _, ok := backupStamp(filepath.Base(outcome.SnapshotPath), pluginDir); !ok {
+		t.Fatalf("snapshot %q is not a copy of %s", outcome.SnapshotPath, pluginDir)
 	}
-	if got := readTestFile(t, filepath.Join(snapshot, "cuda.wlx")); got != "the newer build" {
+	if got := readTestFile(t, filepath.Join(outcome.SnapshotPath, "cuda.wlx")); got != "the newer build" {
 		t.Errorf("snapshot file = %q, want the version the rollback replaced", got)
+	}
+}
+
+func TestRollbackOfAnEntryWithoutAFileListRemovesNothing(t *testing.T) {
+	root := tcFixture(t)
+	pluginDir := filepath.Join(root, "wfx", "CudaLister")
+	writeTestFile(t, filepath.Join(pluginDir, "cuda.wlx"), "the newer build")
+	writeTestFile(t, filepath.Join(pluginDir, "added-by-the-update.txt"), "extra")
+
+	space := backupSpaceFor(t, pluginDir)
+	kept := filepath.Join(space, "CudaLister.bak_1001")
+	writeTestFile(t, filepath.Join(kept, "cuda.wlx"), "the older build")
+
+	// History lines written before the tool recorded names carry an empty list.
+	// With nothing to go by, the only safe reading of "take away what the update
+	// added" is to take away nothing: the older plugin keeps an extra file it does
+	// not know about, which beats deleting someone's settings.
+	if _, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
+		PluginID:   "WFX:c",
+		PluginDir:  pluginDir,
+		BackupPath: kept,
+	}); err != nil {
+		t.Fatalf("RestoreEntry: %v", err)
+	}
+
+	if got := readTestFile(t, filepath.Join(pluginDir, "cuda.wlx")); got != "the older build" {
+		t.Errorf("plugin file = %q, want the copy put back", got)
+	}
+	if got := readTestFile(t, filepath.Join(pluginDir, "added-by-the-update.txt")); got != "extra" {
+		t.Errorf("an extra file was deleted on the strength of no list: %q", got)
+	}
+}
+
+func TestRollbackKeepsThePluginFolder(t *testing.T) {
+	// Total Commander holds a loaded plugin as an image section, and while the
+	// file itself can be renamed over, the folder around it cannot be removed —
+	// so a rollback that emptied the folder first needed the program closed.
+	// Nothing here removes it, which is what makes rolling back right after an
+	// update work.
+	root := tcFixture(t)
+	pluginDir := filepath.Join(root, "wfx", "CudaLister")
+	writeTestFile(t, filepath.Join(pluginDir, "cuda.wlx"), "the newer build")
+	writeTestFile(t, filepath.Join(pluginDir, "descript", "readme.txt"), "the newer build brought this")
+
+	space := backupSpaceFor(t, pluginDir)
+	kept := filepath.Join(space, "CudaLister.bak_1001")
+	writeTestFile(t, filepath.Join(kept, "cuda.wlx"), "the older build")
+
+	if _, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
+		PluginID:     "WFX:c",
+		PluginDir:    pluginDir,
+		BackupPath:   kept,
+		AppliedFiles: []string{"cuda.wlx", filepath.Join("descript", "readme.txt")},
+	}); err != nil {
+		t.Fatalf("RestoreEntry: %v", err)
+	}
+
+	if got := readTestFile(t, filepath.Join(pluginDir, "cuda.wlx")); got != "the older build" {
+		t.Errorf("plugin file = %q, want the copy put back", got)
+	}
+	// Every file the update brought is gone, yet the folder and the directory it
+	// came with are still there: an empty folder is nobody's data, and removing
+	// one is exactly what a loaded plugin does not allow.
+	info, err := os.Stat(pluginDir)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("the plugin folder is gone after a rollback: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(pluginDir, "descript")); err != nil {
+		t.Errorf("the folder an update added was deleted: %v", err)
+	}
+}
+
+func TestRollbackReportsWhatItCouldNotTakeOut(t *testing.T) {
+	root := tcFixture(t)
+	pluginDir := filepath.Join(root, "wfx", "CudaLister")
+	writeTestFile(t, filepath.Join(pluginDir, "cuda.wlx"), "the newer build")
+	// A folder in the way of the removal: the rollback itself still happens, so
+	// this has to come back as a note rather than a failure.
+	writeTestFile(t, filepath.Join(pluginDir, "blocker", "inside.txt"), "held")
+
+	space := backupSpaceFor(t, pluginDir)
+	kept := filepath.Join(space, "CudaLister.bak_1001")
+	writeTestFile(t, filepath.Join(kept, "cuda.wlx"), "the older build")
+
+	outcome, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
+		PluginID:     "WFX:c",
+		PluginDir:    pluginDir,
+		BackupPath:   kept,
+		AppliedFiles: []string{"blocker"},
+	})
+	if err != nil {
+		t.Fatalf("a rollback that could not clear one file must still report success: %v", err)
+	}
+	if strings.Join(outcome.LeftBehind, ",") != "blocker" {
+		t.Errorf("LeftBehind = %v, want the name that would not go", outcome.LeftBehind)
+	}
+	if got := readTestFile(t, filepath.Join(pluginDir, "cuda.wlx")); got != "the older build" {
+		t.Errorf("plugin file = %q, want the copy put back anyway", got)
+	}
+}
+
+func TestRollbackIgnoresANameOutsideThePluginFolder(t *testing.T) {
+	root := tcFixture(t)
+	pluginDir := filepath.Join(root, "wfx", "CudaLister")
+	writeTestFile(t, filepath.Join(pluginDir, "cuda.wlx"), "the newer build")
+	writeTestFile(t, filepath.Join(root, "wfx", "wanted-by-a-crafted-history-file.txt"), "outside")
+
+	space := backupSpaceFor(t, pluginDir)
+	kept := filepath.Join(space, "CudaLister.bak_1001")
+	writeTestFile(t, filepath.Join(kept, "cuda.wlx"), "the older build")
+
+	// The list is read back from a JSON file the user can edit, so a name that
+	// leads out of the folder is not treated as one this tool wrote there.
+	if _, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
+		PluginID:   "WFX:c",
+		PluginDir:  pluginDir,
+		BackupPath: kept,
+		AppliedFiles: []string{
+			"..\\wfx\\wanted-by-a-crafted-history-file.txt",
+			"../wfx/wanted-by-a-crafted-history-file.txt",
+		},
+	}); err != nil {
+		t.Fatalf("RestoreEntry: %v", err)
+	}
+
+	if got := readTestFile(t, filepath.Join(root, "wfx", "wanted-by-a-crafted-history-file.txt")); got != "outside" {
+		t.Errorf("a rollback deleted outside the plugin folder: %q", got)
 	}
 }
 

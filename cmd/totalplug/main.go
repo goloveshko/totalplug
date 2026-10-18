@@ -91,7 +91,7 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Databa
 			continue
 		}
 		fmt.Printf("  [⬆] %-18s %s -> %s (downloading...)\n", name, p.InstalledVersion, p.LatestVersion)
-		backupDir, err := upd.UpdatePlugin(ctx, p)
+		outcome, err := upd.UpdatePlugin(ctx, p)
 		if err != nil {
 			fmt.Printf("  [✗] %-18s %v\n", name, err)
 			if errors.Is(err, updater.ErrFileLocked) {
@@ -103,9 +103,9 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Databa
 			failed++
 			continue
 		}
-		fmt.Printf("  [✓] %-18s updated to %s (backup: %s)\n", name, p.LatestVersion, backupDir)
+		fmt.Printf("  [✓] %-18s updated to %s (backup: %s)\n", name, p.LatestVersion, outcome.BackupPath)
 		if db != nil {
-			if err := db.RecordChange(storage.ChangeFromUpdate(p, backupDir)); err != nil {
+			if err := db.RecordChange(storage.ChangeFromUpdate(p, outcome.BackupPath, outcome.AppliedFiles)); err != nil {
 				fmt.Printf("      ↳ Could not remember version %s in history: %v\n", p.LatestVersion, err)
 			}
 		}

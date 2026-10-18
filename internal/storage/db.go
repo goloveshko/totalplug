@@ -169,14 +169,15 @@ type AppliedChange struct {
 	ReplacedVersion string
 	PluginDir       string
 	BackupPath      string
+	AppliedFiles    []string
 	Restored        bool
 }
 
 // ChangeFromUpdate describes a successful update the way RecordChange wants it:
-// the folder that changed, the copy the updater left behind and the version that
-// copy holds. Both the CLI and the GUI apply an update and then log it, and the
-// mapping is the same answer in both places.
-func ChangeFromUpdate(plugin domain.Plugin, backupPath string) AppliedChange {
+// the folder that changed, the copy the updater left behind, the version that
+// copy holds and the files the update wrote. Both the CLI and the GUI apply an
+// update and then log it, and the mapping is the same answer in both places.
+func ChangeFromUpdate(plugin domain.Plugin, backupPath string, applied []string) AppliedChange {
 	return AppliedChange{
 		PluginID:        plugin.ID,
 		PluginName:      plugin.Name,
@@ -184,12 +185,15 @@ func ChangeFromUpdate(plugin domain.Plugin, backupPath string) AppliedChange {
 		ReplacedVersion: plugin.InstalledVersion,
 		PluginDir:       filepath.Dir(plugin.Path),
 		BackupPath:      backupPath,
+		AppliedFiles:    applied,
 	}
 }
 
 // ChangeFromRestore describes a rollback of one logged change: the version now in
 // the folder is the one the kept copy held, and the snapshot taken of what was
-// there until a moment ago is the copy that makes this line undoable in turn.
+// there until a moment ago is the copy that makes this line undoable in turn. It
+// carries no file list: a rollback line is never itself rolled back (the way
+// forward is to update again), so there is nothing for the list to be asked about.
 func ChangeFromRestore(entry domain.UpdateEntry, snapshotPath string) AppliedChange {
 	return AppliedChange{
 		PluginID:        entry.PluginID,
@@ -249,6 +253,7 @@ func (db *Database) RecordChange(change AppliedChange) error {
 		PluginDir:       change.PluginDir,
 		BackupPath:      change.BackupPath,
 		ReplacedVersion: change.ReplacedVersion,
+		AppliedFiles:    change.AppliedFiles,
 		Restored:        change.Restored,
 	}}, db.history...)
 	if len(db.history) > MaxHistoryEntries {

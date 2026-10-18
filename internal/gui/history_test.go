@@ -70,6 +70,10 @@ func TestRollbackUpdateRestoresAndLogs(t *testing.T) {
 
 	kept := filepath.Join(config.BackupSpacePath(), "wfx", "CudaLister.bak_1700000000")
 	writeGuiFile(t, filepath.Join(kept, "cuda.wlx"), "the older build")
+	// One file the update brought and one the plugin wrote for itself: the first
+	// is named by the change and goes, the second is not and stays.
+	writeGuiFile(t, filepath.Join(pluginDir, "added-by-the-update.txt"), "extra")
+	writeGuiFile(t, filepath.Join(pluginDir, "CudaLister.ini"), "the settings the plugin saved")
 
 	if err := app.db.RecordChange(storage.ChangeFromUpdate(domain.Plugin{
 		ID:               "WFX:c",
@@ -77,7 +81,7 @@ func TestRollbackUpdateRestoresAndLogs(t *testing.T) {
 		Path:             filepath.Join(pluginDir, "cuda.wlx"),
 		InstalledVersion: "1.8",
 		LatestVersion:    "1.9",
-	}, kept)); err != nil {
+	}, kept, []string{"cuda.wlx", "added-by-the-update.txt"})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -101,6 +105,12 @@ func TestRollbackUpdateRestoresAndLogs(t *testing.T) {
 	}
 	if string(got) != "the older build" {
 		t.Errorf("plugin file = %q, want the kept copy back", got)
+	}
+	if _, err := os.Stat(filepath.Join(pluginDir, "added-by-the-update.txt")); !os.IsNotExist(err) {
+		t.Errorf("the file the change named survived the rollback: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(pluginDir, "CudaLister.ini")); err != nil {
+		t.Errorf("the plugin's own settings file was deleted: %v", err)
 	}
 	// What the rollback displaced is on disk, even though no line offers it: the
 	// way back from here is to update the plugin again.
@@ -145,7 +155,7 @@ func TestRollbackUpdateRefusesAnyLineButTheLast(t *testing.T) {
 		Path:             filepath.Join(pluginDir, "cuda.wlx"),
 		InstalledVersion: "1.8",
 		LatestVersion:    "1.9",
-	}, kept)); err != nil {
+	}, kept, nil)); err != nil {
 		t.Fatal(err)
 	}
 	hist, err := app.GetUpdateHistory()

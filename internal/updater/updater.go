@@ -54,10 +54,19 @@ var (
 	ErrBackupGone = errors.New("the kept copy of the plugin folder is gone")
 	// ErrPluginOutsideTCRoot refuses a rollback whose target folder is not inside
 	// a Total Commander install. The folder comes from a JSON file the user can
-	// edit, and a rollback deletes it before writing the copy back, so "it is a
-	// path" is not enough to trust it.
+	// edit, and a rollback writes the copy's files into it and takes files away
+	// from it, so "it is a path" is not enough to trust it.
 	ErrPluginOutsideTCRoot = errors.New("plugin folder is not inside a Total Commander install")
 )
+
+// Outcome is what a successful update leaves behind: the copy of the version it
+// replaced, and the files it wrote into the plugin folder. The list travels into
+// the history line, because nothing else there says later which files in that
+// folder this program itself put there.
+type Outcome struct {
+	BackupPath   string
+	AppliedFiles []string
+}
 
 // DefaultMaxDownloadBytes caps archive size (256 MiB) to bound disk usage.
 const DefaultMaxDownloadBytes int64 = 256 << 20
@@ -529,8 +538,11 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	// where it lies, so a copy that fails leaves the target byte-intact. An
 	// in-place write that broke halfway left a damaged file that rollback did
 	// not know about, and the backup holding the only good copy was then
-	// deleted. The rename also fails cleanly on a target another process holds
-	// open, which is how a locked plugin DLL is still detected.
+	// deleted. On Windows the rename also reaches a target another process has
+	// loaded: the old file goes into delete-pending and disappears when it lets
+	// go, which is why an update gets through with Total Commander running. What
+	// a held file does block is removing the folder that contains it, so nothing
+	// here tries that.
 	tmpFile, err := os.CreateTemp(dir, ".totalplug-copy-*")
 	if err != nil {
 		return fmt.Errorf("creating temp for %q: %w", dst, err)
@@ -702,36 +714,36 @@ func validatePluginFolder(pluginDir string) error {
 
 // UpdatePlugin downloads an update, backs up the current plugin directory, and
 // applies the new files. If applying fails, the files touched so far are rolled
-// back from the backup. On success the backup directory is kept and returned,
-// and the copies the retention policy in the settings file no longer wants are
-// pruned from the app's backup space.
+// back from the backup. On success the backup directory is kept and returned
+// with the list of files that were written, and the copies the retention policy
+// in the settings file no longer wants are pruned from the app's backup space.
 //
 // Every candidate URL (primary + catalog mirrors) is tried until one yields a
 // usable archive; backup and apply happen only after a good package is secured.
-func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (string, error) {
+func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outcome, error) {
 	candidates := downloadCandidates(plugin)
 	if len(candidates) == 0 {
-		return "", ErrEmptyDownloadURL
+		return Outcome{}, ErrEmptyDownloadURL
 	}
 
 	pluginDir := filepath.Dir(plugin.Path)
 	if err := validatePluginFolder(pluginDir); err != nil {
-		return "", err
+		return Outcome{}, err
 	}
 
 	tmpDir, err := config.RunScratch()
 	if err != nil {
-		return "", fmt.Errorf("creating temp directory: %w", err)
+		return Outcome{}, fmt.Errorf("creating temp directory: %w", err)
 	}
 	// A run downloads every plugin of an --update-all into its own scratch folder,
 	// so each one starts from an empty `update` inside it rather than unpacking
 	// over what the previous package left.
 	tmpDir = filepath.Join(tmpDir, updateSpace)
 	if err := os.RemoveAll(tmpDir); err != nil {
-		return "", fmt.Errorf("clearing temp directory: %w", err)
+		return Outcome{}, fmt.Errorf("clearing temp directory: %w", err)
 	}
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return "", fmt.Errorf("creating temp directory: %w", err)
+		return Outcome{}, fmt.Errorf("creating temp directory: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -762,7 +774,7 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 		if len(candidates) > 1 {
 			err = fmt.Errorf("all %d download sources failed, last: %w", len(candidates), err)
 		}
-		return "", err
+		return Outcome{}, err
 	}
 
 	extractedDir := filepath.Join(tmpDir, "extracted")
@@ -776,12 +788,12 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 		err = u.Extract7z(archiveFile, extractedDir)
 	}
 	if err != nil {
-		return "", fmt.Errorf("extraction failed: %w", err)
+		return Outcome{}, fmt.Errorf("extraction failed: %w", err)
 	}
 
 	backupDir, err := u.BackupPlugin(pluginDir)
 	if err != nil {
-		return "", fmt.Errorf("backup failed: %w", err)
+		return Outcome{}, fmt.Errorf("backup failed: %w", err)
 	}
 
 	u.emit(domain.UpdateProgress{Phase: "install", Percent: -1})
@@ -789,13 +801,13 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	if err != nil {
 		locked := isLockedErr(err)
 		if restoreErr := rollback(pluginDir, backupDir, applied); restoreErr != nil {
-			return "", fmt.Errorf("apply failed: %v; automatic rollback failed: %v, restore from %s manually", err, restoreErr, backupDir)
+			return Outcome{}, fmt.Errorf("apply failed: %v; automatic rollback failed: %v, restore from %s manually", err, restoreErr, backupDir)
 		}
 		os.RemoveAll(backupDir)
 		if locked {
-			return "", fmt.Errorf("apply failed (changes rolled back from backup): %w: %v", ErrFileLocked, err)
+			return Outcome{}, fmt.Errorf("apply failed (changes rolled back from backup): %w: %v", ErrFileLocked, err)
 		}
-		return "", fmt.Errorf("apply failed (changes rolled back from backup): %w", err)
+		return Outcome{}, fmt.Errorf("apply failed (changes rolled back from backup): %w", err)
 	}
 
 	// Best-effort cleanup: the update already succeeded, so old backups must
@@ -805,5 +817,5 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (strin
 	// run — is what the next update honours.
 	_, _ = pruneBackupSpace(pluginDir, config.LoadBackupPolicy())
 
-	return backupDir, nil
+	return Outcome{BackupPath: backupDir, AppliedFiles: applied}, nil
 }

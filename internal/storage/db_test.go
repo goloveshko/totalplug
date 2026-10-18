@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -290,7 +291,7 @@ func TestChangeFromUpdateMapsTheAppliedPlugin(t *testing.T) {
 		Path:             filepath.Join("C:", "TC", "wlx", "CudaLister", "cuda.wlx"),
 		InstalledVersion: "1.8",
 		LatestVersion:    "1.9",
-	}, filepath.Join("C:", "data", "backups", "wlx", "CudaLister.bak_1700000000"))
+	}, filepath.Join("C:", "data", "backups", "wlx", "CudaLister.bak_1700000000"), []string{"cuda.wlx", filepath.Join("docs", "info.txt")})
 
 	want := AppliedChange{
 		PluginID:        "WLX:c",
@@ -299,8 +300,11 @@ func TestChangeFromUpdateMapsTheAppliedPlugin(t *testing.T) {
 		ReplacedVersion: "1.8",
 		PluginDir:       filepath.Join("C:", "TC", "wlx", "CudaLister"),
 		BackupPath:      filepath.Join("C:", "data", "backups", "wlx", "CudaLister.bak_1700000000"),
+		AppliedFiles:    []string{"cuda.wlx", filepath.Join("docs", "info.txt")},
 	}
-	if got != want {
+	// A rollback may only take these names away, so the list surviving the trip
+	// into the change is what makes it able to say which files were the update's.
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ChangeFromUpdate() = %+v, want %+v", got, want)
 	}
 }

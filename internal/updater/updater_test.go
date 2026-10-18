@@ -168,7 +168,7 @@ func TestUpdatePluginSuccessKeepsBackup(t *testing.T) {
 		"docs/info.txt": "release-notes",
 	}))
 
-	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+	outcome, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
 		Path:        dllPath,
 		DownloadURL: downloadURL,
 	})
@@ -182,8 +182,13 @@ func TestUpdatePluginSuccessKeepsBackup(t *testing.T) {
 	if got := readTestFile(t, filepath.Join(pluginDir, "docs", "info.txt")); got != "release-notes" {
 		t.Errorf("docs/info.txt = %q, want release-notes", got)
 	}
-	if got := readTestFile(t, filepath.Join(backupDir, "demo.dll")); got != "old-dll" {
+	if got := readTestFile(t, filepath.Join(outcome.BackupPath, "demo.dll")); got != "old-dll" {
 		t.Errorf("backup demo.dll = %q, want old-dll", got)
+	}
+	// A rollback may take only these out of the folder, so keep.txt — the file the
+	// user put there himself — must not be on the list.
+	if strings.Join(outcome.AppliedFiles, ",") != "demo.dll,"+filepath.Join("docs", "info.txt") {
+		t.Errorf("AppliedFiles = %v, want the two files the archive carried", outcome.AppliedFiles)
 	}
 }
 
@@ -522,7 +527,7 @@ func TestUpdatePluginPrunesOldBackups(t *testing.T) {
 	}
 
 	archive := buildTestZip(t, map[string]string{"test.wcx": "new"})
-	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+	outcome, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
 		Path:        pluginFile,
 		DownloadURL: serveTestZip(t, archive),
 	})
@@ -532,7 +537,7 @@ func TestUpdatePluginPrunesOldBackups(t *testing.T) {
 
 	// Three old copies plus the fresh one are four, so the oldest goes and the
 	// backup returned to the caller survives.
-	if _, err := os.Stat(backupDir); err != nil {
+	if _, err := os.Stat(outcome.BackupPath); err != nil {
 		t.Errorf("fresh backup must survive pruning: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(space, "test.bak_1001")); !os.IsNotExist(err) {
@@ -681,7 +686,7 @@ func TestUpdatePluginAppliesRar(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	backupDir, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+	outcome, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
 		Path:        pluginFile,
 		DownloadURL: srv.URL,
 	})
@@ -703,7 +708,7 @@ func TestUpdatePluginAppliesRar(t *testing.T) {
 	if readTestFile(t, pluginFile) == "old-wdx" {
 		t.Error("NL_Info.wdx was not replaced")
 	}
-	if _, err := os.Stat(filepath.Join(backupDir, "NL_Info.wdx")); err != nil {
+	if _, err := os.Stat(filepath.Join(outcome.BackupPath, "NL_Info.wdx")); err != nil {
 		t.Errorf("backup must contain the pre-update wdx: %v", err)
 	}
 }
