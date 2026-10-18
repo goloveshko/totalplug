@@ -67,6 +67,15 @@ next release (v2), and the accepted debt we deliberately postponed.
   order, but a Wails binding is callable from anywhere, and two runs would fight over the one
   progress listener and over this process' single scratch folder, where the second run empties
   the package the first is still unpacking.
+- A rollback from the update history merges the kept copy over the plugin folder instead of
+  emptying the folder first, so it works while Total Commander holds the plugin loaded — an
+  update never needed the program closed, and deleting the folder around a live image section
+  was the only reason a rollback did. What the update brought on top of the copy is then taken
+  out, but by the names the line recorded (`UpdateEntry.AppliedFiles`, collected by `applyTree`):
+  a plugin saves its own settings beside its DLL and the folder can hold a file the user put
+  there, so nothing else is touched. A line written before names were recorded removes nothing,
+  a name the copy also carries belongs to the older version, and a name leading out of the
+  folder is not this tool's to delete.
 
 ### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
 
@@ -89,6 +98,11 @@ next release (v2), and the accepted debt we deliberately postponed.
   Total Commander the registry does not know about, and hands the choice back to
   auto-detection. The path is stored in `settings.json`, so a portable install
   carries it with the rest of the data, and both scan call sites read it.
+- The update history is grouped by plugin. A group leads with its newest change,
+  which is the only line a copy is kept for, so folding the earlier ones away
+  behind a +/− in the name cell hides nothing you could act on. The dialog opens
+  at the top of the log: Close is the last control inside a `<dialog>` that
+  scrolls, and the plain `focus()` handed the log its own end.
 
 ### Engineering
 

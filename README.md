@@ -71,6 +71,13 @@ and nothing older, so the log cannot walk you backwards through itself. The vers
 a rollback displaces is kept as a copy of its own, and the way forward from a
 rollback is to update the plugin again.
 
+A rollback writes the copy over the folder rather than emptying it first, so it works
+with Total Commander running, exactly like an update. The files that update brought
+with it are then taken out — but only those, because a plugin saves its own settings
+next to its DLL and you may have put a file in that folder yourself. A history line
+written before TotalPlug kept track of file names puts the copy back and removes
+nothing.
+
 An update also needs somewhere to hold its download while it is unpacked — the
 only place TotalPlug writes that is neither your plugins folder nor its own data
 folder: `%TEMP%\totalplug`, with one subfolder per running instance so two copies
@@ -120,7 +127,8 @@ path you choose.
 - **Plugin card** — click a row for the description, update source, homepage and
   install path, plus an editor for a manual version/source override when
   auto-detection got it wrong.
-- **History** — the updates TotalPlug applied, with version and timestamp.
+- **History** — the updates TotalPlug applied, with version and timestamp, grouped by
+  plugin: the newest change leads each group and the earlier ones open behind it.
 - **Settings** — light/dark/system theme, English/Russian interface, font size,
   and a Total Commander panel that names the `wincmd.ini` the next scan reads:
   auto-detected, or one you pick when the registry does not know your install.
