@@ -552,6 +552,27 @@ a.dlg-link:focus-visible {
     font-size: 0.75rem;
     color: var(--text-muted);
 }
+/* A plugin with more than one line keeps the older ones behind this glyph, so the
+   log reads as one block per plugin instead of the same name down the column. It is
+   a real button for the keyboard, so it has to shed the base button's fill. */
+.history-toggle {
+    background: none;
+    padding: 0;
+    color: var(--text-muted);
+    font: inherit;
+    font-weight: 600;
+    width: 16px;
+    border-radius: 0;
+    text-align: left;
+}
+.history-toggle:hover {
+    background: none;
+    color: var(--text-main);
+}
+.history-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
 /* The confirm replaces the row it is about, so it takes the whole width and the
    quiet background of a row that is not data any more. */
 .history-confirm td {

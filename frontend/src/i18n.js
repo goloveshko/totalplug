@@ -73,6 +73,8 @@ const STRINGS = {
         'history.col.action': 'Action',
         'history.rollback': 'Roll back',
         'history.restored': 'rolled back',
+        'history.expand': 'Show the earlier changes to {plugin}',
+        'history.collapse': 'Hide the earlier changes to {plugin}',
         'history.confirm': 'Put {version} back instead of {current}?',
         'history.confirm_unknown': 'Put the kept copy back?',
         'history.confirm_note':
@@ -219,6 +221,8 @@ const STRINGS = {
         'history.col.action': 'Действие',
         'history.rollback': 'Откатить',
         'history.restored': 'откат',
+        'history.expand': 'Показать прежние изменения {plugin}',
+        'history.collapse': 'Скрыть прежние изменения {plugin}',
         'history.confirm': 'Вернуть {version} вместо {current}?',
         'history.confirm_unknown': 'Вернуть сохранённую копию?',
         'history.confirm_note': 'Установленная сейчас версия сохранится копией: повторное обновление вернёт её.',
