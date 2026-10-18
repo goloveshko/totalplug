@@ -18,13 +18,18 @@ What to edit:
   custom properties (`:root` plus the dark theme), and so do the table, the
   plugin card, the dialogs and the window titlebar;
 - `src/i18n.js` — every label (EN + RU);
-- `src/*.js` — markup and behavior, one module per screen: `catalog.js` (the table
-  and its search), `card.js`, `update.js`, `progress.js` and `dialog.js` (the two
-  result dialogs), `history.js`, `about.js`, `tc.js`, `settings.js`, over
-  `state.js`, `dom.js`, `text.js` and `plugin.js` for what they share. `main.js`
-  is only the composition root: the titlebar, the order the screens go in, and the
-  two wires that cross them — a row opening its card, a language switch rebuilding
-  every label;
+- `src/*.svelte` — the screens, one component each: `Titlebar.svelte`,
+  `PluginTable.svelte`, `Dialog.svelte` and `ProgressOverlay.svelte`,
+  `PluginCard.svelte`, `HistoryDialog.svelte`, and `Settings.svelte` with its
+  three data-backed panels (`TcPanel`, `BackupsPanel`, `AboutPanel`);
+- `src/*.js` — the behavior behind them, one module per screen: `catalog.js` (the
+  scan and its stores), `card.js`, `update.js`, `progress.js` and `dialog.js` (the
+  two result dialogs), `history.js`, `about.js`, `tc.js`, `settings.js`, over
+  `state.js`, `theme.js`, `text.js` and `plugin.js` for what they share. A module
+  keeps the Go round trips and the state its component draws; nobody writes a
+  label into a DOM tree, so a language switch re-labels the window in place.
+  `main.js` is only the composition root: it mounts the islands and starts the
+  first scan;
 - `src/mock.js` — the demo data (plugins, history), for anything you want to
   look at or add to.
 

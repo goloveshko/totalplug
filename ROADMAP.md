@@ -477,9 +477,9 @@ next release (v2), and the accepted debt we deliberately postponed.
   embed path and the verification pass — on a frontend that no longer has to be rewritten at the
   same time. Stage 16 was the other half of that prep: `main.js` is a composition root over one
   module per screen, so a screen can become a component without touching the others.
-  Five slices are in. `#app` now splits into `#chrome`, `#table` and `#overlays`
-  (mounted islands, all `display: contents` so the flex column does not move a pixel) plus
-  `#screens` (still rebuilt vanilla), the language is a store, and the window chrome is
+  Six slices are in, and the last one deleted `buildScreens()`. `#app` now splits into
+  `#chrome`, `#table`, `#overlays` and `#settings` (mounted islands, all `display: contents` so
+  the flex column does not move a pixel), the language is a store, and the window chrome is
   `frontend/src/Titlebar.svelte` — which is what lets a language switch leave the search box,
   its text and the keyboard focus alone. Slice 2 made `frontend/src/PluginTable.svelte` out of
   the table (`7cb9d76`): the plugin list and the in-flight update flag became stores, so
@@ -514,16 +514,27 @@ next release (v2), and the accepted debt we deliberately postponed.
   row under discussion, the failed attempt and the busy flag to one store, so `HistoryDialog.svelte`
   renders the table, the question that replaces a row and the dates, which it formats from the
   language store — a log that is already open re-formats with the rest of the screen. Every button
-  there carries its own handler, so the delegated `tbody` listener left with `bindHistory()` and
-  `buildScreens()` is down to the settings view. What the module still decides: `openHistory()`
-  reads the log before the dialog opens, because a data folder it cannot reach belongs in the error
-  dialog rather than in an empty window, and focus goes to Close on open — the browser would hand it
-  to the first rollback otherwise — and to the confirm button whenever the question is on screen,
-  including after an attempt that dropped focus by passing through a disabled button. The rest goes
-  ahead of any new feature (2026-10-16), so that no screen is rewritten twice: settings with its
-  subviews last — those forms already keep their values in `settings.json` and localStorage, so a
-  rebuild costs them nothing. Done means `buildScreens()` is deleted: every label comes from a
-  store, so a language switch has nothing left to rebuild.
+  there carries its own handler, so the delegated `tbody` listener left with `bindHistory()`. What
+  the module still decides: `openHistory()` reads the log before the dialog opens, because a data
+  folder it cannot reach belongs in the error dialog rather than in an empty window, and focus goes
+  to Close on open — the browser would hand it to the first rollback otherwise — and to the confirm
+  button whenever the question is on screen, including after an attempt that dropped focus by
+  passing through a disabled button. Settings went last, as agreed (2026-10-16), because those forms
+  already keep their values in `settings.json` and localStorage and a rebuild costs them nothing.
+  Slice 6 took it (`bb9c8bc`) and deleted `buildScreens()` with it: `Settings.svelte` owns the shell
+  and the two panels that only read stores — the theme cards write `theme`, the slider and the
+  language select bind to `scale` and `lang` — while `TcPanel.svelte`, `BackupsPanel.svelte` and
+  `AboutPanel.svelte` each draw one store their own module keeps filling from the Go side. The text
+  of a field lives in that store, which is the only way a rejected edit can keep what was typed and a
+  visit to another panel can leave it alone, and the reload a panel gets on entry is an effect keyed
+  on `settingsSection` and `settingsOpen` — the two moments the old `openSettings()` and nav handler
+  covered. `#screens` became `#settings`, `dom.js` went with the rebuild it existed for, and so did
+  the `currentLang`/`setLang` mirror no screen needs any more; a language switch now re-labels the
+  whole window, dialogs included, which is what "done" meant here. `HistoryDialog.svelte` picked up
+  the table's rule about the `tr` import name on the way (`d120bbd`), where the compiler had warned
+  on every row since slice 5. The migration is over: a new feature starts on components, at 100.95
+  kB JS (gzip 35.63) against the 46.94 kB (gzip 13.82) the app carried before slice 1, one
+  dependency in the compile path and the stage 13 policy still unrelaxed.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
   `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
   `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
