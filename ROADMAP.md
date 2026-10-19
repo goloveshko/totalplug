@@ -585,28 +585,31 @@ next release (v2), and the accepted debt we deliberately postponed.
   prettier from the repo root, not from `frontend/`. Wails v3 itself was at `beta.29` (2026-10-13)
   with its GA milestone already a month overdue.
 
-Nits the final review pass found and deliberately left alone — each is real, none changes
-behaviour a user can reach today:
+Nits the final review pass found — each was real, none changed behaviour a user could reach
+today, and all six are now closed:
 
-- **Two `bufio.Reader`s over `os.Stdin`** — `confirm` (`cmd/totalplug/main.go:321`) and
-  `promptBlindUpdates` (`:338`) each wrap `os.Stdin` in a fresh buffered reader, and one run can
-  call both. Whatever the first buffered past its newline is gone from the second. A terminal
-  hands over one line at a time so this stays invisible; piped answers would skip a prompt.
-- **Builtin `println` in the GUI entry** — `main.go:16` reports a failed `gui.Run` with the
-  builtin, whose format is implementation-defined and whose stderr a Windows GUI-subsystem
-  binary is not attached to, so the one error the window cannot show is also the one nobody sees.
-- **`settings.json` is written in place** — `internal/gui/settings.go:84` uses `os.WriteFile`
-  where `internal/storage/db.go:161` already does temp+rename. A crash mid-write costs the saved
-  geometry, theme and language rather than a crash: `loadSettings` logs the corrupt file and
-  answers with the defaults.
-- **Bare suffix trimming in `normalizeName`** — `internal/checker/checker.go` trims `"plugin"`
-  and `"ext"` without a separator, so a catalog name legitimately ending in those letters loses
-  them (`TextExt` → `text`) and then matches the wrong plugin.
+- **Two `bufio.Reader`s over `os.Stdin`** — `confirm` and `promptBlindUpdates` each wrapped
+  `os.Stdin` in a fresh buffered reader, and one run can call both. Whatever the first buffered
+  past its newline was gone from the second, so piped answers skipped a prompt. Both now read
+  from the single reader the run builds in `main`.
+- **Builtin `println` in the GUI entry** — a failed `gui.Run` was reported with the builtin,
+  whose format is implementation-defined and whose stderr a Windows GUI-subsystem binary is not
+  attached to, so the one error the window cannot show was also the one nobody saw. Now
+  `fmt.Fprintf` on stderr.
+- **`settings.json` written in place** — `os.WriteFile` truncated the file before a byte of the
+  new content existed, where `internal/storage/db.go` already wrote by temp+rename. A crash
+  mid-write cost the saved geometry, theme and language rather than a crash. Same shape now.
+- **Bare suffix trimming in `normalizeName`** — `"plugin"` and `"ext"` were trimmed with no
+  separator, so a name legitimately ending in those letters lost them (`TextExt` → `text`) and
+  then matched the wrong plugin. They are cut only behind a separator, `_plugin`/`_ext` added.
 - **Unused frontend assets** — `frontend/src/assets/fonts/nunito-v16-latin-regular.woff2`,
-  its `OFL.txt` and `assets/images/logo-universal.png` are referenced by nothing (`style.css`
+  its `OFL.txt` and `assets/images/logo-universal.png` were referenced by nothing (`style.css`
   asks for `system-ui`/`Segoe UI`). Vite bundles only what is imported, so they cost repo bytes,
-  not binary bytes.
-- **The scratch sweep's mtime claim** — `internal/config/path.go:137` says an update refreshes
-  its run folder's timestamp "as it goes"; the download writes inside `run-<pid>/update`, which
-  touches that subfolder's mtime and not the swept `run-<pid>` one. The hour is therefore a
-  window since the run started, not since its last activity.
+  not binary bytes. Deleted.
+- **The scratch sweep's mtime claim** — the comment said an update refreshed its run folder's
+  timestamp "as it goes"; the download writes inside `run-<pid>/update`, which touches that
+  subfolder's mtime and not the swept `run-<pid>` one. The comment now tells what actually moves
+  it: the start of an update, since that is when the inner folder is created. The one-hour
+  window is left as it was — a live run loses its scratch only if some other run goes an hour
+  without _starting_ an item — and tightening it would mean touching the run folder when each
+  update begins.
