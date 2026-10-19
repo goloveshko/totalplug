@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/goloveshko/totalplug/internal/config"
 	"github.com/goloveshko/totalplug/internal/domain"
@@ -32,7 +33,9 @@ type RestoreOutcome struct {
 //
 // A copy that cannot be written leaves the folder holding the version it had, with
 // no second copy kept; the failure that restored the folder also proved the line
-// still describes it, so the same rollback can simply be asked again.
+// still describes it, so the same rollback can simply be asked again. Files this
+// attempt had already written there before it stopped go out again with it, because
+// the version being put back has no name for them.
 func (u *Updater) RestoreEntry(entry domain.UpdateEntry) (RestoreOutcome, error) {
 	backupDir, err := restoreSource(entry)
 	if err != nil {
@@ -45,20 +48,34 @@ func (u *Updater) RestoreEntry(entry domain.UpdateEntry) (RestoreOutcome, error)
 		return RestoreOutcome{}, fmt.Errorf("backing up the version being replaced: %w", err)
 	}
 
-	if err := copyTree(backupDir, pluginDir); err != nil {
+	if failed, err := copyTree(backupDir, pluginDir); err != nil {
 		// The folder now holds part of one version, so put back the whole of what
 		// the snapshot held rather than leaving the plugin in neither.
-		if again := copyTree(snapshot, pluginDir); again != nil {
+		stoppedAt, again := copyTree(snapshot, pluginDir)
+		// Writing the snapshot back only replaces the files it holds, so a file
+		// this attempt brought into the folder is still standing there. It cannot
+		// have been there before the attempt, so it goes out again the same way.
+		created := takeOutItsOwnWork(pluginDir, backupDir, snapshot)
+		if again != nil && stoppedAt != failed {
+			// The copy back gave up somewhere else than the copy out did, so the
+			// folder holds part of one version and part of the other, and this
+			// snapshot is the only readable whole left.
 			return RestoreOutcome{SnapshotPath: snapshot}, fmt.Errorf("restoring %s: %v; what was there before is in %s and has to be put back by hand: %v",
 				backupDir, err, snapshot, again)
 		}
-		// The folder holds the version it had again, so the copy made for a rollback
-		// that did not happen is a duplicate of what is installed: no line can point
-		// at it, since the line still describes the change that is in place, and
-		// retrying makes another. Take it away, as an update does with its backup
-		// after its own automatic rollback.
+		// Either the copy back finished, or it gave up at exactly the file that
+		// blocked the copy out — which that pass never changed, and whose earlier
+		// files the copy back has since rewritten. The folder holds the version it
+		// had either way, so the copy made for a rollback that did not happen is a
+		// duplicate of what is installed: no line can point at it, since the line
+		// still describes the change that is in place, and retrying makes another.
+		// Take it away, as an update does with its backup after its own rollback.
 		_ = os.RemoveAll(snapshot)
-		return RestoreOutcome{}, asLocked(fmt.Errorf("restoring %s: %w", backupDir, err))
+		failure := fmt.Errorf("restoring %s: %w", backupDir, err)
+		if len(created) > 0 {
+			failure = fmt.Errorf("%w; the folder also still holds %s, written there by this attempt", failure, strings.Join(created, ", "))
+		}
+		return RestoreOutcome{}, asLocked(failure)
 	}
 
 	left := removeAddedFiles(pluginDir, entry.AppliedFiles, backupDir)
@@ -89,6 +106,34 @@ func removeAddedFiles(pluginDir string, applied []string, backupDir string) []st
 			left = append(left, name)
 		}
 	}
+	return left
+}
+
+// takeOutItsOwnWork removes the files a rollback attempt wrote into the plugin
+// folder before it stopped. The copy being restored holds such a file while the
+// snapshot of the version in place does not, which means it was not in the folder
+// beforehand and only this attempt can have put it there. Directories are left as
+// they are: an empty one says nothing about a version, and a full one is not this
+// function's to empty. What will not go comes back named.
+func takeOutItsOwnWork(pluginDir, backupDir, snapshot string) []string {
+	var left []string
+	_ = filepath.Walk(backupDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil || info.IsDir() {
+			return nil
+		}
+		rel := relWithin(backupDir, path)
+		if _, err := os.Stat(filepath.Join(snapshot, rel)); err == nil {
+			return nil
+		}
+		target, err := sanitizeEntryPath(pluginDir, rel)
+		if err != nil {
+			return nil
+		}
+		if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+			left = append(left, rel)
+		}
+		return nil
+	})
 	return left
 }
 

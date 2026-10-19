@@ -214,6 +214,70 @@ func TestRollbackThatCouldNotWriteKeepsNoCopy(t *testing.T) {
 	}
 }
 
+// Total Commander holds the plugin file it loaded, and a rename cannot replace
+// the image it maps. The copy back then gives up at that same file, having
+// already put back every file the copy out changed before it, so the folder is
+// provably the version it started with: the run has to say so as an ordinary
+// lock, keep no copy of a rollback that did not happen, take away the files the
+// attempt itself wrote, and leave nothing to rescue by hand.
+func TestRollbackStoppedByTheSameFileKeepsNoCopy(t *testing.T) {
+	root := tcFixture(t)
+	pluginDir := filepath.Join(root, "wlx", "fileinfo")
+	// Walk order is a.txt, m.txt then z.txt, so the copy out damages a.txt,
+	// writes a file the folder never held, and only then meets the one that will
+	// not be replaced.
+	writeTestFile(t, filepath.Join(pluginDir, "a.txt"), "a-new")
+	blocker := filepath.Join(pluginDir, "z.txt")
+	writeTestFile(t, blocker, "z-new")
+	if err := os.Chmod(blocker, 0444); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(blocker, 0644) })
+
+	space := backupSpaceFor(t, pluginDir)
+	kept := filepath.Join(space, "fileinfo.bak_1001")
+	writeTestFile(t, filepath.Join(kept, "a.txt"), "a-old")
+	writeTestFile(t, filepath.Join(kept, "m.txt"), "m-old")
+	writeTestFile(t, filepath.Join(kept, "z.txt"), "z-old")
+
+	outcome, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
+		PluginID:     "WLX:f",
+		PluginDir:    pluginDir,
+		BackupPath:   kept,
+		AppliedFiles: []string{"a.txt", "z.txt"},
+	})
+	if err == nil {
+		t.Fatal("expected the held file to stop the rollback")
+	}
+	if !errors.Is(err, ErrFileLocked) {
+		t.Errorf("error should be a locked-file error: %v", err)
+	}
+	if strings.Contains(err.Error(), "by hand") {
+		t.Errorf("nothing needs rescuing by hand, but the run says it does: %v", err)
+	}
+	if outcome.SnapshotPath != "" {
+		t.Errorf("SnapshotPath = %q, want the failed run to keep no copy", outcome.SnapshotPath)
+	}
+	if got := readTestFile(t, filepath.Join(pluginDir, "a.txt")); got != "a-new" {
+		t.Errorf("a.txt = %q, want the version that was installed put back", got)
+	}
+	if got := readTestFile(t, blocker); got != "z-new" {
+		t.Errorf("z.txt = %q, want the held file left as it was", got)
+	}
+	// The copy back had no name for this one: the version being put back never
+	// wrote it, because it was not in the folder when that version was installed.
+	if _, err := os.Stat(filepath.Join(pluginDir, "m.txt")); !os.IsNotExist(err) {
+		t.Errorf("the file this attempt wrote into the folder is still there (err = %v)", err)
+	}
+	remaining, err := filepath.Glob(filepath.Join(space, "*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remaining) != 1 || filepath.Base(remaining[0]) != "fileinfo.bak_1001" {
+		t.Errorf("the namespace holds %v, want only the copy the line is still owed", remaining)
+	}
+}
+
 func TestRollbackIgnoresANameOutsideThePluginFolder(t *testing.T) {
 	root := tcFixture(t)
 	pluginDir := filepath.Join(root, "wfx", "CudaLister")

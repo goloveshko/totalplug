@@ -40,7 +40,7 @@ func (u *Updater) BackupPlugin(pluginDir string) (string, error) {
 	relocateLegacyBackups(pluginDir, space)
 
 	backupDir := filepath.Join(space, filepath.Base(pluginDir)+backupSuffix+strconv.FormatInt(time.Now().Unix(), 10))
-	if err := copyTree(pluginDir, backupDir); err != nil {
+	if _, err := copyTree(pluginDir, backupDir); err != nil {
 		return "", fmt.Errorf("creating backup of %s: %w", pluginDir, err)
 	}
 	return backupDir, nil
@@ -133,7 +133,7 @@ func relocateLegacyBackups(pluginDir, space string) {
 		}
 		// Another volume, or a data folder on a share: copy and only then take
 		// the original away, so a failed copy cannot lose the only good copy.
-		if err := copyTree(old, target); err != nil {
+		if _, err := copyTree(old, target); err != nil {
 			fmt.Printf("[!] Could not move the old backup %s into %s: %v\n", old, space, err)
 			continue
 		}

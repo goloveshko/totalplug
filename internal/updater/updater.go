@@ -502,50 +502,71 @@ func (u *Updater) Extract7z(sevenzPath, targetDir string) error {
 	return nil
 }
 
-// copyTree recursively copies srcDir into dstDir, merging with any existing files.
-func copyTree(srcDir, dstDir string) error {
-	return filepath.Walk(srcDir, func(path string, info os.FileInfo, walkErr error) error {
+// copyTree recursively copies srcDir into dstDir, merging with any existing
+// files. When it stops, it also names the path relative to srcDir it stopped at,
+// which tells a caller how far the folder was changed before the failure.
+func copyTree(srcDir, dstDir string) (string, error) {
+	var stopped string
+	err := filepath.Walk(srcDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
+			stopped = relWithin(srcDir, path)
 			return walkErr
 		}
 
-		rel, err := filepath.Rel(srcDir, path)
-		if err != nil {
-			return err
-		}
-
+		rel := relWithin(srcDir, path)
 		target := filepath.Join(dstDir, rel)
 		if info.IsDir() {
-			return os.MkdirAll(target, info.Mode())
+			if err := os.MkdirAll(target, info.Mode()); err != nil {
+				stopped = rel
+				return err
+			}
+			return nil
 		}
-		return copyFile(path, target, info.Mode().Perm())
+		if err := copyFile(path, target, info.Mode().Perm()); err != nil {
+			stopped = rel
+			return err
+		}
+		return nil
 	})
+	return stopped, err
+}
+
+func relWithin(srcDir, path string) string {
+	rel, err := filepath.Rel(srcDir, path)
+	if err != nil {
+		return path
+	}
+	return rel
 }
 
 func copyFile(src, dst string, mode os.FileMode) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("opening source %q: %w", src, err)
+		return fmt.Errorf("opening source %s: %w", src, err)
 	}
 	defer srcFile.Close()
 
 	dir := filepath.Dir(dst)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("creating parent dir for %q: %w", dst, err)
+		return fmt.Errorf("creating parent dir for %s: %w", dst, err)
 	}
 
 	// Written to a sibling and renamed into place instead of being truncated
 	// where it lies, so a copy that fails leaves the target byte-intact. An
 	// in-place write that broke halfway left a damaged file that rollback did
 	// not know about, and the backup holding the only good copy was then
-	// deleted. On Windows the rename also reaches a target another process has
-	// loaded: the old file goes into delete-pending and disappears when it lets
-	// go, which is why an update gets through with Total Commander running. What
-	// a held file does block is removing the folder that contains it, so nothing
-	// here tries that.
+	// deleted.
+	//
+	// The rename reaches a file another process merely holds open: the old one
+	// goes into delete-pending and disappears when that process lets go, which is
+	// why an update gets through with Total Commander running. A file the process
+	// has *loaded* is the exception — the mapped image is held without share
+	// delete, so the rename answers access denied until Total Commander unloads
+	// the plugin. What a held file also blocks is removing the folder that
+	// contains it, so nothing here tries that.
 	tmpFile, err := os.CreateTemp(dir, ".totalplug-copy-*")
 	if err != nil {
-		return fmt.Errorf("creating temp for %q: %w", dst, err)
+		return fmt.Errorf("creating temp for %s: %w", dst, err)
 	}
 	tmpName := tmpFile.Name()
 	// A successful rename leaves nothing at tmpName, so this only ever deletes
@@ -558,16 +579,16 @@ func copyFile(src, dst string, mode os.FileMode) error {
 
 	if _, err := io.Copy(tmpFile, srcFile); err != nil {
 		tmpFile.Close()
-		return fmt.Errorf("copying %q to %q: %w", src, dst, err)
+		return fmt.Errorf("copying %s to %s: %w", src, dst, err)
 	}
 	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("closing temp for %q: %w", dst, err)
+		return fmt.Errorf("closing temp for %s: %w", dst, err)
 	}
 	if err := os.Chmod(tmpName, mode); err != nil {
-		return fmt.Errorf("setting mode on %q: %w", dst, err)
+		return fmt.Errorf("setting mode on %s: %w", dst, err)
 	}
 	if err := os.Rename(tmpName, dst); err != nil {
-		return fmt.Errorf("replacing %q: %w", dst, err)
+		return fmt.Errorf("replacing %s: %w", dst, err)
 	}
 	return nil
 }
