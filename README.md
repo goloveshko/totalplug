@@ -138,8 +138,10 @@ path you choose.
 - **About** — the running version, where your data lives, and a check for a newer
   release. TotalPlug never replaces its own files: it opens the release page.
 
-Close Total Commander before applying updates — its process holds the plugin
-files, so the first locked file stops the queue and the rest is skipped.
+You do not have to close Total Commander to apply an update: every file is put in
+place by renaming a fresh copy over it, and a loaded plugin allows that. Closing it
+is what to do when a file refuses anyway — the queue stops at the first locked file
+and skips the rest, so a run with Total Commander closed finishes the list.
 
 ---
 
@@ -189,7 +191,9 @@ Non-interactive mode — applies every available update without prompting (for s
 go run cmd/totalplug/main.go --update-all
 ```
 
-> Close Total Commander before applying updates, otherwise locked plugin files will fail to replace.
+> Closing Total Commander is not needed for most updates: a file is replaced by renaming a fresh
+> copy over it, which a loaded plugin allows. Close it and run again when one still reports as
+> locked — the queue stops there and skips the rest.
 > Updates are safe by design: the plugin folder is backed up as `<dir>.bak_<timestamp>` next to it,
 > and any mid-apply failure is automatically rolled back to the previous state.
 > Plugins whose installed version cannot be determined are never auto-updated: in `--update` they
