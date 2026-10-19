@@ -75,88 +75,94 @@
 
 <dialog id="history-dialog" bind:this={el} aria-labelledby="history-title" onclose={closeHistory}>
     <h2 id="history-title">{$msg('history.title')}</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>{$msg('history.col.plugin')}</th>
-                <th>{$msg('history.col.version')}</th>
-                <th>{$msg('history.col.date')}</th>
-                <th>{$msg('history.col.action')}</th>
-            </tr>
-        </thead>
-        <tbody>
-            {#if state.entries.length === 0}
-                <tr class="table-empty">
-                    <td colspan="4">{$msg('history.empty')}</td>
+    <div class="history-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>{$msg('history.col.plugin')}</th>
+                    <th>{$msg('history.col.version')}</th>
+                    <th>{$msg('history.col.date')}</th>
+                    <th>{$msg('history.col.action')}</th>
                 </tr>
-            {:else}
-                {#each groups as group}
-                    {@const open = !!expanded[group.key]}
-                    {#each group.rows as row, offset}
-                        {#if row.idx === state.pending}
-                            <tr class="history-confirm">
-                                <td colspan="4">
-                                    <p>{question(row.entry)}</p>
-                                    <p class="history-note{state.failure ? ' history-failed' : ''}">
-                                        {state.failure || $msg('history.confirm_note')}
-                                    </p>
-                                    <div class="editor-actions">
-                                        <button
-                                            type="button"
-                                            class="btn-update"
-                                            bind:this={confirmBtn}
-                                            disabled={state.busy}
-                                            onclick={() => confirmRollback(row.idx)}
-                                        >
-                                            {$msg('history.rollback')}
-                                        </button>
-                                        <button type="button" disabled={state.busy} onclick={cancelRollback}>
-                                            {$msg('dialog.cancel')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        {:else if offset === 0 || open}
-                            <tr>
-                                <td>
-                                    {#if offset === 0}
-                                        {#if group.rows.length > 1}
+            </thead>
+            <tbody>
+                {#if state.entries.length === 0}
+                    <tr class="table-empty">
+                        <td colspan="4">{$msg('history.empty')}</td>
+                    </tr>
+                {:else}
+                    {#each groups as group}
+                        {@const open = !!expanded[group.key]}
+                        {#each group.rows as row, offset}
+                            {#if row.idx === state.pending}
+                                <tr class="history-confirm">
+                                    <td colspan="4">
+                                        <p>{question(row.entry)}</p>
+                                        <p class="history-note{state.failure ? ' history-failed' : ''}">
+                                            {state.failure || $msg('history.confirm_note')}
+                                        </p>
+                                        <div class="editor-actions">
                                             <button
                                                 type="button"
-                                                class="history-toggle"
-                                                aria-expanded={String(open)}
-                                                aria-label={$msg(open ? 'history.collapse' : 'history.expand', {
-                                                    plugin: row.entry.plugin_name || row.entry.plugin_id,
-                                                })}
-                                                onclick={() => toggle(group.key)}
+                                                class="btn-update"
+                                                bind:this={confirmBtn}
+                                                disabled={state.busy}
+                                                onclick={() => confirmRollback(row.idx)}
                                             >
-                                                {open ? '−' : '+'}
+                                                {$msg('history.rollback')}
+                                            </button>
+                                            <button type="button" disabled={state.busy} onclick={cancelRollback}>
+                                                {$msg('dialog.cancel')}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {:else if offset === 0 || open}
+                                <tr>
+                                    <td>
+                                        {#if offset === 0}
+                                            {#if group.rows.length > 1}
+                                                <button
+                                                    type="button"
+                                                    class="history-toggle"
+                                                    aria-expanded={String(open)}
+                                                    aria-label={$msg(open ? 'history.collapse' : 'history.expand', {
+                                                        plugin: row.entry.plugin_name || row.entry.plugin_id,
+                                                    })}
+                                                    onclick={() => toggle(group.key)}
+                                                >
+                                                    {open ? '−' : '+'}
+                                                </button>
+                                            {/if}
+                                            {row.entry.plugin_name || row.entry.plugin_id}
+                                        {/if}
+                                    </td>
+                                    <td>
+                                        <code>{row.entry.version}</code>
+                                        {#if row.entry.restored}
+                                            <span class="history-kind">{$msg('history.restored')}</span>
+                                        {/if}
+                                    </td>
+                                    <td>{formatStamp(fmt, row.entry.applied_at)}</td>
+                                    <td class="history-action">
+                                        {#if row.entry.backup_path}
+                                            <button
+                                                type="button"
+                                                class="btn-update"
+                                                onclick={() => offerRollback(row.idx)}
+                                            >
+                                                {$msg('history.rollback')}
                                             </button>
                                         {/if}
-                                        {row.entry.plugin_name || row.entry.plugin_id}
-                                    {/if}
-                                </td>
-                                <td>
-                                    <code>{row.entry.version}</code>
-                                    {#if row.entry.restored}
-                                        <span class="history-kind">{$msg('history.restored')}</span>
-                                    {/if}
-                                </td>
-                                <td>{formatStamp(fmt, row.entry.applied_at)}</td>
-                                <td class="history-action">
-                                    {#if row.entry.backup_path}
-                                        <button type="button" class="btn-update" onclick={() => offerRollback(row.idx)}>
-                                            {$msg('history.rollback')}
-                                        </button>
-                                    {/if}
-                                </td>
-                            </tr>
-                        {/if}
+                                    </td>
+                                </tr>
+                            {/if}
+                        {/each}
                     {/each}
-                {/each}
-            {/if}
-        </tbody>
-    </table>
+                {/if}
+            </tbody>
+        </table>
+    </div>
     <div class="editor-actions">
         <button type="button" id="history-close" bind:this={closeBtn} onclick={closeHistory}>
             {$msg('dialog.close')}

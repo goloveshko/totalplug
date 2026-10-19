@@ -453,6 +453,41 @@ td code,
     max-width: 90vw;
 }
 
+/* The log is the one dialog that outgrows the window routinely, so it must not
+   scroll as a whole: that carries the title and the Close button away, and a
+   sticky <th> stuck to the dialog itself leaves its top padding as a band the
+   rows show through. The column below keeps both ends still and lets the table
+   scroll between them, which is also what .table-container does for the list.
+
+   Anchored on [open] on purpose: the browser hides a closed dialog with
+   `dialog:not([open]) { display: none }`, and a bare `#history-dialog { display
+   }` out-specifies that rule, which leaves the log standing in the middle of the
+   screen from the moment the app starts. */
+#history-dialog[open] {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.history-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* The room above the header row is the title's own margin, not the table's.
+   Space inside the scroller belongs to the scrolled content: a header pinned
+   below it still travels by that much on the first wheel notch and comes back on
+   the last, which is what read as the row floating up and down. */
+#history-dialog > h2 {
+    margin-bottom: 14px;
+}
+
+#history-dialog > .editor-actions {
+    flex-shrink: 0;
+    margin-top: 12px;
+}
+
 #app-dialog {
     width: 420px;
     max-width: 90vw;
@@ -531,13 +566,33 @@ a.dlg-link:focus-visible {
 #history-dialog table {
     width: 100%;
     font-size: 0.85rem;
-    margin: 10px 0 16px;
+    /* No vertical margin: this table is the scrolling content, so any space it
+       asks for sits between the pinning edge and the header and the header slides
+       through it. See #history-dialog > h2. */
+    margin: 0;
+    /* Separate borders, so the header's own bottom border travels with the pinned
+       cell. Collapsed borders are drawn on the row instead, which detaches from a
+       sticky cell while scrolling — the reason the global rule fakes the line with
+       an inset shadow. */
+    border-collapse: separate;
+    border-spacing: 0;
 }
+
+/* One sticky level, the global `thead th`. Making the row sticky as well pins it
+   twice over: the cells stick inside a box that is itself sticking, so they slide
+   up out of the background that carries them and the header comes out clipped. */
 #history-dialog td,
 #history-dialog th {
     padding: 6px 8px;
     text-align: left;
     border-bottom: 1px solid var(--border);
+}
+/* The global header rule carries its rule as an inset shadow because the main
+   list collapses borders and a collapsed border detaches from a sticky cell.
+   This table does not collapse, so its own bottom border already travels and the
+   shadow would only be a second line one pixel above it. */
+#history-dialog thead th {
+    box-shadow: none;
 }
 /* The rollback is the one action a line in this log takes, so the column is as
    wide as its button and never wraps the label. */
