@@ -169,8 +169,12 @@ func ReleaseRunScratch() {
 }
 
 // SweepScratch removes run folders left behind by runs that died, keeping
-// anything written to within maxAge — an update refreshes its folder's timestamp
-// as it goes, so a second live process cannot lose the package it is downloading.
+// anything written to within maxAge. What refreshes that timestamp is the start of
+// an update, which creates the `update` folder inside the run folder: writing the
+// package itself only touches the inner one, so the age is measured from the last
+// plugin the run began rather than from its last byte — a window that moves for a
+// batch of one and stands still for a long download. A live process therefore
+// loses its scratch only if some other run goes an hour without starting an item.
 // It reads the root without creating it: a sweep has nothing to make. Returns how
 // many folders went.
 func SweepScratch(maxAge time.Duration) int {
