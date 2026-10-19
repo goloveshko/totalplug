@@ -14,6 +14,7 @@ import (
 	"github.com/goloveshko/totalplug/internal/config"
 	"github.com/goloveshko/totalplug/internal/domain"
 	"github.com/goloveshko/totalplug/internal/pipeline"
+	"github.com/goloveshko/totalplug/internal/rollback"
 	"github.com/goloveshko/totalplug/internal/storage"
 	"github.com/goloveshko/totalplug/internal/updater"
 
@@ -131,26 +132,14 @@ func (a *App) SaveOverride(pluginID string, override domain.Override) error {
 // GetUpdateHistory returns the changes the updater applied, newest first.
 //
 // Only the newest line about a plugin still describes the folder as it stands, so
-// only that one keeps the copy it names: rolling an older line back would either
-// undo something the user has since moved past or put back what is already there.
-// A rollback line keeps nothing either — the way back from it is to update the
-// plugin again, which the table already offers.
+// only that one keeps the copy it names; rollback.ClearStaleCopies drops the rest,
+// and is the same rule the command line applies when it lists the log.
 func (a *App) GetUpdateHistory() ([]domain.UpdateEntry, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
 	entries := a.db.UpdateHistory()
-	seen := make(map[string]bool, len(entries))
-	for i, entry := range entries {
-		if entry.BackupPath == "" {
-			continue
-		}
-		last := !seen[entry.PluginID]
-		seen[entry.PluginID] = true
-		if !last || entry.Restored || !updater.BackupStillKept(entry.BackupPath) {
-			entries[i].BackupPath = ""
-		}
-	}
+	rollback.ClearStaleCopies(entries)
 	return entries, nil
 }
 
@@ -165,21 +154,7 @@ func (a *App) RollbackUpdate(entry domain.UpdateEntry) (domain.UpdateResult, err
 	if a.db == nil {
 		return domain.UpdateResult{}, fmt.Errorf("database not initialized")
 	}
-	// The panel can only offer the line this matches, but a second window or an
-	// edited log should not be able to reach past the last change to the folder.
-	newest, found := domain.UpdateEntry{}, false
-	for _, logged := range a.db.UpdateHistory() {
-		if logged.PluginID != entry.PluginID {
-			continue
-		}
-		newest, found = logged, true
-		break
-	}
-	if !found || newest.Restored || !newest.AppliedAt.Equal(entry.AppliedAt) {
-		return domain.UpdateResult{}, fmt.Errorf("only the last change to %s can be rolled back", entry.PluginName)
-	}
-
-	restored, err := a.updater.RestoreEntry(entry)
+	restored, err := rollback.Apply(a.updater, a.db, entry)
 	if err != nil {
 		if errors.Is(err, updater.ErrFileLocked) {
 			return domain.UpdateResult{Locked: true}, nil
