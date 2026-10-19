@@ -22,6 +22,10 @@ func TestParseArgs(t *testing.T) {
 		{"update all", []string{"--update-all"}, cliOptions{updateAll: true}},
 		{"version long", []string{"--version"}, cliOptions{showVersion: true}},
 		{"version short", []string{"-v"}, cliOptions{showVersion: true}},
+		{"history", []string{"--history"}, cliOptions{history: true}},
+		{"rollback space", []string{"--rollback", "CudaLister"}, cliOptions{rollbackKey: "CudaLister"}},
+		{"rollback equals", []string{"--rollback=CudaLister"}, cliOptions{rollbackKey: "CudaLister"}},
+		{"rollback quoted name", []string{"--rollback", "Total Packer"}, cliOptions{rollbackKey: "Total Packer"}},
 		{"combined", []string{"-r", "--update", "--ini", "x.ini"}, cliOptions{forceRefresh: true, update: true, iniPath: "x.ini"}},
 	}
 
@@ -44,6 +48,8 @@ func TestParseArgsRejectsBadInput(t *testing.T) {
 		{"--ini"},
 		{"-c"},
 		{"--update", "-x"},
+		{"--rollback"},
+		{"--history", "--rollback", "CudaLister"},
 	}
 	for _, args := range cases {
 		if _, err := parseArgs(args); err == nil {

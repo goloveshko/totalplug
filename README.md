@@ -201,6 +201,23 @@ go run cmd/totalplug/main.go --update-all
 > Plugins whose installed version cannot be determined are never auto-updated: in `--update` they
 > are offered separately with a per-item `[y]es / [N]o / [a]ll` prompt, and `--update-all` skips them.
 
+### Read the Update Log and Undo an Update
+
+```bash
+go run cmd/totalplug/main.go --history
+go run cmd/totalplug/main.go --rollback CudaLister
+```
+
+Neither scans Total Commander and neither goes online: both read the log
+`--update` writes, so they answer straight away. `--history` lists the changes
+newest first and marks the line a rollback can still use. `--rollback` takes a
+catalog id or a plugin name (compared without case), shows the folder, the
+version it goes back to and the copy it puts there, and asks before writing.
+
+The same rule the History panel follows holds here: only the last change to a
+plugin is rolled back, and a rollback line is not itself rolled back — after
+one, the way forward is `--update`.
+
 ### Point to a Portable Total Commander Install
 
 ```bash
@@ -291,6 +308,7 @@ see [docs/release.md](docs/release.md).
 ```text
 totalplug/
 ├── cmd/totalplug/main.go     # CLI entry point: report, --update / --update-all prompts
+├── cmd/totalplug/history.go  # CLI over the update log: --history, --rollback
 ├── main.go                   # GUI entry point: embeds frontend/dist, hands it to gui.Run
 ├── internal/
 │   ├── buildinfo/            # Version stamped at build time, release location
@@ -299,6 +317,7 @@ totalplug/
 │   ├── domain/               # Shared models (Plugin, Status, Confidence, AppInfo)
 │   ├── gui/                  # Wails bridge — the Go methods the frontend may call, window state
 │   ├── pipeline/             # Scan orchestration: detect → read → compare
+│   ├── rollback/             # Which history line may still go back, for the GUI and the CLI
 │   ├── scanner/              # Plugin discovery, PE / INF version extraction
 │   ├── storage/              # installed_plugins.json, user overrides, update history
 │   └── updater/              # Download, archive extract, backup, lock-aware install

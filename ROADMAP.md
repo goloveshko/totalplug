@@ -90,6 +90,10 @@ next release (v2), and the accepted debt we deliberately postponed.
 - Interactive confirmed updates; per-item `y/N/a` prompts for "blind" updates
   (installed version unknown); `--update-all` never touches blind updates.
 - Non-zero exit code when any update fails.
+- `--history` lists the log newest first and marks the line that can still go
+  back; `--rollback <id or name>` puts that line's copy back after one `y/N`.
+  Neither scans nor goes online. The rule about which line may be rolled back is
+  shared with the GUI panel (`internal/rollback`), so the two cannot drift.
 
 ### GUI (Wails, `bin/totalplug.exe`, built by `scripts/build-gui.cmd`)
 

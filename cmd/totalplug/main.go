@@ -22,10 +22,12 @@ type cliOptions struct {
 	iniPath      string
 	update       bool
 	updateAll    bool
+	history      bool
+	rollbackKey  string
 	showVersion  bool
 }
 
-const usageLine = "Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>] [-u|--update | --update-all] [-v|--version]"
+const usageLine = "Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>] [-u|--update | --update-all | --history | --rollback <plugin>] [-v|--version]"
 
 func parseArgs(args []string) (cliOptions, error) {
 	var opts cliOptions
@@ -45,11 +47,24 @@ func parseArgs(args []string) (cliOptions, error) {
 			opts.update = true
 		case arg == "--update-all":
 			opts.updateAll = true
+		case arg == "--history":
+			opts.history = true
+		case arg == "--rollback":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("flag %q requires a plugin name or id", arg)
+			}
+			i++
+			opts.rollbackKey = args[i]
+		case strings.HasPrefix(arg, "--rollback="):
+			opts.rollbackKey = strings.TrimPrefix(arg, "--rollback=")
 		case arg == "--version" || arg == "-v":
 			opts.showVersion = true
 		default:
 			return opts, fmt.Errorf("unknown option %q", arg)
 		}
+	}
+	if opts.history && opts.rollbackKey != "" {
+		return opts, fmt.Errorf("--history and --rollback cannot be combined")
 	}
 	return opts, nil
 }
@@ -179,6 +194,20 @@ func main() {
 	db, dbErr := storage.NewDatabase("")
 	if dbErr != nil {
 		fmt.Printf("[!] Storage warning, some data was not loaded: %v\n", dbErr)
+	}
+
+	// The log answers both of these on its own: a rollback takes the folder and
+	// the copy from the line it names, so neither waits on a scan of the install.
+	if opts.history {
+		printHistory(db)
+		return
+	}
+	if opts.rollbackKey != "" {
+		if err := runRollback(db, opts.rollbackKey, os.Stdin); err != nil {
+			fmt.Printf("[!] %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	fmt.Println("[+] Scanning Total Commander plugins...")
