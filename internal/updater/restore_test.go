@@ -170,6 +170,50 @@ func TestRollbackReportsWhatItCouldNotTakeOut(t *testing.T) {
 	}
 }
 
+func TestRollbackThatCouldNotWriteKeepsNoCopy(t *testing.T) {
+	root := tcFixture(t)
+	pluginDir := filepath.Join(root, "wfx", "CudaLister")
+	writeTestFile(t, filepath.Join(pluginDir, "cuda.wlx"), "the newer build")
+	// A name the two trees disagree about: the plugin folder has a directory the
+	// kept copy holds as a file, so writing the copy cannot replace it and the
+	// rollback fails. Whatever the reason the copy could not be written, the
+	// folder comes back holding the version it had.
+	writeTestFile(t, filepath.Join(pluginDir, "data", "saved.txt"), "the newer settings")
+
+	space := backupSpaceFor(t, pluginDir)
+	kept := filepath.Join(space, "CudaLister.bak_1001")
+	writeTestFile(t, filepath.Join(kept, "cuda.wlx"), "the older build")
+	writeTestFile(t, filepath.Join(kept, "data"), "the older settings, saved as a file")
+
+	outcome, err := NewUpdater().RestoreEntry(domain.UpdateEntry{
+		PluginID:     "WFX:c",
+		PluginDir:    pluginDir,
+		BackupPath:   kept,
+		AppliedFiles: []string{"cuda.wlx"},
+	})
+	if err == nil {
+		t.Fatal("a copy that cannot replace a directory is expected to fail")
+	}
+	if got := readTestFile(t, filepath.Join(pluginDir, "cuda.wlx")); got != "the newer build" {
+		t.Errorf("plugin file = %q, want the version that was installed put back", got)
+	}
+	if got := readTestFile(t, filepath.Join(pluginDir, "data", "saved.txt")); got != "the newer settings" {
+		t.Errorf("the folder the copy collided with was disturbed: %q", got)
+	}
+	// The snapshot was made for a rollback that did not happen, and no history
+	// line can point at it: the line still describes the change in place.
+	if outcome.SnapshotPath != "" {
+		t.Errorf("SnapshotPath = %q, want the failed run to keep no copy", outcome.SnapshotPath)
+	}
+	remaining, err := filepath.Glob(filepath.Join(space, "*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remaining) != 1 || filepath.Base(remaining[0]) != "CudaLister.bak_1001" {
+		t.Errorf("the namespace holds %v, want only the copy the line is still owed", remaining)
+	}
+}
+
 func TestRollbackIgnoresANameOutsideThePluginFolder(t *testing.T) {
 	root := tcFixture(t)
 	pluginDir := filepath.Join(root, "wfx", "CudaLister")

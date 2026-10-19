@@ -76,6 +76,11 @@ next release (v2), and the accepted debt we deliberately postponed.
   there, so nothing else is touched. A line written before names were recorded removes nothing,
   a name the copy also carries belongs to the older version, and a name leading out of the
   folder is not this tool's to delete.
+- A rollback whose copy could not be written restores the folder to the version it had and
+  removes the snapshot it had made for itself: the history line still describes the change
+  that is in place, so the line stays actionable and the failed run leaves no copy nobody
+  points at. A run that could not restore the folder either keeps that snapshot and says so,
+  because it is then the only readable copy of what was there.
 
 ### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
 

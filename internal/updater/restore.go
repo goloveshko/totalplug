@@ -29,6 +29,10 @@ type RestoreOutcome struct {
 // then taken away, but only by the names that line recorded, because a plugin
 // writes its settings next to its DLL and the folder can hold a file the user put
 // there himself. A line written before the tool recorded names removes nothing.
+//
+// A copy that cannot be written leaves the folder holding the version it had, with
+// no second copy kept; the failure that restored the folder also proved the line
+// still describes it, so the same rollback can simply be asked again.
 func (u *Updater) RestoreEntry(entry domain.UpdateEntry) (RestoreOutcome, error) {
 	backupDir, err := restoreSource(entry)
 	if err != nil {
@@ -48,7 +52,13 @@ func (u *Updater) RestoreEntry(entry domain.UpdateEntry) (RestoreOutcome, error)
 			return RestoreOutcome{SnapshotPath: snapshot}, fmt.Errorf("restoring %s: %v; what was there before is in %s and has to be put back by hand: %v",
 				backupDir, err, snapshot, again)
 		}
-		return RestoreOutcome{SnapshotPath: snapshot}, asLocked(fmt.Errorf("restoring %s: %w", backupDir, err))
+		// The folder holds the version it had again, so the copy made for a rollback
+		// that did not happen is a duplicate of what is installed: no line can point
+		// at it, since the line still describes the change that is in place, and
+		// retrying makes another. Take it away, as an update does with its backup
+		// after its own automatic rollback.
+		_ = os.RemoveAll(snapshot)
+		return RestoreOutcome{}, asLocked(fmt.Errorf("restoring %s: %w", backupDir, err))
 	}
 
 	left := removeAddedFiles(pluginDir, entry.AppliedFiles, backupDir)
