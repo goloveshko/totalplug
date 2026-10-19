@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -247,6 +248,146 @@ func TestUpdatePluginRollsBackOnApplyFailure(t *testing.T) {
 	leftovers, _ := filepath.Glob(filepath.Join(space, "*"))
 	if len(leftovers) != 0 {
 		t.Errorf("backup dir should be removed after successful rollback, found %v", leftovers)
+	}
+}
+
+// serveCountedZip is serveTestZip with a tally of how often the host was asked,
+// which is how the tests below tell a reused package from a re-downloaded one.
+func serveCountedZip(t *testing.T, data []byte, hits *int32) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(hits, 1)
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
+// keptFor reports whether this run's scratch holds a package back for one URL. It
+// asks about a single slot rather than listing the folder because every test in
+// this package shares the one run folder the process was given, and a failed
+// update in another test is legitimately sitting there.
+func keptFor(t *testing.T, rawURL string) bool {
+	t.Helper()
+	runDir, err := config.RunScratch()
+	if err != nil {
+		t.Fatalf("RunScratch: %v", err)
+	}
+	_, err = os.Stat(filepath.Join(runDir, keptSpace, packageKey(rawURL)))
+	switch {
+	case err == nil:
+		return true
+	case os.IsNotExist(err):
+		return false
+	default:
+		t.Fatalf("reading the kept package for %s: %v", rawURL, err)
+		return false
+	}
+}
+
+// The locked-retry path is the one a user reaches for: Total Commander holds the
+// plugin, the window says so, and closing it and asking again should not have to
+// fetch the same package a second time.
+func TestARetriedUpdateReusesThePackageItKept(t *testing.T) {
+	root := t.TempDir()
+	pluginDir := filepath.Join(root, "wdx", "demo")
+	dllPath := filepath.Join(pluginDir, "demo.dll")
+	writeTestFile(t, dllPath, "old-dll")
+	writeTestFile(t, filepath.Join(pluginDir, "a.txt"), "a-old")
+
+	lockedPath := filepath.Join(pluginDir, "b.txt")
+	writeTestFile(t, lockedPath, "b-old")
+	if err := os.Chmod(lockedPath, 0444); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(lockedPath, 0644) })
+
+	var hits int32
+	downloadURL := serveCountedZip(t, buildTestZip(t, map[string]string{
+		"a.txt":    "a-new",
+		"b.txt":    "b-new",
+		"demo.dll": "new-dll",
+	}), &hits)
+
+	u := NewUpdater()
+	plugin := domain.Plugin{Path: dllPath, DownloadURL: downloadURL}
+	if _, err := u.UpdatePlugin(context.Background(), plugin); err == nil {
+		t.Fatal("expected the blocked apply to fail")
+	}
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Fatalf("the first attempt asked the host %d times; want 1", got)
+	}
+	if !keptFor(t, downloadURL) {
+		t.Fatal("the package that could not be applied should be kept for the retry")
+	}
+
+	// Total Commander is closed: the same ask now goes through on the bytes that
+	// are already on disk.
+	if err := os.Chmod(lockedPath, 0644); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	if _, err := u.UpdatePlugin(context.Background(), plugin); err != nil {
+		t.Fatalf("second UpdatePlugin: %v", err)
+	}
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Errorf("the retry asked the host %d times; want the kept package reused", got)
+	}
+	if got := readTestFile(t, dllPath); got != "new-dll" {
+		t.Errorf("demo.dll = %q, want new-dll", got)
+	}
+	if keptFor(t, downloadURL) {
+		t.Error("the retry applied the kept package, so it should be gone")
+	}
+}
+
+// Magic bytes alone do not make a package readable, so one that fails to unpack
+// must not be held back: a retry has to be free to download another copy.
+func TestAPackageThatWillNotUnpackIsNotKept(t *testing.T) {
+	root := t.TempDir()
+	pluginDir := filepath.Join(root, "wdx", "demo")
+	dllPath := filepath.Join(pluginDir, "demo.dll")
+	writeTestFile(t, dllPath, "old-dll")
+
+	whole := buildTestZip(t, map[string]string{"demo.dll": "new-dll"})
+	truncated := whole[:len(whole)/2]
+
+	var hits int32
+	downloadURL := serveCountedZip(t, truncated, &hits)
+
+	u := NewUpdater()
+	plugin := domain.Plugin{Path: dllPath, DownloadURL: downloadURL}
+	for attempt := 1; attempt <= 2; attempt++ {
+		if _, err := u.UpdatePlugin(context.Background(), plugin); err == nil {
+			t.Fatalf("attempt %d: expected the truncated package to fail", attempt)
+		}
+		if got := atomic.LoadInt32(&hits); got != int32(attempt) {
+			t.Errorf("attempt %d asked the host %d times; want a fresh download", attempt, got)
+		}
+	}
+	if keptFor(t, downloadURL) {
+		t.Error("an unreadable package should not be kept")
+	}
+}
+
+// A package that has been written into the plugin folder is spent: the kept folder
+// holds only what a retry still needs, and the run's scratch goes with the run.
+func TestASuccessfulUpdateKeepsNothingBehind(t *testing.T) {
+	root := t.TempDir()
+	pluginDir := filepath.Join(root, "wdx", "demo")
+	dllPath := filepath.Join(pluginDir, "demo.dll")
+	writeTestFile(t, dllPath, "old-dll")
+
+	downloadURL := serveTestZip(t, buildTestZip(t, map[string]string{"demo.dll": "new-dll"}))
+
+	if _, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
+		Path:        dllPath,
+		DownloadURL: downloadURL,
+	}); err != nil {
+		t.Fatalf("UpdatePlugin: %v", err)
+	}
+	if keptFor(t, downloadURL) {
+		t.Error("an applied package should be forgotten")
 	}
 }
 

@@ -70,6 +70,12 @@ next release (v2), and the accepted debt we deliberately postponed.
   order, but a Wails binding is callable from anywhere, and two runs would fight over the one
   progress listener and over this process' single scratch folder, where the second run empties
   the package the first is still unpacking.
+- A package that unpacked is kept in that scratch (`downloaded/`, named after the URL that
+  produced it) until the apply goes through or the run ends, and the updater looks there before
+  it touches the network: the retry a user asks for after closing Total Commander starts from
+  the bytes this process already downloaded and proved rather than fetching them a second time.
+  One that failed to unpack is dropped instead of kept — magic bytes alone are not proof, and a
+  retry has to stay free to ask for another copy.
 - A rollback from the update history merges the kept copy over the plugin folder instead of
   emptying the folder first, so the files it can replace are replaced while Total Commander
   runs — an update never needed the program closed, and deleting the folder around a live

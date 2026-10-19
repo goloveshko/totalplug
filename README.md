@@ -84,9 +84,13 @@ close the window and ask for the same rollback again.
 An update also needs somewhere to hold its download while it is unpacked — the
 only place TotalPlug writes that is neither your plugins folder nor its own data
 folder: `%TEMP%\totalplug`, with one subfolder per running instance so two copies
-of the app never unpack into each other. The subfolder goes when the update ends;
-a run killed mid-download leaves a leftover that a later start sweeps once it is
-over an hour old. `TOTALPLUG_SCRATCH_DIR` moves the whole tree elsewhere.
+of the app never unpack into each other. The unpacking space goes when that update
+ends. A package that unpacked all right but could not be written into the plugin
+folder — Total Commander still holding it, for instance — stays beside it until the
+app closes, so the retry after you close the window starts from the download it
+already has instead of fetching it again. A run killed mid-way leaves a leftover
+that a later start sweeps once it is over an hour old. `TOTALPLUG_SCRATCH_DIR`
+moves the whole tree elsewhere.
 
 The About panel prints the folder in use. `TOTALPLUG_DATA_DIR` pins it to any
 path you choose.

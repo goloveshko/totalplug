@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -81,6 +82,21 @@ const DefaultMaxExtractBytes int64 = 1 << 30
 // into. It is emptied before each plugin rather than recreated, so a run reuses
 // one path for every update it makes.
 const updateSpace = "update"
+
+// keptSpace holds the packages this run already downloaded and unpacked, named
+// after the URL that produced them, so that a retry of a plugin the update could
+// not write (Total Commander still holding it) starts from the bytes already on
+// disk instead of fetching them again. Only the run's own folder, so it goes with
+// the run: on a normal exit, or with the sweep once a process dies.
+const keptSpace = "downloaded"
+
+// packageKey names the slot one URL owns. A hash rather than the last path
+// segment because hosts hand the same filename out from different addresses, and
+// a query string is part of what is being fetched.
+func packageKey(rawURL string) string {
+	sum := sha256.Sum256([]byte(rawURL))
+	return fmt.Sprintf("%x", sum)
+}
 
 // staleScratchAfter is how long a scratch folder may sit untouched before the
 // next run treats it as the leftover of a process that died, and removes it.
@@ -662,27 +678,90 @@ func downloadCandidates(plugin domain.Plugin) []string {
 	return nil
 }
 
-// tryDownloadCandidates downloads and validates archives from an ordered URL
-// list, returning the first usable archive format. An empty format means all
-// candidates failed; lastErr is the most recent failure.
-func (u *Updater) tryDownloadCandidates(ctx context.Context, urls []string, archiveFile string) (format string, lastErr error) {
+// securedPackage is one usable package: where it lies on disk, which URL produced
+// it (that URL names its slot in the kept folder), which reader unpacks it, and
+// whether the bytes were already paid for by this run.
+type securedPackage struct {
+	path   string
+	source string
+	format string
+	kept   bool
+}
+
+// isExtractable reports whether one of the archive readers can open a format
+// detectArchiveFormat answered with.
+func isExtractable(format string) bool {
+	switch format {
+	case "zip", "rar", "7z":
+		return true
+	}
+	return false
+}
+
+// takeKeptPackage returns the package this run kept for one URL, when it is still
+// there and still something the extractors can read. A slot that fails that check
+// goes out with the check, so a corrupt leftover cannot block the download the
+// retry needs.
+func takeKeptPackage(rawURL, keepDir string) (securedPackage, bool) {
+	slot := filepath.Join(keepDir, packageKey(rawURL))
+	info, err := os.Stat(slot)
+	if err != nil || info.Size() == 0 {
+		return securedPackage{}, false
+	}
+	format, err := detectArchiveFormat(slot)
+	if err != nil || !isExtractable(format) {
+		_ = os.Remove(slot)
+		return securedPackage{}, false
+	}
+	return securedPackage{path: slot, source: rawURL, format: format, kept: true}, true
+}
+
+// keepPackage moves a package that has proved it unpacks into the run's kept
+// folder under the URL that produced it, and says where the bytes ended up. It is
+// best effort: a run that cannot keep a package still holds it for this attempt.
+func keepPackage(archiveFile, rawURL, keepDir string) string {
+	if err := os.MkdirAll(keepDir, 0755); err != nil {
+		return archiveFile
+	}
+	slot := filepath.Join(keepDir, packageKey(rawURL))
+	if err := os.Rename(archiveFile, slot); err != nil {
+		return archiveFile
+	}
+	return slot
+}
+
+// forgetPackage drops the kept copy of a package whose update went through: the
+// bytes did their job, and the folder should hold only what a retry still needs.
+func forgetPackage(rawURL, keepDir string) {
+	_ = os.Remove(filepath.Join(keepDir, packageKey(rawURL)))
+}
+
+// tryDownloadCandidates secures one usable package from an ordered URL list,
+// returning the first one and the format to read it with. A package this run kept
+// earlier answers before the network is touched, in the same candidate order. An
+// empty format means every candidate failed; lastErr is the most recent failure.
+func (u *Updater) tryDownloadCandidates(ctx context.Context, urls []string, archiveFile, keepDir string) (securedPackage, error) {
+	var lastErr error
 	for _, candidate := range urls {
+		if kept, ok := takeKeptPackage(candidate, keepDir); ok {
+			return kept, nil
+		}
 		if err := u.DownloadFile(ctx, candidate, archiveFile); err != nil {
 			lastErr = fmt.Errorf("download failed: %w", err)
 			continue
 		}
-		f, err := detectArchiveFormat(archiveFile)
+		format, err := detectArchiveFormat(archiveFile)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		if f != "zip" && f != "rar" && f != "7z" {
-			lastErr = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, f)
+		if !isExtractable(format) {
+			lastErr = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format)
 			continue
 		}
-		return f, nil
+		return securedPackage{path: archiveFile, source: candidate, format: format}, nil
 	}
-	return "", lastErr
+	return securedPackage{}, lastErr
 }
 
 // tcExeNames are the executables that only ever sit in a Total Commander install
@@ -741,6 +820,9 @@ func validatePluginFolder(pluginDir string) error {
 //
 // Every candidate URL (primary + catalog mirrors) is tried until one yields a
 // usable archive; backup and apply happen only after a good package is secured.
+// One that unpacked is held in the run's folder until the apply goes through or
+// the run ends, so retrying a plugin the update could not write starts from those
+// bytes rather than fetching them a second time.
 func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outcome, error) {
 	candidates := downloadCandidates(plugin)
 	if len(candidates) == 0 {
@@ -752,14 +834,16 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outco
 		return Outcome{}, err
 	}
 
-	tmpDir, err := config.RunScratch()
+	runDir, err := config.RunScratch()
 	if err != nil {
 		return Outcome{}, fmt.Errorf("creating temp directory: %w", err)
 	}
 	// A run downloads every plugin of an --update-all into its own scratch folder,
 	// so each one starts from an empty `update` inside it rather than unpacking
-	// over what the previous package left.
-	tmpDir = filepath.Join(tmpDir, updateSpace)
+	// over what the previous package left. The `downloaded` beside it is emptied by
+	// nobody until the run ends: it is what a retry reads back.
+	tmpDir := filepath.Join(runDir, updateSpace)
+	keepDir := filepath.Join(runDir, keptSpace)
 	if err := os.RemoveAll(tmpDir); err != nil {
 		return Outcome{}, fmt.Errorf("clearing temp directory: %w", err)
 	}
@@ -769,9 +853,9 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outco
 	defer os.RemoveAll(tmpDir)
 
 	archiveFile := filepath.Join(tmpDir, "package.archive")
-	format, lastErr := u.tryDownloadCandidates(ctx, candidates, archiveFile)
+	pkg, lastErr := u.tryDownloadCandidates(ctx, candidates, archiveFile, keepDir)
 
-	if format == "" {
+	if pkg.format == "" {
 		// All catalog sources failed: for totalcmd.net links, lazily parse the
 		// plugin page for mirrors and retry them (fallback maintained by the
 		// community, e.g. wincmd.ru).
@@ -779,13 +863,13 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outco
 			// DownloadFile announces each candidate URL, so mirror attempts are
 			// already visible in the UI.
 			var mirrorErr error
-			format, mirrorErr = u.tryDownloadCandidates(ctx, mirrors, archiveFile)
+			pkg, mirrorErr = u.tryDownloadCandidates(ctx, mirrors, archiveFile, keepDir)
 			if mirrorErr != nil {
 				lastErr = mirrorErr
 			}
 		}
 	}
-	if format == "" {
+	if pkg.format == "" {
 		// Broken catalog/upstream links are common (totalcmd.net download
 		// counters redirect to dead hosts), so point at the plugin page.
 		err := lastErr
@@ -800,16 +884,27 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outco
 
 	extractedDir := filepath.Join(tmpDir, "extracted")
 	u.emit(domain.UpdateProgress{Phase: "extract", Percent: -1})
-	switch format {
+	switch pkg.format {
 	case "zip":
-		err = u.ExtractZip(archiveFile, extractedDir)
+		err = u.ExtractZip(pkg.path, extractedDir)
 	case "rar":
-		err = u.ExtractRar(archiveFile, extractedDir)
+		err = u.ExtractRar(pkg.path, extractedDir)
 	case "7z":
-		err = u.Extract7z(archiveFile, extractedDir)
+		err = u.Extract7z(pkg.path, extractedDir)
 	}
 	if err != nil {
+		// Magic bytes alone did not make this package readable, so it is not worth
+		// keeping: a retry has to be free to fetch another one.
+		if pkg.kept {
+			forgetPackage(pkg.source, keepDir)
+		}
 		return Outcome{}, fmt.Errorf("extraction failed: %w", err)
+	}
+	// Unpacking proved the bytes good, so from here on they are worth keeping for a
+	// retry: an apply that Total Commander blocks should not ask the host for the
+	// same package again once the user closes it and tries once more.
+	if !pkg.kept {
+		pkg.path = keepPackage(archiveFile, pkg.source, keepDir)
 	}
 
 	backupDir, err := u.BackupPlugin(pluginDir)
@@ -837,6 +932,10 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outco
 	// settings change made while this process runs — by this window or by a CLI
 	// run — is what the next update honours.
 	_, _ = pruneBackupSpace(pluginDir, config.LoadBackupPolicy())
+
+	// The kept package has been written into the plugin folder, so nothing a retry
+	// still needs is waiting on it.
+	forgetPackage(pkg.source, keepDir)
 
 	return Outcome{BackupPath: backupDir, AppliedFiles: applied}, nil
 }
