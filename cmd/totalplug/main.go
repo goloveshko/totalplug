@@ -346,7 +346,7 @@ func main() {
 
 		proceed := opts.updateAll
 		if !proceed {
-			prompt := "\n[?] Apply the updates listed above? Close Total Commander first. [y/N]: "
+			prompt := "\n[?] Apply the updates listed above? [y/N]: "
 			proceed = confirm(os.Stdin, prompt)
 		}
 
