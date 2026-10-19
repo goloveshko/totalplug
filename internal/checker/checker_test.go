@@ -49,6 +49,9 @@ func TestNormalizeName(t *testing.T) {
 		{"tc_total7zip plugin", "total7zip"},
 		{"TC mdview ext", "mdview"},
 		{"Plugins", "plugin"},
+		// A name that ends in the letters is the plugin's own word, not a tag.
+		{"TextExt", "textext"},
+		{"ListerPlugin", "listerplugin"},
 	}
 
 	for _, tt := range tests {

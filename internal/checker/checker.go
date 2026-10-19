@@ -123,7 +123,11 @@ func normalizeName(s string) string {
 		s = strings.TrimPrefix(s, p)
 	}
 
-	suffixes := []string{"64", "32", "x64", "x86", "_64", "_32", " plugin", "plugin", " ext", "ext"}
+	// "plugin" and "ext" are cut only behind a separator: a name legitimately ending
+	// in those letters is the plugin's own word, and cutting them made one entry
+	// match a different plugin (TextExt answered as text). The width tags keep the
+	// form they had.
+	suffixes := []string{"64", "32", "x64", "x86", "_64", "_32", " plugin", "_plugin", " ext", "_ext"}
 	for _, sfx := range suffixes {
 		s = strings.TrimSuffix(s, sfx)
 	}
