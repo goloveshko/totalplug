@@ -28,8 +28,9 @@ already ships with Windows 11 and with current Windows 10 updates.
 The binaries are not code-signed, so SmartScreen shows "Windows protected your
 PC" on the first run — pick **More info → Run anyway**. TotalPlug writes only to
 your Total Commander `plugins` directory, to its own data folder and to a
-throwaway download folder it removes on exit (see **Where Your Files Live**), and
-every plugin folder it changes is backed up next to it.
+throwaway download folder it removes on exit (see **Where Your Files Live**);
+before it changes a plugin folder, a copy of that folder goes into `backups\` of
+the same data folder.
 
 ---
 
@@ -194,8 +195,9 @@ go run cmd/totalplug/main.go --update-all
 > Closing Total Commander is not needed for most updates: a file is replaced by renaming a fresh
 > copy over it, which a loaded plugin allows. Close it and run again when one still reports as
 > locked — the queue stops there and skips the rest.
-> Updates are safe by design: the plugin folder is backed up as `<dir>.bak_<timestamp>` next to it,
-> and any mid-apply failure is automatically rolled back to the previous state.
+> Updates are safe by design: the plugin folder is copied first to `backups\<type>\<dir>.bak_<unix>`
+> in the TotalPlug data folder, and any mid-apply failure is automatically rolled back to the
+> previous state.
 > Plugins whose installed version cannot be determined are never auto-updated: in `--update` they
 > are offered separately with a per-item `[y]es / [N]o / [a]ll` prompt, and `--update-all` skips them.
 
