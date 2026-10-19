@@ -484,11 +484,15 @@ next release (v2), and the accepted debt we deliberately postponed.
   `io.Copy`, so a small crafted archive could still fill the disk.~~ Shipped in `b1bb4aa` (see
   Safe updates): one `extractLimiter` shared by the three format loops caps the cumulative
   decompressed output at `DefaultMaxExtractBytes` (1 GiB), aborting with `ErrExtractTooLarge`.
-- **The plugin card is mouse-only** — a row receives `tabindex="-1"` only _after_ the card opens
-  (`openCard` in `frontend/src/card.js`), so there is nothing to focus and therefore no way to
-  open a card with the keyboard. The pass that fixes it also owes the dialogs their accessible
-  names: the four `<dialog>`s carry no `aria-label`/`aria-labelledby`, and neither
-  `#lang-select` nor `#font-scale` has one, while every icon button and the search box do.
+- ~~**The plugin card is mouse-only** — a row receives `tabindex="-1"` only _after_ the card
+  opens (`openCard` in `frontend/src/card.js`), so there is nothing to focus and therefore no way
+  to open a card with the keyboard.~~ The keyboard half was already closed by the slice 4 pass
+  that made the name cell a `.row-open` button: nothing under `frontend/src` writes a `tabindex`
+  any more, so the entry described a mechanism that no longer exists. The names were the real
+  debt and `3492c0b` paid them — the history, card and progress dialogs point `aria-labelledby`
+  at the heading each already draws, the app dialog has no heading so it is named by whether it
+  asks a question or reports one, and `#font-scale` and `#lang-select` reuse the labels their own
+  panels show.
 - ~~**Stale state across a concurrent refresh** — one known race left: a language switch rebuilds
   the DOM, so the `finally` in `runScan` enables buttons that the in-flight scan never disabled
   (harmless, but a second scan starts while the first is running).~~ Closed by the titlebar
