@@ -56,7 +56,10 @@ next release (v2), and the accepted debt we deliberately postponed.
   sibling temp and renames it over the destination. An in-place write that broke halfway
   left a damaged file `applyTree` had not recorded, so rollback skipped it and the backup
   holding the only good copy was then deleted as a success. The rename is also where a
-  target another process holds open fails with errno 5, which is what lock detection keys on.
+  target another process holds fails with errno 5, which is what lock detection keys on:
+  a file Total Commander merely has open renames through (delete-pending), while one it
+  has _loaded_ as an image does not, so an update or a rollback of a plugin the session
+  is using is the case the "close Total Commander" hint is for.
 - An update is refused when the plugin file does not live in a folder of its own
   (`ErrPluginNeedsOwnFolder`), because both the backup and the unpack take the whole parent
   directory: a `wincmd.ini` entry pointing straight at a file next to `wincmd.exe` /
@@ -68,10 +71,12 @@ next release (v2), and the accepted debt we deliberately postponed.
   progress listener and over this process' single scratch folder, where the second run empties
   the package the first is still unpacking.
 - A rollback from the update history merges the kept copy over the plugin folder instead of
-  emptying the folder first, so it works while Total Commander holds the plugin loaded — an
-  update never needed the program closed, and deleting the folder around a live image section
-  was the only reason a rollback did. What the update brought on top of the copy is then taken
-  out, but by the names the line recorded (`UpdateEntry.AppliedFiles`, collected by `applyTree`):
+  emptying the folder first, so the files it can replace are replaced while Total Commander
+  runs — an update never needed the program closed, and deleting the folder around a live
+  image section was the only reason a rollback did. A plugin the session has loaded stays
+  in the way of the one file it holds, which is the locked case. What the update brought on
+  top of the copy is then taken out, but by the names the line recorded
+  (`UpdateEntry.AppliedFiles`, collected by `applyTree`):
   a plugin saves its own settings beside its DLL and the folder can hold a file the user put
   there, so nothing else is touched. A line written before names were recorded removes nothing,
   a name the copy also carries belongs to the older version, and a name leading out of the
@@ -79,8 +84,13 @@ next release (v2), and the accepted debt we deliberately postponed.
 - A rollback whose copy could not be written restores the folder to the version it had and
   removes the snapshot it had made for itself: the history line still describes the change
   that is in place, so the line stays actionable and the failed run leaves no copy nobody
-  points at. A run that could not restore the folder either keeps that snapshot and says so,
-  because it is then the only readable copy of what was there.
+  points at. `copyTree` returns the path it stopped at precisely for this comparison — both
+  passes give up at the same file in the usual case, since the file that blocked the copy
+  out was never changed and everything before it is put back. A file the attempt brought
+  into the folder is in neither pass's list of names to put back, so after them any file
+  the kept copy holds and the snapshot does not is removed as this run's own work; one that
+  will not go is named in the failure. Only a run that could not restore the folder either
+  keeps that snapshot and says so, because it is then the only readable copy of what was there.
 
 ### CLI (`bin/totalplug-cli.exe`, `scripts/build.cmd` / `release.cmd`)
 

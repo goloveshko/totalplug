@@ -77,7 +77,9 @@ with Total Commander running, exactly like an update. The files that update brou
 with it are then taken out — but only those, because a plugin saves its own settings
 next to its DLL and you may have put a file in that folder yourself. A history line
 written before TotalPlug kept track of file names puts the copy back and removes
-nothing.
+nothing. When Total Commander has the plugin loaded and one file cannot be replaced,
+the folder is returned to the version it held and no copy of this attempt is kept:
+close the window and ask for the same rollback again.
 
 An update also needs somewhere to hold its download while it is unpacked — the
 only place TotalPlug writes that is neither your plugins folder nor its own data
@@ -193,8 +195,9 @@ go run cmd/totalplug/main.go --update-all
 ```
 
 > Closing Total Commander is not needed for most updates: a file is replaced by renaming a fresh
-> copy over it, which a loaded plugin allows. Close it and run again when one still reports as
-> locked — the queue stops there and skips the rest.
+> copy over it, and Total Commander keeps a plugin loaded only while it uses one. Close it and run
+> again when a plugin still reports as locked — that is the loaded file holding the rename back,
+> and the queue stops there and skips the rest.
 > Updates are safe by design: the plugin folder is copied first to `backups\<type>\<dir>.bak_<unix>`
 > in the TotalPlug data folder, and any mid-apply failure is automatically rolled back to the
 > previous state.
