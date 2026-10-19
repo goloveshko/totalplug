@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"fmt"
+	"os"
 
 	"github.com/goloveshko/totalplug/internal/gui"
 )
@@ -13,6 +15,9 @@ var assets embed.FS
 // root and //go:embed cannot reach above it; the window itself is internal/gui.
 func main() {
 	if err := gui.Run(assets); err != nil {
-		println("Error:", err.Error())
+		// The builtin println has an implementation-defined format and no stream a
+		// GUI-subsystem binary writes to, so this is the one failure the window
+		// cannot show and the terminal would not see either.
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
 }
