@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/goloveshko/totalplug/internal/domain"
@@ -56,7 +56,7 @@ func historyMatch(entries []domain.UpdateEntry, key string) (domain.UpdateEntry,
 // runRollback reads the log, puts one plugin's kept copy back and records the
 // change. It needs no scan: the line names both the folder and the copy, and the
 // updater checks each of them against what is on disk before writing.
-func runRollback(db *storage.Database, key string, in io.Reader) error {
+func runRollback(db *storage.Database, key string, in *bufio.Reader) error {
 	entries := db.UpdateHistory()
 	rollback.ClearStaleCopies(entries)
 

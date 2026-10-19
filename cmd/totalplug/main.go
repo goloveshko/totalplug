@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -79,10 +78,12 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-// confirm reads a yes/no answer from the reader, defaulting to no on EOF.
-func confirm(reader io.Reader, prompt string) bool {
+// confirm reads a yes/no answer, defaulting to no on EOF. The reader is the one
+// this run was given: a fresh bufio.Reader over os.Stdin would fill its buffer
+// past the newline and take the next answer with it when it is thrown away.
+func confirm(in *bufio.Reader, prompt string) bool {
 	fmt.Print(prompt)
-	line, err := bufio.NewReader(reader).ReadString('\n')
+	line, err := in.ReadString('\n')
 	if err != nil {
 		return false
 	}
@@ -149,11 +150,10 @@ func readBlindAnswer(in *bufio.Reader, prompt string) rune {
 
 // promptBlindUpdates lets the user decide item by item which updates with an
 // unresolvable installed version should be applied anyway.
-func promptBlindUpdates(reader io.Reader, candidates []domain.Plugin) []domain.Plugin {
+func promptBlindUpdates(in *bufio.Reader, candidates []domain.Plugin) []domain.Plugin {
 	fmt.Printf("\nUnverified updates (%d): installed version could not be determined.\n", len(candidates))
 	fmt.Println("Apply anyway? Answer per item: [y]es / [N]o / [a]ll remaining.")
 
-	in := bufio.NewReader(reader)
 	var selected []domain.Plugin
 	allRemaining := false
 	for i, p := range candidates {
@@ -196,6 +196,11 @@ func main() {
 		fmt.Printf("[!] Storage warning, some data was not loaded: %v\n", dbErr)
 	}
 
+	// One answer stream for the whole run, because every prompt below reads a
+	// line ahead: a second buffered reader would swallow what the first took past
+	// its newline, which is the next answer when answers come from a pipe.
+	in := bufio.NewReader(os.Stdin)
+
 	// The log answers both of these on its own: a rollback takes the folder and
 	// the copy from the line it names, so neither waits on a scan of the install.
 	if opts.history {
@@ -203,7 +208,7 @@ func main() {
 		return
 	}
 	if opts.rollbackKey != "" {
-		if err := runRollback(db, opts.rollbackKey, os.Stdin); err != nil {
+		if err := runRollback(db, opts.rollbackKey, in); err != nil {
 			fmt.Printf("[!] %v\n", err)
 			os.Exit(1)
 		}
@@ -347,7 +352,7 @@ func main() {
 		proceed := opts.updateAll
 		if !proceed {
 			prompt := "\n[?] Apply the updates listed above? [y/N]: "
-			proceed = confirm(os.Stdin, prompt)
+			proceed = confirm(in, prompt)
 		}
 
 		if proceed {
@@ -364,7 +369,7 @@ func main() {
 		if opts.updateAll {
 			fmt.Printf("\n[i] Skipped %d unverified update(s): --update-all never applies unknown versions.\n", len(unverified))
 		} else {
-			selected := promptBlindUpdates(os.Stdin, unverified)
+			selected := promptBlindUpdates(in, unverified)
 			if len(selected) > 0 {
 				fmt.Println()
 				s, f := runUpdates(context.Background(), selected, db)

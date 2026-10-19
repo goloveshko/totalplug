@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,13 @@ import (
 	"github.com/goloveshko/totalplug/internal/domain"
 	"github.com/goloveshko/totalplug/internal/storage"
 )
+
+// answers feeds the prompts the way a terminal does: one buffered reader for the
+// whole run, so an answer a prompt read past its own newline still reaches the
+// next one.
+func answers(text string) *bufio.Reader {
+	return bufio.NewReader(strings.NewReader(text))
+}
 
 func writeCliFile(t *testing.T, path, content string) {
 	t.Helper()
@@ -66,7 +74,7 @@ func cliFixture(t *testing.T) (pluginDir string, db *storage.Database) {
 func TestRunRollbackPutsTheKeptCopyBack(t *testing.T) {
 	pluginDir, db := cliFixture(t)
 
-	if err := runRollback(db, "cudalister", strings.NewReader("y\n")); err != nil {
+	if err := runRollback(db, "cudalister", answers("y\n")); err != nil {
 		t.Fatalf("runRollback: %v", err)
 	}
 
@@ -94,7 +102,7 @@ func TestRunRollbackPutsTheKeptCopyBack(t *testing.T) {
 func TestRunRollbackSkipsWithoutConfirmation(t *testing.T) {
 	pluginDir, db := cliFixture(t)
 
-	if err := runRollback(db, "CudaLister", strings.NewReader("n\n")); err != nil {
+	if err := runRollback(db, "CudaLister", answers("n\n")); err != nil {
 		t.Fatalf("runRollback: %v", err)
 	}
 	if got := readCliFile(t, filepath.Join(pluginDir, "cuda.wlx")); got != "the newer build" {
@@ -108,18 +116,18 @@ func TestRunRollbackSkipsWithoutConfirmation(t *testing.T) {
 func TestRunRollbackExplainsWhyItCannot(t *testing.T) {
 	_, db := cliFixture(t)
 
-	if err := runRollback(db, "NotInLog", strings.NewReader("y\n")); err == nil {
+	if err := runRollback(db, "NotInLog", answers("y\n")); err == nil {
 		t.Fatal("an unknown plugin name was accepted")
 	} else if !strings.Contains(err.Error(), "--history") {
 		t.Errorf("error should point at --history: %v", err)
 	}
 
-	if err := runRollback(db, "CudaLister", strings.NewReader("y\n")); err != nil {
+	if err := runRollback(db, "CudaLister", answers("y\n")); err != nil {
 		t.Fatalf("first rollback: %v", err)
 	}
 	// The way forward from a rollback is to update again, so the second ask has
 	// to say that rather than fail on the copy it no longer offers.
-	if err := runRollback(db, "CudaLister", strings.NewReader("y\n")); err == nil {
+	if err := runRollback(db, "CudaLister", answers("y\n")); err == nil {
 		t.Fatal("a rollback line was rolled back")
 	} else if !strings.Contains(err.Error(), "update it again") {
 		t.Errorf("error should point at updating again: %v", err)
@@ -128,7 +136,7 @@ func TestRunRollbackExplainsWhyItCannot(t *testing.T) {
 
 func TestHistoryMatchPrefersTheNewestLine(t *testing.T) {
 	_, db := cliFixture(t)
-	if err := runRollback(db, "CudaLister", strings.NewReader("y\n")); err != nil {
+	if err := runRollback(db, "CudaLister", answers("y\n")); err != nil {
 		t.Fatalf("runRollback: %v", err)
 	}
 

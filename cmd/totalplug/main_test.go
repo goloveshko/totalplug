@@ -61,16 +61,32 @@ func TestParseArgsRejectsBadInput(t *testing.T) {
 func TestConfirm(t *testing.T) {
 	yes := []string{"y\n", "Y\n", "yes\n", "  YES  \n"}
 	for _, in := range yes {
-		if !confirm(strings.NewReader(in), "") {
+		if !confirm(answers(in), "") {
 			t.Errorf("confirm(%q) = false, want true", in)
 		}
 	}
 
 	no := []string{"n\n", "\n", "maybe\n", ""}
 	for _, in := range no {
-		if confirm(strings.NewReader(in), "") {
+		if confirm(answers(in), "") {
 			t.Errorf("confirm(%q) = true, want false", in)
 		}
+	}
+}
+
+// A prompt buffers ahead of the line it reads, so the two of them in one run have
+// to share the reader: with a fresh one each, the second question is asked over
+// whatever the first already took and never gives back.
+func TestPromptsShareTheirReader(t *testing.T) {
+	in := answers("y\ny\n")
+	if !confirm(in, "") {
+		t.Fatal("the first answer was not read")
+	}
+	if !confirm(in, "") {
+		t.Fatal("the second answer was swallowed by the first prompt")
+	}
+	if confirm(in, "") {
+		t.Error("an exhausted reader must answer no, not yes")
 	}
 }
 
