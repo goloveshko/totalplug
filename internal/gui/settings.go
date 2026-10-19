@@ -99,8 +99,18 @@ func writeSettings(s settings) error {
 	if err != nil {
 		return fmt.Errorf("encode settings: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("write settings to %s: %w", path, err)
+	// Written beside the target and renamed over it, as the storage files are:
+	// os.WriteFile truncates the settings before a byte of the new content
+	// exists, so a crash or a full disk there left a half-written file that the
+	// next start answered with defaults — the geometry, theme and language gone
+	// for a write that never finished.
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return fmt.Errorf("write settings to %s: %w", tmp, err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("put the settings in place at %s: %w", path, err)
 	}
 	return nil
 }
