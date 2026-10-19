@@ -73,8 +73,8 @@
     });
 </script>
 
-<dialog id="history-dialog" bind:this={el} onclose={closeHistory}>
-    <h2>{$msg('history.title')}</h2>
+<dialog id="history-dialog" bind:this={el} aria-labelledby="history-title" onclose={closeHistory}>
+    <h2 id="history-title">{$msg('history.title')}</h2>
     <table>
         <thead>
             <tr>

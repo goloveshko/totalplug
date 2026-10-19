@@ -37,7 +37,12 @@
     });
 </script>
 
-<dialog id="app-dialog" bind:this={el} onclose={onClose}>
+<dialog
+    id="app-dialog"
+    bind:this={el}
+    aria-label={$tr($dialogState.isConfirm ? 'dialog.title.confirm' : 'dialog.title.message')}
+    onclose={onClose}
+>
     <button
         type="button"
         class="dlg-close"

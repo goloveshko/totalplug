@@ -65,7 +65,15 @@
             </div>
             <div class="section-label">{$tr('settings.font')}</div>
             <div class="font-row">
-                <input type="range" id="font-scale" min="80" max="140" step="5" bind:value={$scale} />
+                <input
+                    type="range"
+                    id="font-scale"
+                    min="80"
+                    max="140"
+                    step="5"
+                    aria-label={$tr('settings.font')}
+                    bind:value={$scale}
+                />
                 <span class="font-value" id="font-scale-value">{$scale}%</span>
             </div>
         </div>
@@ -76,7 +84,7 @@
             <p class="section-desc">{$tr('settings.language')}</p>
             <!-- Each name is written in its own language on purpose: an English
                  interface still has to say what «Русский» is. -->
-            <select id="lang-select" bind:value={$lang}>
+            <select id="lang-select" aria-label={$tr('settings.language')} bind:value={$lang}>
                 <option value="en">English</option>
                 <option value="ru">Русский</option>
             </select>

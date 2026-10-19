@@ -51,7 +51,14 @@
     }
 </script>
 
-<dialog id="update-progress" bind:this={el} oncancel={onCancel} onclose={settleProgress} use:interceptLinks>
+<dialog
+    id="update-progress"
+    bind:this={el}
+    aria-labelledby="progress-title"
+    oncancel={onCancel}
+    onclose={settleProgress}
+    use:interceptLinks
+>
     <button
         type="button"
         class="dlg-close"

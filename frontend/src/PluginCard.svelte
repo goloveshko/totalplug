@@ -49,7 +49,7 @@
     });
 </script>
 
-<dialog id="plugin-card" bind:this={el} onclose={restoreCardOpener}>
+<dialog id="plugin-card" bind:this={el} aria-labelledby="card-name" onclose={restoreCardOpener}>
     {#if plugin}
         <h2 id="card-name">{plugin.name}</h2>
         <div class="card-sub" id="card-sub">{sub}</div>
