@@ -41,12 +41,20 @@ next release (v2), and the accepted debt we deliberately postponed.
 - Windows file-lock detection (error codes 5/32/33) with a
   "close Total Commander and run again" hint.
 - Downloads restricted to https (loopback http allowed for tests) and capped at 256 MiB.
-- Mirror fallback (`7c6b18d`): the checker collects ordered download URLs per plugin from
-  the catalog's `available_sources` (resolved first, then same-version mirrors, stable
-  order); the updater tries each until one delivers a usable archive, so a dead
-  totalcmd.net link can fall through to a wincmd.ru mirror. The catalog currently lists
-  only the `totalcmd` source per entry — mirrors become effective once added to the
-  totalplug-catalog repo.
+- Mirror fallback, in two layers. The catalog-declared one (`7c6b18d`): the checker collects
+  ordered download URLs per plugin from the catalog's `available_sources` (resolved first, then
+  same-version mirrors, stable order) and the updater tries each until one delivers a usable
+  archive. In the published catalog only 3 of 1213 entries carry `available_sources` at all, and
+  each holds what the _other_ resolver returned rather than a second host for the same version.
+  Giving the catalog a mirror field is decided against (2026-10-20): publishing ~1200 mirrors
+  would mean scraping ~1200 plugin pages on every build, so this layer stays dormant by design
+  and the search below is the mechanism.
+  The layer that works today (`5c2ae8c`): once every known source has failed, the updater fetches
+  the plugin's plugring page from the user's own machine and retries the `Mirror` links found
+  there, restricted to https and to a trusted-host allowlist (`wincmd.ru`). That is what carries
+  a dead totalcmd.net download counter through to a working archive with no catalog change, and
+  it costs one page per actually broken download instead of scraping ~1200 pages from CI. Parsing
+  trouble degrades to the ordinary error naming the plugin page.
 - Zip-slip guarded extraction.
 - Total decompressed output of one archive capped at 1 GiB (`DefaultMaxExtractBytes`,
   one `extractLimiter` shared by the ZIP/RAR/7z loops in `internal/updater`), so a small
@@ -254,8 +262,9 @@ next release (v2), and the accepted debt we deliberately postponed.
    override, or —) via new `domain.Plugin.Source`, plus a clickable
    «Домашняя страница» (web_url → BrowserOpenURL). The override editor is
    deliberately NOT pre-filled: a value there shadows the catalog.
-   User-side source lists were declined — mirrors belong in the catalog repo
-   (`available_sources`), not in per-plugin storage.
+   User-side source lists were declined — a mirror is not something to type per plugin, and
+   storage is not where one belongs. What was left open, "put them in the catalog repo", is
+   declined too by the time the mirror search above shipped: see the Safe updates bullet.
 9. **Update source UX** — done (`f1ade2c`): the editor field now accepts a pasted
    GitHub page URL (or bare `owner/repo`) and canonicalizes to
    `github:Owner/Repo` on save; the placeholder says «вставьте страницу

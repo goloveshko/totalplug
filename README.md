@@ -110,6 +110,13 @@ path you choose.
     4. **Tier 4 (Confidence Tags):** Transparently labels confidence (`[PE Binary]`, `[Readme/INF]`, `[Manual DB]`, `[Unknown]`).
 - 🌐 **Powered by TotalPlug Community Catalog:**  
   Checks updates against the open [totalplug-catalog](https://github.com/goloveshko/totalplug-catalog) database. The on-disk copy is revalidated by ETag on every launch — a newly published plugin shows up on the next start, an unchanged catalog costs a 304 instead of a full download — and it is what answers when the network does not.
+- 🔁 **Mirror Search on a Dead Download Link:**  
+  A totalcmd.net download counter sometimes redirects to a host that no longer answers. When
+  every source the catalog names has failed, TotalPlug opens that plugin's plugring page from
+  your own machine and retries the mirror links it shows there — https only, and only from
+  hosts on a small allowlist (`wincmd.ru`). Nothing is scraped in advance: one page is fetched
+  per actually broken download. When the page offers no usable mirror, the update fails with
+  the plugin's web address in the message.
 - 🗜️ **Archive-Format Aware Updater:**  
   Plugin packages are dispatched by their magic bytes, so ZIP, RAR and 7z all
   install, while an unsupported container is refused with a clear message
@@ -338,6 +345,11 @@ totalplug/
 ## 🤝 Community Catalog
 
 TotalPlug relies on the open community registry [totalplug-catalog](https://github.com/goloveshko/totalplug-catalog). Anyone can add or update plugins by submitting a simple Pull Request!
+
+The catalog holds one download address per plugin and deliberately no mirror list: a catalog of
+~1200 entries would have to be built by scraping ~1200 plugin pages on every run, so the fallback
+copy is looked up at update time instead, from your machine, and only for the plugin whose
+download just failed.
 
 ---
 
