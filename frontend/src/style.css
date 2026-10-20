@@ -374,15 +374,6 @@ tr:hover {
     background: transparent;
 }
 
-/* The plugin type is filter context, not the headline of the row. */
-.cell-type {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
 /* One line per type group, above the run of rows that share it. The list is already
    in ini order, so the band and its bottom border are what separates the types — no
    colour per group. It inherits the column header's tokens, and takes less padding

@@ -83,8 +83,9 @@
     }
 
     // The header and the placeholder's colspan come from the same list, so a
-    // column added here cannot quietly make a placeholder row misaligned.
-    const columns = ['type', 'plugin', 'installed', 'latest', 'status', 'actions'];
+    // column added here cannot quietly make a placeholder row misaligned. The type
+    // is not in it: every run of rows already carries a heading naming its type.
+    const columns = ['plugin', 'installed', 'latest', 'status', 'actions'];
 </script>
 
 <div id="view-main" hidden={$settingsOpen}>
@@ -135,7 +136,6 @@
                         {#each group.rows as { plugin, index } (plugin.id)}
                             {@const mark = badge(plugin.status)}
                             <tr data-idx={index}>
-                                <td class="cell-type">{plugin.type}</td>
                                 <td>
                                     <button
                                         type="button"
