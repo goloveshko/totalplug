@@ -584,9 +584,10 @@ next release (v2), and the accepted debt we deliberately postponed.
   the `currentLang`/`setLang` mirror no screen needs any more; a language switch now re-labels the
   whole window, dialogs included, which is what "done" meant here. `HistoryDialog.svelte` picked up
   the table's rule about the `tr` import name on the way (`d120bbd`), where the compiler had warned
-  on every row since slice 5. The migration is over: a new feature starts on components, at 100.95
-  kB JS (gzip 35.63) against the 46.94 kB (gzip 13.82) the app carried before slice 1, one
-  dependency in the compile path and the stage 13 policy still unrelaxed.
+  on every row since slice 5. The migration is over: a new feature starts on components, at 102.71
+  kB JS (gzip 36.26, as `npm run build` reports it now) against the 46.94 kB (gzip 13.82) the app
+  carried before slice 1, one dependency in the compile path and the stage 13 policy still
+  unrelaxed.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
   `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
   `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
