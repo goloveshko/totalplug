@@ -614,8 +614,8 @@ today, and all six are now closed:
   not binary bytes. Deleted.
 - **The scratch sweep's mtime claim** — the comment said an update refreshed its run folder's
   timestamp "as it goes"; the download writes inside `run-<pid>/update`, which touches that
-  subfolder's mtime and not the swept `run-<pid>` one. The comment now tells what actually moves
-  it: the start of an update, since that is when the inner folder is created. The one-hour
-  window is left as it was — a live run loses its scratch only if some other run goes an hour
-  without _starting_ an item — and tightening it would mean touching the run folder when each
-  update begins.
+  subfolder's mtime and not the swept `run-<pid>` one. The comment was corrected first, then the
+  behaviour: `config.RunScratch` now stamps the run folder on every call, and every update
+  already calls it at its start, so a batch keeps the one-hour window moving instead of letting a
+  second process decide the first one died. What remains exposed is a single item that runs
+  longer than an hour on a batch of one — the download itself still does not move the timestamp.

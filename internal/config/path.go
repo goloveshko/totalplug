@@ -154,6 +154,14 @@ func RunScratch() (string, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("create run scratch %s: %w", dir, err)
 	}
+	// MkdirAll leaves an existing folder's timestamp where it was, and SweepScratch
+	// measures a run's age from exactly that timestamp. Writing it here — on every
+	// call, which means at the start of every update — is what keeps a live run's
+	// package out of reach of a sweep from another process.
+	now := time.Now()
+	if err := os.Chtimes(dir, now, now); err != nil {
+		return "", fmt.Errorf("refresh run scratch %s: %w", dir, err)
+	}
 	return dir, nil
 }
 
@@ -169,12 +177,11 @@ func ReleaseRunScratch() {
 }
 
 // SweepScratch removes run folders left behind by runs that died, keeping
-// anything written to within maxAge. What refreshes that timestamp is the start of
-// an update, which creates the `update` folder inside the run folder: writing the
-// package itself only touches the inner one, so the age is measured from the last
-// plugin the run began rather than from its last byte — a window that moves for a
-// batch of one and stands still for a long download. A live process therefore
-// loses its scratch only if some other run goes an hour without starting an item.
+// anything written to within maxAge. What refreshes that timestamp is
+// RunScratch, which every update calls at its start, so the age is measured from
+// the last item the run began rather than from when the process was made. A live
+// run therefore loses its scratch only if some other run goes an hour without
+// _starting_ an item — one very long download on a batch of one.
 // It reads the root without creating it: a sweep has nothing to make. Returns how
 // many folders went.
 func SweepScratch(maxAge time.Duration) int {

@@ -168,6 +168,35 @@ func TestRunScratchIsOneFolderPerProcess(t *testing.T) {
 	}
 }
 
+func TestRunScratchKeepsTheRunInsideTheSweepWindow(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "scratch")
+	t.Setenv(ScratchEnv, root)
+
+	dir, err := RunScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A run that started an hour ago is what the next sweep is meant to take;
+	// starting an item has to move the folder back inside the window.
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(dir, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if got := SweepScratch(time.Hour); got != 1 {
+		t.Fatalf("a run that never started an item must be swept, removed %d, want 1", got)
+	}
+
+	if _, err := RunScratch(); err != nil {
+		t.Fatal(err)
+	}
+	if got := SweepScratch(time.Hour); got != 0 {
+		t.Errorf("SweepScratch() = %d over a run that just started an update, want 0", got)
+	}
+	if _, err := os.Stat(filepath.Join(root, runDirName())); err != nil {
+		t.Errorf("the run's folder must survive its own sweep: %v", err)
+	}
+}
+
 func TestSweepScratchRemovesOnlyStaleRuns(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "scratch")
 	t.Setenv(ScratchEnv, root)
