@@ -113,8 +113,10 @@ function installMockBackend() {
             emit('update:progress', { phase: 'install', percent: -1, url });
             await sleep(300);
             // Scripted failures keep the single-plugin and queue error paths demoable:
-            // wdx_BrokenMirror always fails, wfx_DeviceLocker always reports a lock.
-            if (p.id === 'wdx_BrokenMirror') throw new Error('mock: every mirror returned 404 for ' + p.id);
+            // wcx_BrokenMirror always fails, wfx_DeviceLocker always reports a lock.
+            // The queue walks the list in scan order, so everything after DeviceLocker
+            // is a row that gets skipped by the lock ending the run.
+            if (p.id === 'wcx_BrokenMirror') throw new Error('mock: every mirror returned 404 for ' + p.id);
             if (p.id === 'wfx_DeviceLocker') return { locked: true, backup_path: '' };
             p.installed_version = p.latest_version;
             reclassify(p);
@@ -286,7 +288,7 @@ function clone(x) {
 function makePlugins() {
     const checked = iso(0, 9);
     const base = (p) => ({
-        type: 'wlx',
+        type: 'WLX',
         path: `C:\\TC\\plugins\\${p.id}\\`,
         confidence: 'PE Binary',
         status: 'up_to_date',
@@ -294,11 +296,25 @@ function makePlugins() {
         arch: 'x64',
         ...p,
     });
+    // Grouped by type the way a scan hands rows over: wincmd.ini is read section by
+    // section — Packer, Lister, FileSystem, Content — and nothing re-sorts the list,
+    // so equal types always arrive as one run. Type values are the four the Go side
+    // emits, not the short lowercase forms the folder names use.
     return [
         base({
-            id: 'ltx_CudaLister',
+            id: 'wcx_BrokenMirror',
+            name: 'Broken Mirror',
+            type: 'WCX',
+            installed_version: '3.1',
+            latest_version: '3.2',
+            status: 'update_avail',
+            source: 'totalcmd',
+            download_url: 'https://example.invalid/broken-mirror-3.2.zip',
+            description: 'Stub: every UpdatePlugin call on it throws, to demo a failed queue item.',
+        }),
+        base({
+            id: 'wlx_CudaLister',
             name: 'CudaLister',
-            type: 'ltx',
             installed_version: '3.1.6',
             latest_version: '3.1.6',
             source: 'github:Alexey-T/CudaLister',
@@ -306,9 +322,59 @@ function makePlugins() {
             description: 'Lister plugin showing CUDA source files with syntax highlighting.',
         }),
         base({
+            id: 'wlx_EdgeView',
+            name: 'WLX EdgeViewer',
+            installed_version: '1.2.5',
+            latest_version: '1.2.6',
+            status: 'update_avail',
+            source: 'github:rg-software/wlx-edge-viewer',
+            download_url: 'https://example.invalid/edgeview-1.2.6.zip',
+            web_url: 'https://github.com/rg-software/wlx-edge-viewer',
+            description: 'Lister plugin: opens files in a Chromium/Edge-based viewer.',
+        }),
+        base({
+            id: 'wlx_HexPreviewVeryLongPluginName',
+            name: 'Hex Preview (Very Long Plugin Name)',
+            installed_version: '0.7.1',
+            latest_version: '0.7.1',
+            confidence: 'Readme/INF',
+            status: 'uncertain',
+            description: 'Hex viewer/editor preview inside the Lister window.',
+        }),
+        base({
+            id: 'wlx_PreviewPlus',
+            name: 'PreviewPlus',
+            installed_version: '1.0',
+            latest_version: '1.1',
+            status: 'update_avail',
+            source: 'totalcmd',
+            download_url: 'https://example.invalid/previewplus-1.1.zip',
+            description: 'Stub whose update is offered, to demo a batch row that succeeds.',
+        }),
+        base({
+            id: 'wfx_DeviceLocker',
+            name: 'DeviceLocker',
+            type: 'WFX',
+            installed_version: '0.9.3',
+            latest_version: '1.0.0',
+            status: 'update_avail',
+            source: 'totalcmd',
+            download_url: 'https://example.invalid/devicelocker-1.0.0.zip',
+            description: 'Stub: every UpdatePlugin call on it returns Locked, to demo the lock dialog.',
+        }),
+        base({
+            id: 'wfx_AllwaySync',
+            name: 'Allway Sync',
+            type: 'WFX',
+            installed_version: '15.2',
+            latest_version: '15.2',
+            web_url: 'https://allwaysync.com/',
+            description: 'Folder synchronization packer with scheduling and delta transfer.',
+        }),
+        base({
             id: 'wdx_7zip',
             name: '7-Zip',
-            type: 'wdx',
+            type: 'WDX',
             installed_version: '24.08',
             latest_version: '24.09',
             status: 'update_avail',
@@ -319,83 +385,21 @@ function makePlugins() {
             description: 'Content plugin: lists archives, computes hashes, reads embedded comments.',
         }),
         base({
-            id: 'wlx_EdgeView',
-            name: 'WLX EdgeViewer',
-            type: 'wlx',
-            installed_version: '1.2.5',
-            latest_version: '1.2.6',
-            status: 'update_avail',
-            source: 'github:rg-software/wlx-edge-viewer',
-            download_url: 'https://example.invalid/edgeview-1.2.6.zip',
-            web_url: 'https://github.com/rg-software/wlx-edge-viewer',
-            description: 'Lister plugin: opens files in a Chromium/Edge-based viewer.',
-        }),
-        base({
-            id: 'dsx_UninstallLister',
+            id: 'wdx_UninstallLister',
             name: 'Uninstall List',
-            type: 'dsx',
+            type: 'WDX',
             installed_version: '1.4.0',
             latest_version: '1.5.2',
             status: 'update_avail',
             source: 'wincmd_ru',
             download_url: 'https://example.invalid/uninstall-1.5.2.zip',
             web_url: 'https://totalcmd.net/plugring/uninstall_list.html',
-            description: 'Диск-плагин: список установленных программ с быстрым удалением.',
-        }),
-        base({
-            id: 'wdx_BrokenMirror',
-            name: 'Broken Mirror',
-            type: 'wdx',
-            installed_version: '3.1',
-            latest_version: '3.2',
-            status: 'update_avail',
-            source: 'totalcmd',
-            download_url: 'https://example.invalid/broken-mirror-3.2.zip',
-            description: 'Stub: every UpdatePlugin call on it throws, to demo a failed queue item.',
-        }),
-        base({
-            id: 'wfx_DeviceLocker',
-            name: 'DeviceLocker',
-            type: 'wfx',
-            installed_version: '0.9.3',
-            latest_version: '1.0.0',
-            status: 'update_avail',
-            source: 'totalcmd',
-            download_url: 'https://example.invalid/devicelocker-1.0.0.zip',
-            description: 'File packer stub: every UpdatePlugin call on it returns Locked, to demo the lock dialog.',
-        }),
-        base({
-            id: 'tbr_ToolbarPlus',
-            name: 'ToolbarPlus Extended Collection',
-            type: 'tbr',
-            installed_version: '2.0',
-            latest_version: '2.0',
-            confidence: 'Readme/INF',
-            description: '',
-        }),
-        base({
-            id: 'wlx_HexPreviewVeryLongPluginName',
-            name: 'Hex Preview (Very Long Plugin Name)',
-            type: 'wlx',
-            installed_version: '0.7.1',
-            latest_version: '0.7.1',
-            confidence: 'Readme/INF',
-            status: 'uncertain',
-            description: 'Hex viewer/editor preview inside the Lister window.',
-        }),
-        base({
-            id: 'wfx_AllwaySync',
-            name: 'Allway Sync',
-            type: 'wfx',
-            installed_version: '15.2',
-            latest_version: '15.2',
-            web_url: 'https://allwaysync.com/',
-            description: 'Folder synchronization packer with scheduling and delta transfer.',
+            description: 'Content plugin: список установленных программ с быстрым удалением.',
         }),
         base({
             id: 'wdx_SysInfo',
             name: 'SysInfo',
-            type: 'wdx',
+            type: 'WDX',
             installed_version: '2.3',
             latest_version: '2.3',
             confidence: 'Readme/INF',
@@ -404,15 +408,13 @@ function makePlugins() {
             description: 'Content plugin: system and file properties, CPU/RAM temperature widgets.',
         }),
         base({
-            id: 'wlx_PreviewPlus',
-            name: 'PreviewPlus',
-            type: 'wlx',
-            installed_version: '1.0',
-            latest_version: '1.1',
-            status: 'update_avail',
-            source: 'totalcmd',
-            download_url: 'https://example.invalid/previewplus-1.1.zip',
-            description: 'Stub placed after the locked plugin, to demo queue rows that were skipped.',
+            id: 'wdx_ToolbarPlus',
+            name: 'ToolbarPlus Extended Collection',
+            type: 'WDX',
+            installed_version: '2.0',
+            latest_version: '2.0',
+            confidence: 'Readme/INF',
+            description: '',
         }),
     ];
 }
