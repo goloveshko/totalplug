@@ -25,6 +25,25 @@
             .filter(({ plugin }) => !q || plugin.name.toLowerCase().includes(q));
     });
 
+    // One group per run of equal types. The scan hands rows over in ini order and
+    // the sections are parsed Packer, Lister, FileSystem, Content, so a type does
+    // not normally reappear after its run ended — but the key carries the first row
+    // anyway, because a run is what a group is and two runs of one type must not
+    // collide onto one key. The name filter only shortens a run or drops it whole.
+    const groups = derived(rows, ($rows) => {
+        const out = [];
+        for (const row of $rows) {
+            const last = out[out.length - 1];
+            if (last && last.type === row.plugin.type) last.rows.push(row);
+            else out.push({ type: row.plugin.type, key: groupKey(row), rows: [row] });
+        }
+        return out;
+    });
+
+    function groupKey(row) {
+        return `${row.plugin.type}:${row.plugin.id}`;
+    }
+
     const offered = derived(plugins, ($plugins) => $plugins.filter(isUpdatable).length);
 
     // One delegated handler, as the table had before: the update button keeps its
@@ -106,32 +125,40 @@
                         </td>
                     </tr>
                 {:else}
-                    {#each $rows as { plugin, index } (plugin.id)}
-                        {@const mark = badge(plugin.status)}
-                        <tr data-idx={index}>
-                            <td class="cell-type">{plugin.type}</td>
-                            <td>
-                                <button
-                                    type="button"
-                                    class="row-open"
-                                    onclick={(event) => openCard(index, event.currentTarget)}
-                                >
-                                    {plugin.name}
-                                </button>
-                            </td>
-                            <td><code>{plugin.installed_version}</code></td>
-                            <td><code>{plugin.latest_version || '—'}</code></td>
-                            <td>
-                                <span class="badge {mark.cls}">{mark.glyph} {mark.label}</span>
-                            </td>
-                            <td>
-                                {#if isUpdatable(plugin)}
-                                    <button type="button" class="btn-update" data-update={index}>
-                                        {$msg('btn.update')}
-                                    </button>
-                                {/if}
-                            </td>
+                    {#each $groups as group (group.key)}
+                        <tr class="group-head">
+                            <th colspan={columns.length} scope="colgroup">
+                                {group.type} ·
+                                <small class="group-count">{$plural('count.plugins', group.rows.length)}</small>
+                            </th>
                         </tr>
+                        {#each group.rows as { plugin, index } (plugin.id)}
+                            {@const mark = badge(plugin.status)}
+                            <tr data-idx={index}>
+                                <td class="cell-type">{plugin.type}</td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        class="row-open"
+                                        onclick={(event) => openCard(index, event.currentTarget)}
+                                    >
+                                        {plugin.name}
+                                    </button>
+                                </td>
+                                <td><code>{plugin.installed_version}</code></td>
+                                <td><code>{plugin.latest_version || '—'}</code></td>
+                                <td>
+                                    <span class="badge {mark.cls}">{mark.glyph} {mark.label}</span>
+                                </td>
+                                <td>
+                                    {#if isUpdatable(plugin)}
+                                        <button type="button" class="btn-update" data-update={index}>
+                                            {$msg('btn.update')}
+                                        </button>
+                                    {/if}
+                                </td>
+                            </tr>
+                        {/each}
                     {/each}
                 {/if}
             </tbody>

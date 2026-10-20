@@ -383,6 +383,22 @@ tr:hover {
     letter-spacing: 0.5px;
 }
 
+/* One line per type group, above the run of rows that share it. The list is already
+   in ini order, so the band and its bottom border are what separates the types — no
+   colour per group. It inherits the column header's tokens, and takes less padding
+   because it labels rows rather than ranking them. */
+tr.group-head th {
+    padding: 5px 14px;
+}
+
+/* The count is a sentence, not a heading: `th` uppercases, and «5 ПЛАГИНОВ» reads as
+   shoutiness the chip next to the title does not have. */
+.group-count {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+}
+
 small.muted {
     color: var(--text-muted);
 }
