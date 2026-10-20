@@ -291,7 +291,7 @@ next release (v2), and the accepted debt we deliberately postponed.
     - Table (`b35e0d2`, `6cec710`): the «Источник» column showed `confidence`, not a source — the column
       is gone (6 columns), detection stays in the plugin card; every cell
       (`name`, `type`, versions, `path`) is escaped; the type cell became a muted
-      label (`.cell-type`) instead of `<strong>`; badges use monochrome glyphs
+      label (`.cell-type`, gone with the stage 17 headings) instead of `<strong>`; badges use monochrome glyphs
       (`✓ ↑ ✗ ?`); placeholder rows share `.table-empty`; sticky `thead` with the
       scroll container moved to `.table-container` (inset shadow instead of a
       collapsed border); startup state is «Сканирую wincmd.ini…», a failed scan
@@ -376,6 +376,26 @@ next release (v2), and the accepted debt we deliberately postponed.
     And `EventsOn` must stay at module scope, registered once before the first
     `buildDom()`: a language switch re-binds every screen, so the same event would
     acquire a second listener each time.
+17. **Type groups in the table** — done (`8c9d0ad`, `b20ba2b`, `207fe01`): one undivided
+    list made the reader compare the type cell row by row, while the scan already hands
+    rows over in `wincmd.ini` order — `internal/config/ini.go` parses Packer, Lister,
+    FileSystem, Content and nothing re-sorts the result — so the types were runs all
+    along, only unlabeled. Each run now carries a heading with its type and count
+    («WFX · 2 плагина»), drawn from the column header's own tokens with less padding, and
+    the type column is deleted with its `col.type` keys: repeated down a run it read as
+    noise once the heading above said the same thing. Two invariants the grouping had to
+    keep. A run is keyed `type:id`, because two runs of one type must not collide onto one
+    heading, and a row still holds its index into the full plugin list rather than into
+    the filtered view, since the card and both update paths resolve a plugin by that index
+    — which is also why a heading itself opens nothing. The mock came first because it
+    could not show a run at all: it invented lowercase types (`ltx`, `dsx`, `tbr`)
+    scattered through the list, and its ids had drifted from the history entry it seeds.
+    Deliberately no tint per group — the band and its border are the separation. Verified
+    in the dev harness in both languages: four headings with CLDR plurals, indices 0..10
+    preserved, the name button and the delegated cell click resolving the same plugin in a
+    later group, a filtered view labelling only the surviving run, sticky `thead` above the
+    headings, contrast 5.21 dark / 4.82 light, and no horizontal scrollbar at the width the
+    six-column table used. A plain `npm run build` reports 103.22 kB JS (gzip 36.42).
 
 ## Before the first public release (v1) — shipped
 
@@ -442,8 +462,10 @@ next release (v2), and the accepted debt we deliberately postponed.
   references; adding one is the reverse pass: pick a catalog entry, download it,
   extract it into its own folder under the plugins root and write the matching ini
   section. This is the "next release" the v1 scope notes point at.
-- **Column sorting** (at least status and name) — needs a
-  sort state in `catalog.js` and stable ordering with the search filter.
+- **Sorting inside a type group** (at least status and name) — the stage 17 headings fix
+  the order of the types, so sorting is now about the rows within one run: a sort state in
+  `catalog.js`, stable ordering with the search filter, and the rule that a row keeps its
+  index into the full plugin list rather than into what is on screen.
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
   user-menu button to the CLI.
@@ -585,9 +607,9 @@ next release (v2), and the accepted debt we deliberately postponed.
   whole window, dialogs included, which is what "done" meant here. `HistoryDialog.svelte` picked up
   the table's rule about the `tr` import name on the way (`d120bbd`), where the compiler had warned
   on every row since slice 5. The migration is over: a new feature starts on components, at 102.71
-  kB JS (gzip 36.26, as `npm run build` reports it now) against the 46.94 kB (gzip 13.82) the app
-  carried before slice 1, one dependency in the compile path and the stage 13 policy still
-  unrelaxed.
+  kB JS (gzip 36.26 — what `npm run build` answered then, stage 17 carries the current
+  figure) against the 46.94 kB (gzip 13.82) the app carried before slice 1, one dependency
+  in the compile path and the stage 13 policy still unrelaxed.
 - **Svelte-on-v2 spike** — `svelte@5.57` with `@sveltejs/vite-plugin-svelte@6.2.4` on the existing
   `vite ^7`. The plugin's newest major asks for vite 8, which swaps the bundler for
   `rolldown 1.0.0-rc`, and that is not a layer to change right before a tag. One island component
