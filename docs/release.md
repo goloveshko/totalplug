@@ -68,7 +68,33 @@ Annotated tags are recommended, `--tags` reads either kind. Use the major for a
 breaking change in the plugin or data format, the minor for new GUI sections and
 the patch for fixes.
 
-## 3. Build the artifacts
+## 3. Tag and push
+
+```powershell
+git push <public-remote> main
+git push <public-remote> vX.Y.Z
+```
+
+The tag starts `.github/workflows/release.yml`. Its Windows job checks out the tag
+with the full history, installs the Wails CLI at the version `go.mod` pins, and runs
+`scripts\build.ps1 package` — the same script, payload and archive name the by-hand
+path below uses. Before uploading it reads both stamps back (the CLI must print
+`totalplug X.Y.Z`, the GUI's `FileVersion` must carry the numeric head) and fails
+otherwise, because a build that fell back to `wails.json` would publish a `1.0.0`
+archive under a new tag. It then opens a **draft** release for the tag with the zip
+and the `.sha256` attached and generated notes.
+
+Two things the workflow depends on: `fetch-depth: 0` (a shallow checkout has no
+tags, so `git describe` fails and the script silently stamps the fallback) and the
+Wails version in the workflow matching `go.mod`.
+
+If the job fails after the draft exists, `gh release create` refuses to run again;
+delete the draft (`gh release delete vX.Y.Z`) and re-run the job. A failure before
+that point leaves no release at all.
+
+### Building by hand instead
+
+The same package without CI, from the same script:
 
 ```powershell
 scripts\package.cmd
@@ -103,9 +129,13 @@ exactly on the tag still packages, and its archive is named after what
 
 ## 4. Publish
 
+Open the draft the job created, replace the generated notes with the bilingual
+body, and publish. Publishing is what moves `releases/latest`; until that click the
+in-app release check keeps offering the previous version.
+
+The by-hand path creates the release itself, and that publishes immediately:
+
 ```powershell
-git push <public-remote> main
-git push <public-remote> vX.Y.Z
 gh release create vX.Y.Z build/artifacts/totalplug-vX.Y.Z-win-x64.zip build/artifacts/totalplug-vX.Y.Z-win-x64.zip.sha256 --title "TotalPlug vX.Y.Z" --generate-notes
 ```
 

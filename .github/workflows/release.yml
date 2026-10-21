@@ -1,0 +1,79 @@
+# File: .github/workflows/release.yml
+name: TotalPlug Release
+
+# Only a tag makes `git describe` answer exactly the version being published, and
+# build.ps1 takes the version from it, so nothing but a tag starts this workflow.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Package and draft the release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v7.0.1
+        with:
+          # Without the whole history there is no tag for `git describe`, and the
+          # script falls back to wails.json without saying so.
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # The same module version go.mod pins; a major bump here would silently stop
+      # matching what a local build runs.
+      - name: Install Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.14.0
+          "$(go env GOPATH)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      # Everything about the artifact — which files go in, the archive name, the
+      # sha256sum file — stays in the script docs/release.md points at, so CI and a
+      # hand build cannot drift apart.
+      - name: Build the release package
+        run: ./scripts/build.ps1 package
+
+      # The failure worth stopping for: a build that stamped the wails.json fallback
+      # would upload a 1.0.0 archive under a new tag, and nothing downstream checks.
+      - name: Check the stamp
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:TAG -replace '^v', ''
+          $printed = (& ./bin/totalplug-cli.exe --version).Trim()
+          if ($printed -ne "totalplug $version") {
+              throw "CLI stamped '$printed', tag says 'totalplug $version'"
+          }
+          $numeric = ($version -split '-')[0]
+          $fileVersion = (Get-Item ./bin/totalplug.exe).VersionInfo.FileVersion
+          if ($fileVersion -notin @($numeric, "$numeric.0")) {
+              throw "GUI FileVersion is '$fileVersion', tag's numeric head is '$numeric'"
+          }
+
+      # A draft, not a published release: the notes are bilingual and pasted by
+      # hand, and publishing is what moves releases/latest. Nothing reaches users
+      # until that click.
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          $assets = Get-ChildItem ./build/artifacts/totalplug-*.zip, ./build/artifacts/*.zip.sha256 |
+              ForEach-Object { $_.FullName }
+          gh release create $env:TAG @assets --draft --title "TotalPlug $env:TAG" --generate-notes
