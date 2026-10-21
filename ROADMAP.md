@@ -146,6 +146,18 @@ next release (v2), and the accepted debt we deliberately postponed.
   been green on every push to GitHub since the first one (`59618d3`), the formatting
   gate included, so the workflow is no longer the untested layer it was while `origin`
   pointed at a local Gitea.
+- Release packaging in CI (`.github/workflows/release.yml`): a `v*` tag starts a Windows
+  job that installs the Wails CLI at the version `go.mod` pins and runs
+  `scripts/build.ps1 package`, so the artifact keeps coming from the one script a hand
+  build uses — payload, archive name and the `.sha256` line included; the actions carry
+  the same pins as `ci.yml`. `fetch-depth: 0` is load-bearing: a shallow checkout has no
+  tags, `git describe` fails, and the script silently stamps the `wails.json` fallback.
+  Before uploading, the job reads both stamps back (CLI `--version`, the GUI's
+  `FileVersion`) and fails otherwise — that is the failure worth a gate, because the
+  fallback would publish a `1.0.0` archive under a new tag. It then opens a **draft**
+  release with the zip and its checksum: the notes are bilingual and pasted by hand, and
+  publishing is what moves `releases/latest`. The first run is the v1.1 tag, so until
+  then this job is the untested layer `ci.yml` used to be.
 - Prettier over the whole tree, not just the frontend: `.prettierrc` keeps 4 spaces and
   single quotes for JS/CSS/HTML/Markdown (how `frontend/src` is written by hand) and
   overrides JSON/YAML back to 2 spaces and double quotes (how npm, Wails and a pasted
