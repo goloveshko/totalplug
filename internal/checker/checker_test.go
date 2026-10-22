@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/goloveshko/totalplug/internal/config"
 	"github.com/goloveshko/totalplug/internal/domain"
@@ -112,6 +113,7 @@ func TestCheckUpdatesCacheOnly(t *testing.T) {
 	ctx := context.Background()
 
 	// Seed a disk cache with one resolvable entry.
+	published := time.Date(2026, 8, 20, 8, 4, 9, 0, time.UTC)
 	snapshot := CatalogSnapshot{Plugins: []CatalogEntry{{
 		ID:   "demo-lister",
 		Name: "Demo",
@@ -122,6 +124,7 @@ func TestCheckUpdatesCacheOnly(t *testing.T) {
 		Resolved: &ResolvedSource{
 			Version:     "2.0",
 			DownloadURL: "https://example.invalid/demo.zip",
+			PublishedAt: published,
 		},
 	}}}
 	if err := SaveCatalogToCache(snapshot, ""); err != nil {
@@ -149,6 +152,9 @@ func TestCheckUpdatesCacheOnly(t *testing.T) {
 	if demo.LatestVersion != "2.0" || demo.Status != domain.StatusUpdateAvail || demo.DownloadURL == "" {
 		t.Errorf("cached catalog entry not applied: %+v", demo)
 	}
+	if !demo.PublishedAt.Equal(published) {
+		t.Errorf("catalog release date lost: got %v, want %v", demo.PublishedAt, published)
+	}
 	// A github source is skipped offline and the plugin matches no catalog
 	// entry, so it cannot be claimed up to date: an unresolved row is uncertain.
 	if ghost.LatestVersion != "N/A (Not in catalog)" || ghost.Status != domain.StatusUncertain {
@@ -173,7 +179,8 @@ func TestCheckUpdatesCacheOnlyWithoutCache(t *testing.T) {
 
 func TestCheckUpdatesCacheOnlyUsesGitHubCache(t *testing.T) {
 	t.Setenv(config.DataDirEnv, t.TempDir())
-	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip")
+	published := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip", published)
 
 	plugins := []domain.Plugin{{ID: "wlx_EdgeView", Name: "EdgeView",
 		Path:             `C:\tc\plugins\edgeview\edgeview.wlx`,
@@ -190,6 +197,9 @@ func TestCheckUpdatesCacheOnlyUsesGitHubCache(t *testing.T) {
 		p.WebURL != "https://github.com/rg-software/wlx-edge-viewer" ||
 		p.Source != "github:rg-software/wlx-edge-viewer" {
 		t.Errorf("remembered github release not applied on cache-only paint: %+v", p)
+	}
+	if !p.PublishedAt.Equal(published) {
+		t.Errorf("github release date lost on cache-only paint: got %v, want %v", p.PublishedAt, published)
 	}
 }
 
@@ -215,7 +225,7 @@ func TestCheckUpdatesKeepsRememberedReleaseWhenLookupFails(t *testing.T) {
 	GitHubAPIBase, CommunityCatalogURL = srv.URL, srv.URL+"/catalog.json"
 	t.Cleanup(func() { GitHubAPIBase, CommunityCatalogURL = oldBase, oldCatalog })
 
-	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip")
+	saveGitHubRelease("rg-software/wlx-edge-viewer", "1.2.6", "https://example.invalid/edgeview.zip", time.Time{})
 
 	plugins := []domain.Plugin{{ID: "wlx_EdgeView", Name: "EdgeView",
 		Path:             `C:\tc\plugins\edgeview\edgeview.wlx`,
@@ -242,14 +252,18 @@ func TestGitHubReleaseCacheRoundtrip(t *testing.T) {
 	if loadGitHubRelease("owner/repo") != nil {
 		t.Fatal("expected empty cache")
 	}
-	saveGitHubRelease("owner/repo", "2.0", "https://example.invalid/r.zip")
-	saveGitHubRelease("owner/other", "3.0", "")
+	saveGitHubRelease("owner/repo", "2.0", "https://example.invalid/r.zip", time.Time{})
+	saveGitHubRelease("owner/other", "3.0", "", time.Time{})
 	// Overwrite keeps one entry per repo.
-	saveGitHubRelease("owner/repo", "2.1", "https://example.invalid/r21.zip")
+	published := time.Date(2026, 10, 1, 9, 30, 0, 0, time.UTC)
+	saveGitHubRelease("owner/repo", "2.1", "https://example.invalid/r21.zip", published)
 
 	repo := loadGitHubRelease("owner/repo")
 	if repo == nil || repo.TagName != "2.1" || repo.DownloadURL != "https://example.invalid/r21.zip" {
 		t.Errorf("roundtrip failed: %+v", repo)
+	}
+	if repo != nil && !repo.PublishedAt.Equal(published) {
+		t.Errorf("release date not persisted: got %v, want %v", repo.PublishedAt, published)
 	}
 	if other := loadGitHubRelease("owner/other"); other == nil || other.TagName != "3.0" {
 		t.Errorf("second repo lost: %+v", other)

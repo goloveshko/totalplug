@@ -7,16 +7,23 @@
     --border: #e2e2ea;
     --text-main: #1c1c22;
     --text-muted: #6e6e7c;
-    --accent: #4c8bf5;
-    --accent-hover: #3b74db;
+    /* One accent for every action; the label on it flips to dark ink in the dark
+       theme, where the accent itself is a light blue. */
+    --accent: #005fb8;
+    --accent-hover: #0f6cbd;
+    --on-accent: #ffffff;
+    --disabled-bg: #e4e4ea;
     --th-bg: #fafafd;
     --row-hover: rgba(0, 0, 0, 0.04);
     --track-bg: #d8d8e2;
+    --scroll-thumb: #c6c6d2;
+    /* The list and the strip over it share one measure, so the table does not
+       stretch to 3440px while its header text stays at the left edge. */
+    --content-max: 1120px;
     /* Badge colors carry text on a 15% tint, so they need an AA contrast
        against the card background, not just a pretty hue. */
     --badge-up: #15803d;
     --badge-avail: #c05621;
-    --badge-avail-strong: #a34314;
     --badge-err: #b3261e;
 }
 
@@ -28,12 +35,16 @@ html[data-theme='dark'] {
     --border: #3d3d4e;
     --text-main: #f0f0f5;
     --text-muted: #9595a8;
+    --accent: #60cdff;
+    --accent-hover: #8adcff;
+    --on-accent: #101014;
+    --disabled-bg: #333340;
     --th-bg: #242430;
     --row-hover: rgba(255, 255, 255, 0.03);
     --track-bg: #3d3d4e;
+    --scroll-thumb: #4a4a5a;
     --badge-up: #2ecc71;
     --badge-avail: #f39c12;
-    --badge-avail-strong: #f7b13f;
     --badge-err: #ff6f61;
 }
 
@@ -41,6 +52,13 @@ html[data-theme='dark'] {
    below would otherwise beat the UA [hidden] rule (see b5b0f2c). */
 [hidden] {
     display: none !important;
+}
+
+/* The default scrollbar is a light slab that belongs to neither theme; thin and
+   themed keeps it from competing with the table's own border. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -190,18 +208,12 @@ html[data-backdrop='mica'] .settings-body {
     stroke-linecap: round;
     stroke-linejoin: round;
 }
-.icon-btn.primary {
-    color: var(--accent);
-}
-.icon-btn.primary:hover {
-    color: var(--accent-hover);
-}
-/* Catalog freshness dot on the refresh icon: amber = cached data awaiting the
+/* Catalog freshness dot on the check icon: amber = cached data awaiting the
    background update, green = catalog fresh, red = last refresh failed. */
-#btn-refresh {
+#btn-check {
     position: relative;
 }
-#btn-refresh::after {
+#btn-check::after {
     content: '';
     position: absolute;
     top: 8px;
@@ -211,15 +223,15 @@ html[data-backdrop='mica'] .settings-body {
     border-radius: 50%;
     display: none;
 }
-#btn-refresh[data-catalog='cache']::after {
+#btn-check[data-catalog='cache']::after {
     display: block;
     background: var(--badge-avail);
 }
-#btn-refresh[data-catalog='fresh']::after {
+#btn-check[data-catalog='fresh']::after {
     display: block;
     background: var(--badge-up);
 }
-#btn-refresh[data-catalog='error']::after {
+#btn-check[data-catalog='error']::after {
     display: block;
     background: var(--badge-err);
 }
@@ -263,7 +275,7 @@ html[data-backdrop='mica'] .settings-body {
 
 button {
     background-color: var(--accent);
-    color: white;
+    color: var(--on-accent);
     border: none;
     border-radius: 6px;
     padding: 8px 14px;
@@ -279,26 +291,49 @@ button:hover {
 }
 
 button:disabled {
-    background-color: var(--border);
+    background-color: var(--disabled-bg);
+    color: var(--text-muted);
     cursor: not-allowed;
 }
 
 /* The batch action lives in its own strip above the table, not in the titlebar:
-   it only exists while the scan actually found offerable updates. */
+   it only exists while the scan actually found offerable updates. The count on
+   the left is also the switch that filters the table down to those rows. */
 .update-all {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 10px;
+    width: 100%;
+    max-width: var(--content-max);
+    /* The flex column has no auto centring for a fixed measure. */
+    margin: 0 auto 10px;
     padding: 8px 14px;
+    box-sizing: border-box;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
 }
 
-.update-all-count {
+/* Quiet until pressed: the sentence is a control, but it must not outshout the
+   table it counts. */
+.update-filter {
+    background: transparent;
+    margin-left: -8px;
+    padding: 4px 8px;
     color: var(--text-muted);
+    font-weight: 500;
+}
+.update-filter:hover {
+    background: var(--row-hover);
+    color: var(--text-main);
+}
+.update-filter[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+}
+
+.update-all-count {
     font-size: 0.85rem;
 }
 
@@ -307,6 +342,10 @@ button:disabled {
 .table-container {
     flex: 1;
     min-height: 0;
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    box-sizing: border-box;
     overflow: auto;
     background: var(--card-bg);
     border-radius: 8px;
@@ -418,6 +457,25 @@ td code,
     font-variant-numeric: tabular-nums;
 }
 
+/* Versions read as data: tabular digits keep the two columns aligned, and the
+   UI font is easier on the eye than the browser's monospace fallback. */
+.num {
+    font-variant-numeric: tabular-nums;
+    user-select: text;
+}
+/* The catalog version is the one number worth colouring, and only when it is a
+   real offer rather than the version already installed. */
+.num.new {
+    color: var(--accent);
+    font-weight: 600;
+}
+.release-date {
+    margin-left: 8px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
 .badge {
     padding: 3px 8px;
     border-radius: 4px;
@@ -444,15 +502,66 @@ td code,
     color: var(--text-muted);
 }
 
+/* The row action is tonal rather than a filled button: an update is worth
+   offering, not worth shouting on every line. */
 .btn-update {
-    background: var(--badge-avail);
-    padding: 4px 8px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    padding: 4px 10px;
     font-size: 0.8rem;
 }
 .btn-update:hover {
-    /* A themed token: a fixed dark hex made the button *darker* on hover in the
-       dark theme, inverting the expectation. */
-    background: var(--badge-avail-strong);
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* The status column is anchored right and its width is reserved, because the
+   two together are what keeps the table still during an update. The progress
+   block is wider than the button it replaces, and an auto-laid column grows to
+   fit whatever its widest cell asks for: at a 1280px window an update pushed this
+   column from 195px to 269px and took the difference off the other three, so
+   every row's version numbers and actions slid sideways for the length of the
+   download. The reservation stops the column from moving; the anchor holds the
+   buttons at the right edge whatever the column ends up worth. */
+#view-main thead th:last-child {
+    width: 170px;
+    text-align: right;
+}
+.row-status {
+    text-align: right;
+}
+
+/* Progress replaces the row's own button in the same cell, drawn at whatever
+   width the column already has rather than sizing it. */
+.row-update {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 132px;
+}
+.row-update-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.row-progress-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track-bg);
+    overflow: hidden;
+}
+.row-progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.25s ease;
+}
+.row-progress-track.indeterminate .row-progress-fill {
+    width: 35%;
+    transition: none;
+    animation: progress-slide 1.1s ease-in-out infinite;
 }
 
 .btn-update:focus-visible,
@@ -558,12 +667,6 @@ td code,
 .dlg-message a.dlg-link {
     color: var(--accent);
 }
-/* The updater's result is drawn from data, so its line breaks come from the
-   elements rather than from newlines in a string. Only the disclosure body keeps
-   the raw error's own line breaks, through the rule below. */
-.dlg-message.progress-result {
-    white-space: normal;
-}
 /* The one control this app left to the browser's guess: a keyboard reaching a
    link drew the UA's black rectangle, next to the accent ring every other target
    here paints. Inline, so the ring hugs the text rather than the row. */
@@ -583,8 +686,7 @@ a.dlg-link:focus-visible {
 .dlg-tech .dlg-tech-body {
     margin-top: 6px;
     user-select: text;
-}
-.progress-result .dlg-tech-body {
+    /* Raw Go errors keep their own line breaks. */
     white-space: pre-wrap;
 }
 #history-dialog table {
@@ -672,33 +774,8 @@ a.dlg-link:focus-visible {
     margin-top: 10px;
 }
 
-/* Update progress dialog */
-#update-progress {
-    width: 420px;
-    max-width: 90vw;
-    padding-top: 34px;
-}
-.progress-track {
-    height: 6px;
-    border-radius: 3px;
-    /* --row-hover is 3-4% alpha: the unfilled part was invisible and the
-       percentage looked like it floated. */
-    background: var(--track-bg);
-    overflow: hidden;
-    margin: 12px 0 8px;
-}
-.progress-fill {
-    height: 100%;
-    width: 0;
-    border-radius: 3px;
-    background: var(--accent);
-    transition: width 0.25s ease;
-}
-.progress-track.indeterminate .progress-fill {
-    width: 35%;
-    transition: none;
-    animation: progress-slide 1.1s ease-in-out infinite;
-}
+/* The indeterminate phase slides a short bar across the row's track; the
+   keyframes are shared by every row, which is why they live outside it. */
 @keyframes progress-slide {
     0% {
         transform: translateX(-100%);
@@ -706,18 +783,6 @@ a.dlg-link:focus-visible {
     100% {
         transform: translateX(286%);
     }
-}
-.progress-phase {
-    font-size: 0.85rem;
-}
-.progress-url {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    user-select: text;
 }
 
 /* Queue summary: the head line carries the honest count, the rows say which
@@ -790,6 +855,8 @@ dialog h2 {
 #plugin-card {
     width: 480px;
     max-width: 92vw;
+    /* Room for the corner close button, same as the app dialog. */
+    padding-top: 34px;
 }
 .card-sub {
     color: var(--text-muted);
@@ -808,9 +875,7 @@ dialog h2 {
 }
 .card-info .k {
     color: var(--text-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 0.8rem;
     white-space: nowrap;
 }
 .card-info .v {
@@ -846,8 +911,6 @@ dialog h2 {
 .card-tech summary {
     cursor: pointer;
     user-select: none;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 .card-tech-body {
     display: grid;
@@ -856,11 +919,23 @@ dialog h2 {
     align-items: baseline;
     margin-top: 6px;
 }
+/* The hint explains an unreadable installed version and is the reason the
+   editor opens by itself; it reads as a sentence, not as a warning. */
+.card-hint {
+    margin: 0 0 14px;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+.card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
 .card-edit-title {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
+    font-size: 0.8rem;
+    font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 10px;
 }
@@ -921,13 +996,19 @@ dialog input:focus {
     display: flex;
     flex-direction: column;
 }
-/* Full-width page; only the «Settings» title is centered. */
+/* Full-width page; only the «Settings» title is centered. The header and the
+   body share the list's measure, so the settings view starts where the table
+   does on a wide window instead of hugging the left edge. */
 .settings-top {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
     padding-bottom: 14px;
     border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
 }
 .settings-top h2 {
     margin: 0;
@@ -956,6 +1037,10 @@ dialog input:focus {
     display: flex;
     flex: 1;
     min-height: 0;
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    box-sizing: border-box;
 }
 .settings-nav {
     width: 200px;
@@ -979,8 +1064,12 @@ dialog input:focus {
     background: var(--row-hover);
 }
 .settings-nav button.active {
-    background: var(--accent);
-    color: white;
+    /* A tint and an accent rail, not a filled blue block: the nav is a place,
+       not an action. */
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+    font-weight: 600;
 }
 .settings-panel {
     flex: 1;
@@ -1002,10 +1091,8 @@ dialog input:focus {
     color: var(--text-muted);
 }
 .section-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
+    font-size: 0.8rem;
+    font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 8px;
 }
@@ -1096,6 +1183,7 @@ dialog input:focus {
     flex: 1;
     width: auto;
     margin-top: 0;
+    accent-color: var(--accent);
 }
 .font-row .font-value {
     min-width: 44px;
@@ -1227,8 +1315,6 @@ dialog input:focus {
 .about-details summary {
     cursor: pointer;
     user-select: none;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 .about-tech {
     display: grid;

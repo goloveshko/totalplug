@@ -57,3 +57,7 @@ export function SetTcConfig(arg1) {
 export function UpdatePlugin(arg1) {
   return window['go']['gui']['App']['UpdatePlugin'](arg1);
 }
+
+export function UpdatePluginInsecure(arg1) {
+  return window['go']['gui']['App']['UpdatePluginInsecure'](arg1);
+}

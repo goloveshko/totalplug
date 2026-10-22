@@ -13,10 +13,19 @@ import { escapeHtml, firstHttpUrl, linkify } from './text.js';
 // in or out of the top layer: a <dialog> has to be asked with showModal().
 export const dialogState = writable({ open: false, html: '', isConfirm: false });
 
-// The pending answer, and the element that opened the dialog so focus can go
-// back to it on close — keyboard users must not land at the top of the document.
-let resolve = null;
+// Overlapping requests must preserve each answer and the original opener.
+let active = null;
+const queue = [];
 let opener = null;
+
+function showNextDialog() {
+    active = queue.shift() ?? null;
+    if (active) {
+        dialogState.set({ open: true, html: active.html, isConfirm: active.isConfirm });
+    } else {
+        dialogState.update((state) => (state.open ? { ...state, open: false } : state));
+    }
+}
 
 // Raw Go errors are technical English; show the localized friendly sentence
 // with a named link and hide the exact error behind a disclosure. The link
@@ -38,9 +47,11 @@ export function errorDialogHtml(err, friendlyMessage, linkLabel) {
 
 export function openAppDialog(html, isConfirm) {
     return new Promise((done) => {
-        resolve = done;
-        opener = document.activeElement;
-        dialogState.set({ open: true, html, isConfirm: Boolean(isConfirm) });
+        queue.push({ html, isConfirm: Boolean(isConfirm), done });
+        if (!active) {
+            opener ??= document.activeElement;
+            showNextDialog();
+        }
     });
 }
 
@@ -48,22 +59,23 @@ const textToDialogHtml = (message) => linkify(escapeHtml(message));
 
 export const showConfirm = (message) => openAppDialog(textToDialogHtml(message), true);
 
-// Every way out of the dialog ends here with the answer it means. The pending
-// promise is settled first, so a second call — the close event that follows the
-// store change — finds nothing to answer and cannot turn a yes into a no.
+// A one-button message for an outcome the user only has to read: a locked file
+// or a batch that partly failed. Errors that carry a raw Go reason still go
+// through errorDialogHtml, which hides it behind the disclosure.
+export const showMessage = (message) => openAppDialog(textToDialogHtml(message), false);
+
+// Advance before resolving so a resumed caller cannot replace a queued request.
 export function answerDialog(result) {
-    if (resolve) {
-        resolve(result);
-        resolve = null;
-    }
-    dialogState.update((state) => (state.open ? { ...state, open: false } : state));
+    if (!active) return;
+    const answered = active;
+    showNextDialog();
+    answered.done(result);
 }
 
-// Runs on the dialog's own close event, after it has really left the top layer:
-// while it was open the rest of the document was inert and could not take focus.
+// A delayed close event must not steal focus from an active request.
 export function restoreOpener() {
-    if (opener) {
-        opener.focus?.();
-        opener = null;
-    }
+    if (active) return;
+    const target = opener;
+    opener = null;
+    target?.focus?.();
 }

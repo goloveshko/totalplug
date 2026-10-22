@@ -3,12 +3,13 @@
     // Aliased, not `tr`/`trp` like the other island: a component that renders
     // table rows cannot import a binding named `tr`, because Svelte then has to
     // guess whether `<tr>` is the element or a component.
-    import { tr as msg, trp as plural } from './i18n.js';
-    import { scanFailure, scanRunning, searchQuery } from './catalog.js';
+    import { lang, tr as msg, trp as plural } from './i18n.js';
+    import { scanFailure, scanRunning, searchQuery, updatesOnly } from './catalog.js';
     import { badgeFor, isUpdatable } from './plugin.js';
     import { plugins, progressRunning, settingsOpen } from './state.js';
-    import { handleUpdate, handleUpdateAll } from './update.js';
+    import { activeUpdate, handleUpdate, handleUpdateAll } from './update.js';
     import { openCard } from './card.js';
+    import { releaseDate } from './text.js';
 
     // The plugin table as one component: rows, the batch bar over them and the
     // placeholder that stands in when there are none. Every value it shows comes
@@ -18,18 +19,20 @@
     // A row keeps its index into the plugin list, not into the filtered view: the
     // card and both update paths look a plugin up by that index, and a background
     // refresh is free to swap the list underneath them.
-    const rows = derived([plugins, searchQuery], ([$plugins, $query]) => {
+    const rows = derived([plugins, searchQuery, updatesOnly], ([$plugins, $query, $updatesOnly]) => {
         const q = $query.trim().toLowerCase();
         return $plugins
             .map((plugin, index) => ({ plugin, index }))
-            .filter(({ plugin }) => !q || plugin.name.toLowerCase().includes(q));
+            .filter(
+                ({ plugin }) => (!q || plugin.name.toLowerCase().includes(q)) && (!$updatesOnly || isUpdatable(plugin)),
+            );
     });
 
     // One group per run of equal types. The scan hands rows over in ini order and
     // the sections are parsed Packer, Lister, FileSystem, Content, so a type does
     // not normally reappear after its run ended — but the key carries the first row
     // anyway, because a run is what a group is and two runs of one type must not
-    // collide onto one key. The name filter only shortens a run or drops it whole.
+    // collide onto one key. The filters only shorten a run or drop it whole.
     const groups = derived(rows, ($rows) => {
         const out = [];
         for (const row of $rows) {
@@ -46,6 +49,14 @@
 
     const offered = derived(plugins, ($plugins) => $plugins.filter(isUpdatable).length);
 
+    // The strip that owns the filter disappears when nothing is offerable, so the
+    // flag must not outlive it: otherwise the next scan that finds an update would
+    // come back with the table already filtered and the control to undo it hidden
+    // behind nothing.
+    $effect(() => {
+        if ($updatesOnly && $offered === 0) updatesOnly.set(false);
+    });
+
     // One delegated handler, as the table had before: the update button keeps its
     // own action, a click anywhere else in the row opens the plugin card. The name
     // cell is a button, so its own handler gets there first and the guard below
@@ -53,7 +64,7 @@
     function onTableClick(event) {
         const updateBtn = event.target.closest('button.btn-update');
         if (updateBtn) {
-            handleUpdate(Number(updateBtn.dataset.update));
+            handleUpdate(updateBtn.dataset.update);
             return;
         }
         if (event.target.closest('button')) return;
@@ -74,7 +85,11 @@
                 ? $msg('table.scanning')
                 : $plugins.length === 0
                   ? $msg('table.none')
-                  : $msg('table.noresults'),
+                  : $searchQuery.trim()
+                    ? $msg('table.noresults')
+                    : $updatesOnly
+                      ? $msg('table.noupdates')
+                      : $msg('table.noresults'),
     );
 
     function badge(status) {
@@ -82,16 +97,39 @@
         return { cls, glyph, label: $msg(key) };
     }
 
+    // Progress is drawn in the row that is being worked on: the phase name comes
+    // from the language store, and only a download has a percentage to show.
+    function rowProgress(state) {
+        const percent =
+            state.phase === 'download' && state.percent >= 0 ? Math.min(100, Math.round(state.percent)) : -1;
+        return {
+            phase: $msg('update.progress.' + (state.phase || 'download')),
+            pct: percent >= 0 ? `${percent}%` : '',
+            percent,
+            indeterminate: percent < 0,
+        };
+    }
+
     // The header and the placeholder's colspan come from the same list, so a
     // column added here cannot quietly make a placeholder row misaligned. The type
     // is not in it: every run of rows already carries a heading naming its type.
-    const columns = ['plugin', 'installed', 'latest', 'status', 'actions'];
+    // Status and action share the last column: an updatable row holds its button,
+    // an exception holds its badge, and an up-to-date row holds nothing.
+    const columns = ['plugin', 'installed', 'latest', 'status'];
 </script>
 
 <div id="view-main" hidden={$settingsOpen}>
     {#if $offered > 0}
         <div class="update-all">
-            <span class="update-all-count">{$plural('update_all.count', $offered)}</span>
+            <button
+                type="button"
+                class="update-filter"
+                aria-pressed={$updatesOnly}
+                title={$msg('update_all.filter')}
+                onclick={() => updatesOnly.update((on) => !on)}
+            >
+                <span class="update-all-count">{$plural('update_all.count', $offered)}</span>
+            </button>
             <button type="button" class="btn-save" disabled={$progressRunning} onclick={handleUpdateAll}>
                 {$msg('update_all.btn')}
             </button>
@@ -135,6 +173,10 @@
                         </tr>
                         {#each group.rows as { plugin, index } (plugin.id)}
                             {@const mark = badge(plugin.status)}
+                            {@const updatable = isUpdatable(plugin)}
+                            {@const released =
+                                updatable && plugin.published_at ? releaseDate(plugin.published_at, $lang) : null}
+                            {@const progress = $activeUpdate.id === plugin.id ? rowProgress($activeUpdate) : null}
                             <tr data-idx={index}>
                                 <td>
                                     <button
@@ -145,16 +187,45 @@
                                         {plugin.name}
                                     </button>
                                 </td>
-                                <td><code>{plugin.installed_version}</code></td>
-                                <td><code>{plugin.latest_version || '—'}</code></td>
+                                <td><span class="num">{plugin.installed_version}</span></td>
                                 <td>
-                                    <span class="badge {mark.cls}">{mark.glyph} {mark.label}</span>
+                                    {#if plugin.latest_version}
+                                        <span class="num" class:new={updatable}>{plugin.latest_version}</span>
+                                        {#if released}
+                                            <span class="release-date" title={released.title}>{released.text}</span>
+                                        {/if}
+                                    {:else}
+                                        —
+                                    {/if}
                                 </td>
-                                <td>
-                                    {#if isUpdatable(plugin)}
-                                        <button type="button" class="btn-update" data-update={index}>
+                                <td class="row-status">
+                                    {#if progress}
+                                        <span class="row-update" role="status">
+                                            <span class="row-update-line">
+                                                <span>{progress.phase}</span>
+                                                <span>{progress.pct}</span>
+                                            </span>
+                                            <span
+                                                class="row-progress-track"
+                                                class:indeterminate={progress.indeterminate}
+                                            >
+                                                <span
+                                                    class="row-progress-fill"
+                                                    style:width={progress.indeterminate ? null : `${progress.percent}%`}
+                                                ></span>
+                                            </span>
+                                        </span>
+                                    {:else if updatable}
+                                        <button
+                                            type="button"
+                                            class="btn-update"
+                                            data-update={plugin.id}
+                                            disabled={$progressRunning}
+                                        >
                                             {$msg('btn.update')}
                                         </button>
+                                    {:else if plugin.status !== 'up_to_date'}
+                                        <span class="badge {mark.cls}">{mark.glyph} {mark.label}</span>
                                     {/if}
                                 </td>
                             </tr>

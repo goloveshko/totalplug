@@ -47,6 +47,33 @@ export const formatStamp = (fmt, value) => {
     return Number.isFinite(date.getTime()) ? fmt.format(date) : String(value || '—');
 };
 
+// A release date is useful as "3 days ago" at a glance and as the exact date on
+// hover. Days are the granularity that matters for a version: anything older
+// than a month reads better in months, and past a year in years. `Intl` also
+// localizes the plural form («2 дня назад»), which a hand-built string would not.
+export function releaseDate(value, lang) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return null;
+
+    const days = Math.round((date.getTime() - Date.now()) / 86400000);
+    const months = days / 30;
+    let amount = days;
+    let unit = 'day';
+    if (Math.abs(months) >= 12) {
+        amount = Math.round(days / 365);
+        unit = 'year';
+    } else if (Math.abs(months) >= 1) {
+        amount = Math.round(months);
+        unit = 'month';
+    }
+
+    const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
+    return {
+        text: new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(amount, unit),
+        title: new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date),
+    };
+}
+
 // A dialog link must not navigate the webview. A click hands the address to the
 // system browser, and a middle click has to be caught too: it fires `auxclick`,
 // which the browser otherwise acts on by itself, replacing the GUI with a

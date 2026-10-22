@@ -2,7 +2,7 @@ import { SaveOverride } from '../wailsjs/go/gui/App';
 import { get, writable } from 'svelte/store';
 import { t } from './i18n.js';
 import { plugins } from './state.js';
-import { normalizeSource, displaySource } from './plugin.js';
+import { normalizeSource, displaySource, isUnknownInstalled } from './plugin.js';
 import { openAppDialog, errorDialogHtml } from './dialog.js';
 import { runScan } from './catalog.js';
 
@@ -16,6 +16,12 @@ import { runScan } from './catalog.js';
 // switch — which re-renders it — cannot lose what the user typed.
 export const cardState = writable({ open: false, plugin: null, version: '', source: '', saving: false });
 
+// Whether the override editor is unfolded. Separate from cardState on purpose:
+// typing a draft writes cardState, and an editing flag living there would make
+// the component's focus effect re-run on every keystroke and drag the caret back
+// into the version field.
+export const cardEditing = writable(false);
+
 // The control that opened the card. A row is not focusable, so the table hands
 // over the name button inside it; closing puts the keyboard back on it.
 let cardOpener = null;
@@ -27,6 +33,9 @@ export function openCard(index, opener) {
     // Remembered before the dialog opens: while a modal is up the rest of the
     // document is inert, so focus can only be restored once it is gone.
     cardOpener = opener || null;
+    // An unreadable installed version is the one case where the version field is
+    // where the user has to start, so the editor opens by itself.
+    cardEditing.set(isUnknownInstalled(plugin));
     cardState.set({
         open: true,
         plugin,
@@ -39,10 +48,14 @@ export function openCard(index, opener) {
 export const requestCardClose = () => cardState.update((state) => ({ ...state, open: false }));
 
 export function restoreCardOpener() {
+    // Resetting the editor before the open flag can reopen a natively closed card.
+    requestCardClose();
+    cardEditing.set(false);
     // A background refresh can repaint the table while the card is open, so the
     // opener may be detached by now; focusing such an element does nothing.
-    cardOpener?.focus();
+    const opener = cardOpener;
     cardOpener = null;
+    opener?.focus();
 }
 
 // What to prefill the version field with. A row whose installed version was only

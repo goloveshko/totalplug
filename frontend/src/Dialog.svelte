@@ -11,27 +11,34 @@
     let el = $state(null);
     let ok = $state(null);
     let cancel = $state(null);
+    let pendingCloses = 0;
 
-    // Dismissed any other way than by a button — Esc, or the top layer closing on
-    // its own — means the question was not answered, which is a no. The answer is
-    // settled before the focus moves, and a dialog a button already answered finds
-    // nothing left to settle here.
+    // Prevent native closure so Escape advances the queue inside the same modal.
+    function onCancel(event) {
+        event.preventDefault();
+        answerDialog(false);
+    }
+
     function onClose() {
+        // A queued close event must not answer a newly opened request.
+        if (pendingCloses > 0) {
+            pendingCloses--;
+            if (!el?.open) restoreOpener();
+            return;
+        }
+        if (el?.open) return;
         answerDialog(false);
         restoreOpener();
     }
 
-    // A dialog only enters the top layer when it is asked, so the store's `open`
-    // drives showModal() and close(). Enter must never confirm an update by
-    // accident, which is why the safe button takes the focus once the dialog is up.
+    // Each queued request resets focus to the safe answer without closing the modal.
     $effect(() => {
         if (!el) return;
         if ($dialogState.open) {
-            if (!el.open) {
-                el.showModal();
-                ($dialogState.isConfirm ? cancel : ok).focus();
-            }
+            if (!el.open) el.showModal();
+            ($dialogState.isConfirm ? cancel : ok)?.focus();
         } else if (el.open) {
+            pendingCloses++;
             el.close();
         }
     });
@@ -41,6 +48,7 @@
     id="app-dialog"
     bind:this={el}
     aria-label={$tr($dialogState.isConfirm ? 'dialog.title.confirm' : 'dialog.title.message')}
+    oncancel={onCancel}
     onclose={onClose}
 >
     <button

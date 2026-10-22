@@ -92,6 +92,7 @@ export namespace domain {
 	    arch?: string;
 	    description?: string;
 	    status: string;
+	    published_at?: string;
 	    last_checked?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -116,6 +117,7 @@ export namespace domain {
 	        this.arch = source["arch"];
 	        this.description = source["description"];
 	        this.status = source["status"];
+	        this.published_at = source["published_at"];
 	        this.last_checked = source["last_checked"];
 	    }
 	}
@@ -167,6 +169,7 @@ export namespace domain {
 	}
 	export class UpdateResult {
 	    locked: boolean;
+	    insecure: boolean;
 	    backup_path?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -176,6 +179,7 @@ export namespace domain {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.locked = source["locked"];
+	        this.insecure = source["insecure"];
 	        this.backup_path = source["backup_path"];
 	    }
 	}

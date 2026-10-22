@@ -10,8 +10,8 @@ import { writable } from 'svelte/store';
 // modal dialog is open.
 export const plugins = writable([]);
 
-// True while an updater call is in flight. It disables the batch button, makes a
-// second update click a no-op, and keeps the progress dialog from being dismissed.
+// True while an updater call is in flight. It disables every update button, so
+// a second click cannot start a parallel call.
 export const progressRunning = writable(false);
 
 // Which full-window view is on screen. The titlebar and the plugin table hide

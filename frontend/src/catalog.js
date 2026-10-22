@@ -3,6 +3,7 @@ import { EventsOn } from '../wailsjs/runtime';
 import { derived, writable } from 'svelte/store';
 import { t } from './i18n.js';
 import { plugins } from './state.js';
+import { isUpdatable } from './plugin.js';
 import { openAppDialog, errorDialogHtml } from './dialog.js';
 
 // The plugin view's state and its one backend call. The markup is
@@ -14,22 +15,29 @@ import { openAppDialog, errorDialogHtml } from './dialog.js';
 // used to be rewritten on every language switch.
 export const searchQuery = writable('');
 
-// Catalog freshness shown as a colored dot on the refresh icon: cache (amber),
+// The count in the strip over the table is also a filter: while it is on, the
+// table shows only what that number counted. The strip disappears when nothing
+// is offerable, and PluginTable clears this flag with it — otherwise the filter
+// would silently come back on the next scan that finds an update.
+export const updatesOnly = writable(false);
+
+// Catalog freshness shown as a colored dot on the check icon: cache (amber),
 // fresh (green), error (red). `{ state: '' }` means no dot at all.
 export const catalogStatus = writable({ state: '', detail: '' });
 
-// Plugin-count chip next to the app title: visible rows, or shown/total while the
-// search filter hides some. Derived, so the chip and the table cannot disagree
+// Plugin-count chip next to the app title: visible rows, or shown/total while
+// either filter hides some. Derived, so the chip and the table cannot disagree
 // about what a row is.
-export const pluginCount = derived([plugins, searchQuery], ([$plugins, $query]) => {
+export const pluginCount = derived([plugins, searchQuery, updatesOnly], ([$plugins, $query, $updatesOnly]) => {
     const q = $query.trim().toLowerCase();
+    const matches = (p) => (!q || p.name.toLowerCase().includes(q)) && (!$updatesOnly || isUpdatable(p));
     return {
-        shown: q ? $plugins.filter((p) => p.name.toLowerCase().includes(q)).length : $plugins.length,
+        shown: $plugins.filter(matches).length,
         total: $plugins.length,
     };
 });
 
-// True while a scan is in flight; the island disables both toolbar buttons.
+// True while a scan is in flight; the island disables the check button.
 export const scanRunning = writable(false);
 
 // The raw reason the last scan failed, empty when there is none. It outranks the

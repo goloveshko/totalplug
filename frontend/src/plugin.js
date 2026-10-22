@@ -8,6 +8,13 @@
 // in the CLI.
 export const isUpdatable = (p) => p.status === 'update_avail' && !!p.download_url;
 
+// A record whose installed version was never read: the scanner writes
+// "Unknown"/"N/A" or a low-confidence guess, and the checker refuses to offer an
+// automatic update for it. The card uses this to explain why there is no update
+// button and to open the version field right away.
+export const isUnknownInstalled = (p) =>
+    !!p && (p.confidence === 'Unknown' || !p.installed_version || /^(unknown|n\/a)/i.test(p.installed_version));
+
 // One source for how a status looks, so the table and the card cannot grow a
 // second set of glyphs. Each screen labels the key through the language store.
 export function badgeFor(status) {

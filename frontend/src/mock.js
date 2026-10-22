@@ -111,6 +111,23 @@ function installMockBackend() {
         async UpdatePlugin(plugin) {
             const p = plugins.find((x) => x.id === plugin.id);
             if (!p) throw new Error('mock: unknown plugin ' + plugin.id);
+            // A source that ends on a plaintext server is refused before a byte is
+            // fetched, and the bridge reports it as a result rather than an error:
+            // the frontend's next move is to ask the user, not to show a failure.
+            if (/^http:\/\//i.test(p.download_url || '')) {
+                return { locked: false, insecure: true, backup_path: '' };
+            }
+            return app.downloadAndInstall(p);
+        },
+
+        // The second attempt the consent flow makes once the user allows HTTP.
+        UpdatePluginInsecure(plugin) {
+            const p = plugins.find((x) => x.id === plugin.id);
+            if (!p) return Promise.reject(new Error('mock: unknown plugin ' + plugin.id));
+            return app.downloadAndInstall(p);
+        },
+
+        async downloadAndInstall(p) {
             const url = p.download_url || 'https://example.invalid/' + p.name + '.zip';
             for (let pct = 0; pct <= 100; pct += 20) {
                 await sleep(150);
@@ -129,7 +146,7 @@ function installMockBackend() {
             if (p.id === 'wfx_DeviceLocker') return { locked: true, backup_path: '' };
             p.installed_version = p.latest_version;
             reclassify(p);
-            return { locked: false, backup_path: 'C:\\TC\\plugins\\' + p.id + '.bak_' + Date.now() };
+            return { locked: false, insecure: false, backup_path: 'C:\\TC\\plugins\\' + p.id + '.bak_' + Date.now() };
         },
 
         GetUpdateHistory() {
@@ -317,6 +334,7 @@ function makePlugins() {
             status: 'update_avail',
             source: 'totalcmd',
             download_url: 'https://example.invalid/broken-mirror-3.2.zip',
+            published_at: iso(-3, 8),
             description: 'Stub: every UpdatePlugin call on it throws, to demo a failed queue item.',
         }),
         base({
@@ -325,6 +343,7 @@ function makePlugins() {
             installed_version: '3.1.6',
             latest_version: '3.1.6',
             source: 'github:Alexey-T/CudaLister',
+            published_at: iso(-200, 14),
             web_url: 'https://github.com/Alexey-T/CudaLister',
             description: 'Lister plugin showing CUDA source files with syntax highlighting.',
         }),
@@ -336,6 +355,7 @@ function makePlugins() {
             status: 'update_avail',
             source: 'github:rg-software/wlx-edge-viewer',
             download_url: 'https://example.invalid/edgeview-1.2.6.zip',
+            published_at: iso(-21, 12),
             web_url: 'https://github.com/rg-software/wlx-edge-viewer',
             description: 'Lister plugin: opens files in a Chromium/Edge-based viewer.',
         }),
@@ -356,6 +376,7 @@ function makePlugins() {
             status: 'update_avail',
             source: 'totalcmd',
             download_url: 'https://example.invalid/previewplus-1.1.zip',
+            published_at: iso(-40, 15),
             description: 'Stub whose update is offered, to demo a batch row that succeeds.',
         }),
         base({
@@ -367,6 +388,7 @@ function makePlugins() {
             status: 'update_avail',
             source: 'totalcmd',
             download_url: 'https://example.invalid/devicelocker-1.0.0.zip',
+            published_at: iso(-64, 9),
             description: 'Stub: every UpdatePlugin call on it returns Locked, to demo the lock dialog.',
         }),
         base({
@@ -388,9 +410,11 @@ function makePlugins() {
             source: 'totalcmd',
             download_url: 'https://example.invalid/7zip-24.09.zip',
             download_urls: ['https://example.invalid/7zip-24.09.zip', 'https://mirror.example.invalid/7zip-24.09.zip'],
+            published_at: iso(-95, 18),
             web_url: 'https://sevenzip.osdn.jp/',
             description: 'Content plugin: lists archives, computes hashes, reads embedded comments.',
         }),
+        // The plain-HTTP case: the strict call refuses it and the consent flow asks.
         base({
             id: 'wdx_UninstallLister',
             name: 'Uninstall List',
@@ -399,7 +423,8 @@ function makePlugins() {
             latest_version: '1.5.2',
             status: 'update_avail',
             source: 'wincmd_ru',
-            download_url: 'https://example.invalid/uninstall-1.5.2.zip',
+            download_url: 'http://example.invalid/uninstall-1.5.2.zip',
+            published_at: iso(-400, 11),
             web_url: 'https://totalcmd.net/plugring/uninstall_list.html',
             description: 'Content plugin: список установленных программ с быстрым удалением.',
         }),
@@ -418,9 +443,10 @@ function makePlugins() {
             id: 'wdx_ToolbarPlus',
             name: 'ToolbarPlus Extended Collection',
             type: 'WDX',
-            installed_version: '2.0',
+            installed_version: 'Unknown',
             latest_version: '2.0',
-            confidence: 'Readme/INF',
+            confidence: 'Unknown',
+            status: 'uncertain',
             description: '',
         }),
     ];

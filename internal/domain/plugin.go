@@ -61,6 +61,10 @@ type Plugin struct {
 	Arch        string       `json:"arch,omitempty"`
 	Description string       `json:"description,omitempty"`
 	Status      PluginStatus `json:"status"`
+	// PublishedAt is when the version in LatestVersion was released, as the
+	// catalog or GitHub reports it. It is zero for plugins nothing resolved, and
+	// the GUI then shows no date rather than inventing one.
+	PublishedAt time.Time `json:"published_at,omitempty" ts_type:"string"`
 	// ts_type is read by Wails' model generator, not by encoding/json: a struct
 	// field whose type it cannot resolve is emitted as `any` and reported on the
 	// console ("Not found: time.Time") on every build. A timestamp crosses the
@@ -85,6 +89,8 @@ type UpdateResult struct {
 	// Locked is true when the update was aborted because plugin files are
 	// held by a running Total Commander; changes were rolled back.
 	Locked bool `json:"locked"`
+	// Insecure means no usable package was secured and an HTTP candidate needs consent.
+	Insecure bool `json:"insecure"`
 	// BackupPath is the timestamped backup directory kept after success.
 	BackupPath string `json:"backup_path,omitempty"`
 }

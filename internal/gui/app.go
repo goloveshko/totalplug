@@ -223,9 +223,20 @@ func (a *App) BackupLocation() string {
 }
 
 // UpdatePlugin installs the latest version for the specified plugin. A locked
-// target (Total Commander still running) is reported through the structured
-// result instead of an error so the frontend can show recovery guidance.
+// target (Total Commander still running) and a refused plain-HTTP source are
+// reported through the structured result instead of an error, so the frontend
+// can show recovery guidance and ask the one question it needs answered.
 func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
+	return a.updatePlugin(plugin, false)
+}
+
+// UpdatePluginInsecure is UpdatePlugin for a plugin whose download the user
+// agreed to take over plain HTTP. The frontend asks first.
+func (a *App) UpdatePluginInsecure(plugin domain.Plugin) (domain.UpdateResult, error) {
+	return a.updatePlugin(plugin, true)
+}
+
+func (a *App) updatePlugin(plugin domain.Plugin, allowInsecure bool) (domain.UpdateResult, error) {
 	a.updateMu.Lock()
 	defer a.updateMu.Unlock()
 
@@ -234,10 +245,21 @@ func (a *App) UpdatePlugin(plugin domain.Plugin) (domain.UpdateResult, error) {
 	})
 	defer a.updater.SetProgressListener(nil)
 
-	outcome, err := a.updater.UpdatePlugin(a.ctx, plugin)
+	var (
+		outcome updater.Outcome
+		err     error
+	)
+	if allowInsecure {
+		outcome, err = a.updater.UpdatePluginInsecure(a.ctx, plugin)
+	} else {
+		outcome, err = a.updater.UpdatePlugin(a.ctx, plugin)
+	}
 	if err != nil {
 		if errors.Is(err, updater.ErrFileLocked) {
 			return domain.UpdateResult{Locked: true}, nil
+		}
+		if errors.Is(err, updater.ErrPlainHTTPSource) {
+			return domain.UpdateResult{Insecure: true}, nil
 		}
 		return domain.UpdateResult{}, err
 	}

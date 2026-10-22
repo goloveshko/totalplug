@@ -4,14 +4,13 @@ import { mount } from 'svelte';
 import Titlebar from './Titlebar.svelte';
 import PluginTable from './PluginTable.svelte';
 import Dialog from './Dialog.svelte';
-import ProgressOverlay from './ProgressOverlay.svelte';
 import PluginCard from './PluginCard.svelte';
 import HistoryDialog from './HistoryDialog.svelte';
 import Settings from './Settings.svelte';
 import { loadAppInfo } from './about.js';
 import { initBackdrop } from './backdrop.js';
 import { initCatalogEvents, runScan } from './catalog.js';
-import { initProgressEvents } from './progress.js';
+import { initUpdateEvents } from './update.js';
 
 // Composition root: every screen is a Svelte island that stays mounted and reads
 // what it shows from a store, so nothing is rebuilt — a language switch re-labels
@@ -24,13 +23,12 @@ const overlays = document.getElementById('overlays');
 const settingsRoot = document.getElementById('settings');
 
 initCatalogEvents();
-initProgressEvents();
+initUpdateEvents();
 initBackdrop();
 
 mount(Titlebar, { target: chrome });
 mount(PluginTable, { target: tableRoot });
 mount(Dialog, { target: overlays });
-mount(ProgressOverlay, { target: overlays });
 mount(PluginCard, { target: overlays });
 mount(HistoryDialog, { target: overlays });
 mount(Settings, { target: settingsRoot });

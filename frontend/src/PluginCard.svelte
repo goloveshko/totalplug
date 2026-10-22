@@ -1,20 +1,28 @@
 <script>
-    import { tr } from './i18n.js';
-    import { badgeFor } from './plugin.js';
-    import { cardState, requestCardClose, restoreCardOpener, saveCardOverride } from './card.js';
-    import { interceptLinks, safeHttpUrl, shortUrl } from './text.js';
+    import { tick } from 'svelte';
+    import { lang, tr } from './i18n.js';
+    import { badgeFor, isUnknownInstalled, isUpdatable } from './plugin.js';
+    import { cardEditing, cardState, requestCardClose, restoreCardOpener, saveCardOverride } from './card.js';
+    import { plugins, progressRunning } from './state.js';
+    import { handleUpdate } from './update.js';
+    import { interceptLinks, releaseDate, safeHttpUrl, shortUrl } from './text.js';
 
-    // The plugin card as an island: the record it shows and the two drafts being
-    // edited live in a store, so a language switch re-labels every row in place and
-    // a background scan can replace the list without rebuilding the dialog.
+    // Live records and editing drafts must refresh independently.
 
     let el = $state(null);
-    let cancel = $state(null);
+    let changeBtn = $state(null);
+    let versionInput = $state(null);
+    let pendingCloses = 0;
 
-    const plugin = $derived($cardState.plugin);
+    const cardOpen = $derived($cardState.open);
+    const pluginId = $derived($cardState.plugin?.id);
+    const plugin = $derived($plugins.find((p) => p.id === pluginId) ?? null);
     const sub = $derived(plugin ? plugin.type + (plugin.arch ? ' · ' + plugin.arch : '') : '');
     const site = $derived(safeHttpUrl(plugin?.web_url));
     const mark = $derived(badgeFor(plugin?.status));
+    const updatable = $derived(!!plugin && isUpdatable(plugin));
+    const unknown = $derived(isUnknownInstalled(plugin));
+    const released = $derived(plugin?.published_at ? releaseDate(plugin.published_at, $lang) : null);
 
     // Which provider resolved the latest version, shown as a glyph beside it: the
     // tooltip names it, so no text row is spent on a source that for a GitHub
@@ -29,39 +37,91 @@
         saveCardOverride();
     }
 
+    // The card closes first so the row's own progress is what the user watches;
+    // the update itself is looked up by id and survives the card going away.
+    function onUpdate() {
+        const id = plugin?.id;
+        if (!id) return;
+        requestCardClose();
+        handleUpdate(id);
+    }
+
+    // Change is removed together with the actions row, so the button that has to
+    // take the focus back does not exist yet at the moment the flag flips.
+    async function closeEditor() {
+        cardEditing.set(false);
+        await tick();
+        if (cardOpen && el?.open) changeBtn?.focus();
+    }
+
+    function onCancel(event) {
+        event.preventDefault();
+        requestCardClose();
+    }
+
+    function onClose() {
+        // A queued close event must not reset a newly opened card.
+        if (pendingCloses > 0) {
+            pendingCloses--;
+            if (cardOpen || el?.open) return;
+        } else if (el?.open) return;
+        restoreCardOpener();
+    }
+
     // A dialog enters the top layer only when it is asked, so the store's `open`
-    // drives showModal() and close(), exactly like the other two overlays.
+    // drives showModal() and close(), exactly like the other two overlays. Focus
+    // starts on Change rather than on Update: an accidental Enter must not install
+    // anything. The one exception is a version we could not read — the editor is
+    // already open there, and the field is the only way forward.
     $effect(() => {
         if (!el) return;
-        if ($cardState.open) {
+        if (cardOpen) {
             if (!el.open) {
                 el.showModal();
-                // Without this the dialog picks the first focusable element it finds,
-                // which is the SITE link whenever the plugin has a page — so the link
-                // opens framed and Enter navigates it. Cancel is the safe place to
-                // start: a field prefilled from auto-detection would otherwise be
-                // confirmed by accident.
-                cancel?.focus();
+                ($cardEditing ? versionInput : changeBtn)?.focus();
             }
         } else if (el.open) {
+            pendingCloses++;
             el.close();
         }
     });
+
+    // Primitive flags keep draft writes from refocusing the version field.
+    $effect(() => {
+        if (cardOpen && $cardEditing) versionInput?.focus();
+    });
 </script>
 
-<dialog id="plugin-card" bind:this={el} aria-labelledby="card-name" onclose={restoreCardOpener}>
+<dialog id="plugin-card" bind:this={el} aria-labelledby="card-name" oncancel={onCancel} onclose={onClose}>
+    <button
+        type="button"
+        class="dlg-close"
+        id="card-close"
+        title={$tr('dialog.close')}
+        aria-label={$tr('dialog.close')}
+        onclick={requestCardClose}
+    >
+        <svg viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+    </button>
     {#if plugin}
         <h2 id="card-name">{plugin.name}</h2>
         <div class="card-sub" id="card-sub">{sub}</div>
         <div class="card-info" id="card-info">
             <div class="k">{$tr('col.installed')}</div>
             <div class="v">
-                <code>{plugin.installed_version}</code> <small class="muted">{plugin.confidence}</small>
+                <span class="num">{plugin.installed_version}</span>
+                <small class="muted">{plugin.confidence}</small>
             </div>
             <div class="k">{$tr('col.latest')}</div>
             <div class="v">
                 {#if plugin.latest_version}
-                    <code>{plugin.latest_version}</code>
+                    <span class="num" class:new={updatable}>{plugin.latest_version}</span>
+                    {#if released}
+                        <span class="release-date" title={released.title}>{released.text}</span>
+                    {/if}
                     <span class="src-icon" role="img" title={srcLabel} aria-label={srcLabel}>
                         {#if github}
                             <!-- octicons/mark-github-16 (MIT, (c) GitHub Inc.) -->
@@ -107,37 +167,64 @@
                 </div>
             </details>
         </div>
-        <div class="card-edit-title">{$tr('editor.title')}</div>
-        <form method="dialog" id="editor-form" onsubmit={onSubmit}>
-            <label>
-                {$tr('editor.version')}
-                <input
-                    type="text"
-                    id="editor-version"
-                    placeholder={$tr('editor.version.ph')}
-                    autocomplete="off"
-                    bind:value={$cardState.version}
-                />
-            </label>
-            <label>
-                {$tr('editor.source')}
-                <input
-                    type="text"
-                    id="editor-source"
-                    placeholder={$tr('editor.source.ph')}
-                    autocomplete="off"
-                    bind:value={$cardState.source}
-                />
-            </label>
-            <p class="editor-hint">{$tr('editor.hint')}</p>
-            <div class="editor-actions">
-                <button type="submit" class="btn-save" id="editor-save" disabled={$cardState.saving}>
-                    {$tr('editor.save')}
-                </button>
-                <button type="button" id="editor-cancel" bind:this={cancel} onclick={requestCardClose}>
-                    {$tr('editor.cancel')}
+        {#if unknown}
+            <p class="card-hint">{$tr('card.unknown_hint')}</p>
+        {/if}
+        {#if $cardEditing}
+            <div class="card-edit-title">{$tr('editor.title')}</div>
+            <form method="dialog" id="editor-form" onsubmit={onSubmit}>
+                <label>
+                    {$tr('editor.version')}
+                    <input
+                        type="text"
+                        id="editor-version"
+                        bind:this={versionInput}
+                        placeholder={$tr('editor.version.ph')}
+                        autocomplete="off"
+                        bind:value={$cardState.version}
+                    />
+                </label>
+                <label>
+                    {$tr('editor.source')}
+                    <input
+                        type="text"
+                        id="editor-source"
+                        placeholder={$tr('editor.source.ph')}
+                        autocomplete="off"
+                        bind:value={$cardState.source}
+                    />
+                </label>
+                <p class="editor-hint">{$tr('editor.hint')}</p>
+                <div class="editor-actions">
+                    <button type="submit" class="btn-save" id="editor-save" disabled={$cardState.saving}>
+                        {$tr('editor.save')}
+                    </button>
+                    <button type="button" id="editor-cancel" onclick={closeEditor}>{$tr('editor.cancel')}</button>
+                </div>
+            </form>
+        {:else}
+            <div class="card-actions">
+                {#if updatable}
+                    <button
+                        type="button"
+                        class="btn-save"
+                        id="card-update"
+                        disabled={$progressRunning}
+                        onclick={onUpdate}
+                    >
+                        {$tr('card.update', { version: plugin.latest_version })}
+                    </button>
+                {/if}
+                <button
+                    type="button"
+                    class="btn-secondary"
+                    id="card-change"
+                    bind:this={changeBtn}
+                    onclick={() => cardEditing.set(true)}
+                >
+                    {$tr('card.change')}
                 </button>
             </div>
-        </form>
+        {/if}
     {/if}
 </dialog>

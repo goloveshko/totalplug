@@ -209,15 +209,17 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		if strings.HasPrefix(p.CustomSource, "github:") {
 			ghRepo := strings.TrimPrefix(p.CustomSource, "github:")
 			var version, downloadURL string
+			var publishedAt time.Time
 			found := false
 			if !c.cacheOnly {
 				if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil && ghRelease.TagName != "" {
 					version = ghRelease.TagName
+					publishedAt = ghRelease.PublishedAt
 					if len(ghRelease.Assets) > 0 {
 						downloadURL = ghRelease.Assets[0].BrowserDownloadURL
 					}
 					found = true
-					saveGitHubRelease(ghRepo, version, downloadURL)
+					saveGitHubRelease(ghRepo, version, downloadURL, publishedAt)
 				}
 			}
 			if !found {
@@ -227,11 +229,12 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 				// is "N/A (Not in catalog)", which throws away what we know and
 				// drops the plugin out of the update queue.
 				if cached := loadGitHubRelease(ghRepo); cached != nil {
-					version, downloadURL, found = cached.TagName, cached.DownloadURL, true
+					version, downloadURL, publishedAt, found = cached.TagName, cached.DownloadURL, cached.PublishedAt, true
 				}
 			}
 			if found {
 				p.LatestVersion = version
+				p.PublishedAt = publishedAt
 				if downloadURL != "" {
 					p.DownloadURL = downloadURL
 				}
@@ -254,6 +257,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 
 		if matchedEntry != nil && matchedEntry.Resolved != nil {
 			p.LatestVersion = matchedEntry.Resolved.Version
+			p.PublishedAt = matchedEntry.Resolved.PublishedAt
 			p.DownloadURL = matchedEntry.Resolved.DownloadURL
 			p.DownloadURLs = downloadCandidates(*matchedEntry)
 			p.WebURL = matchedEntry.Resolved.WebURL

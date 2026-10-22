@@ -73,6 +73,7 @@ func FetchLatestGitHubRelease(ctx context.Context, repo string) (*GitHubRelease,
 type githubCachedRelease struct {
 	TagName     string    `json:"tag_name"`
 	DownloadURL string    `json:"download_url,omitempty"`
+	PublishedAt time.Time `json:"published_at,omitempty"`
 	CheckedAt   time.Time `json:"checked_at"`
 }
 
@@ -106,7 +107,7 @@ func loadGitHubRelease(repo string) *githubCachedRelease {
 // saveGitHubRelease remembers a fresh network result. Best-effort: cache
 // problems must never fail a scan, and a corrupt file is rewritten from
 // scratch on the next successful fetch.
-func saveGitHubRelease(repo, tagName, downloadURL string) {
+func saveGitHubRelease(repo, tagName, downloadURL string, publishedAt time.Time) {
 	cache := loadGitHubReleaseCache()
 	if cache == nil {
 		cache = map[string]githubCachedRelease{}
@@ -114,6 +115,7 @@ func saveGitHubRelease(repo, tagName, downloadURL string) {
 	cache[repo] = githubCachedRelease{
 		TagName:     tagName,
 		DownloadURL: downloadURL,
+		PublishedAt: publishedAt,
 		CheckedAt:   time.Now().UTC(),
 	}
 

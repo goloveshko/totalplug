@@ -1,7 +1,15 @@
 <script>
     import { Quit, WindowMinimise, WindowToggleMaximise } from '../wailsjs/runtime';
     import { tr, trp } from './i18n.js';
-    import { catalogStatus, pluginCount, runScan, scanRunning, searchQuery, setSearchQuery } from './catalog.js';
+    import {
+        catalogStatus,
+        pluginCount,
+        runScan,
+        scanRunning,
+        searchQuery,
+        setSearchQuery,
+        updatesOnly,
+    } from './catalog.js';
     import { settingsOpen } from './state.js';
     import { openHistory } from './history.js';
     import { openSettings } from './settings.js';
@@ -20,7 +28,7 @@
     // a tooltip alone is mouse-only.
     let refresh = $derived.by(() => {
         const { state: key, detail } = $catalogStatus;
-        const base = $tr('btn.refresh');
+        const base = $tr('btn.check');
         if (!key) return { dot: undefined, title: base, aria: base };
         const label = $tr(catalogStateLabels[key]);
         return {
@@ -34,7 +42,7 @@
     // plural form («2 плагина» instead of a fixed «плагинов»).
     let count = $derived.by(() => {
         const { shown, total } = $pluginCount;
-        const filtered = $searchQuery.trim() !== '' && shown !== total;
+        const filtered = ($searchQuery.trim() !== '' || $updatesOnly) && shown !== total;
         return {
             text: filtered ? `${shown}/${total}` : $trp('count.plugins', total),
             hidden: total === 0 || $settingsOpen,
@@ -47,7 +55,29 @@
         if (event.target.closest('input, button')) return;
         WindowToggleMaximise();
     }
+
+    let search = $state(null);
+
+    // Ctrl+F is the one shortcut a list like this is expected to have, and an
+    // empty search box leaves Esc with nothing to do: while it has text, Esc
+    // clears it. Both stay out of modal dialogs, which have their own Esc.
+    function onWindowKey(event) {
+        if ($settingsOpen || document.querySelector('dialog[open]')) return;
+
+        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'f') {
+            event.preventDefault();
+            search?.focus();
+            search?.select();
+            return;
+        }
+        if (event.key === 'Escape' && (document.activeElement === search || $searchQuery !== '')) {
+            event.preventDefault();
+            setSearchQuery('');
+        }
+    }
 </script>
+
+<svelte:window onkeydown={onWindowKey} />
 
 <div class="titlebar" id="titlebar" role="presentation" ondblclick={onTitlebarDblclick}>
     <div class="titlebar-left">
@@ -57,6 +87,7 @@
     <input
         type="search"
         id="plugin-search"
+        bind:this={search}
         placeholder={$tr('search.ph')}
         aria-label={$tr('search.ph')}
         autocomplete="off"
@@ -80,31 +111,18 @@
         </button>
         <button
             type="button"
-            id="btn-refresh"
+            id="btn-check"
             class="icon-btn"
             data-catalog={refresh.dot}
             title={refresh.title}
             aria-label={refresh.aria}
             disabled={$scanRunning}
-            onclick={() => runScan(true)}
+            onclick={() => runScan(false)}
         >
             <svg viewBox="0 0 24 24">
                 <polyline points="23 4 23 10 17 10" />
                 <polyline points="1 20 1 14 7 14" />
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-        </button>
-        <button
-            type="button"
-            id="btn-scan"
-            class="icon-btn primary"
-            title={$tr('btn.scan')}
-            aria-label={$tr('btn.scan')}
-            disabled={$scanRunning}
-            onclick={() => runScan(false)}
-        >
-            <svg viewBox="0 0 24 24">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
             </svg>
         </button>
         <button
