@@ -893,10 +893,15 @@ func (u *Updater) updatePlugin(ctx context.Context, plugin domain.Plugin, allowI
 	pkg, downloadErr := u.tryDownloadCandidates(ctx, candidates, archiveFile, keepDir, allowInsecure)
 
 	if pkg.format == "" {
-		// All catalog sources failed; discover mirrors lazily.
-		if mirrors := u.resolveTotalCmdMirrors(ctx, plugin.DownloadURL); len(mirrors) > 0 {
+		// Mirrors must advertise the requested release before they can replace it.
+		if mirrors := u.resolveTotalCmdMirrors(ctx, plugin.DownloadURL, plugin.LatestVersion); len(mirrors) > 0 {
+			// Ordinary cached downloads have not passed the mirror redirect allowlist.
+			mirrorKeepDir := filepath.Join(keepDir, "mirrors")
 			var mirrorErr error
-			pkg, mirrorErr = u.tryDownloadCandidates(ctx, mirrors, archiveFile, keepDir, allowInsecure)
+			pkg, mirrorErr = u.tryTotalCmdMirrors(ctx, mirrors, archiveFile, mirrorKeepDir)
+			if pkg.format != "" {
+				keepDir = mirrorKeepDir
+			}
 			downloadErr = errors.Join(downloadErr, mirrorErr)
 		}
 	}

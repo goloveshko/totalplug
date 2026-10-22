@@ -6,6 +6,7 @@ require (
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/nwaples/rardecode v1.1.3
 	github.com/wailsapp/wails/v2 v2.14.0
+	golang.org/x/net v0.56.0
 	golang.org/x/sys v0.47.0
 	gopkg.in/ini.v1 v1.67.3
 )
@@ -46,6 +47,5 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	go4.org v0.0.0-20260112195520-a5071408f32f // indirect
 	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 )
