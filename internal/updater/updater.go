@@ -41,6 +41,11 @@ var (
 	// ErrInsecureScheme rejects downloads from plaintext or non-network schemes
 	// that could deliver tampered archives.
 	ErrInsecureScheme = errors.New("refusing insecure download scheme, https required")
+	// ErrPlainHTTPSource marks the one insecure case the user can allow: a plain
+	// HTTP source the opt-in download would accept. A ftp:// or a file:// link is
+	// refused even with that opt-in, so the GUI must not offer a retry for it.
+	// Errors for this case wrap both sentinels.
+	ErrPlainHTTPSource = errors.New("source is plain HTTP")
 	// ErrDownloadTooLarge aborts downloads above the configured size cap.
 	ErrDownloadTooLarge = errors.New("download exceeds size limit")
 	// ErrUnsupportedArchive marks a downloaded package in a format that cannot
@@ -103,9 +108,11 @@ func packageKey(rawURL string) string {
 // Long enough for the largest download in the catalog to finish on a slow link.
 const staleScratchAfter = time.Hour
 
-// validateDownloadURL requires https; plain http is only accepted for loopback
-// hosts so automated tests can serve archives from a local server.
-func validateDownloadURL(rawURL string) error {
+// validateDownloadURL requires https; plain http is accepted for loopback hosts
+// so automated tests can serve archives from a local server, and for any host
+// when allowInsecure is set — that flag comes only from the GUI's explicit
+// "download anyway" confirmation for a plugin the catalog offers over HTTP.
+func validateDownloadURL(rawURL string, allowInsecure bool) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("invalid download URL: %w", err)
@@ -114,11 +121,14 @@ func validateDownloadURL(rawURL string) error {
 	case "https":
 		return nil
 	case "http":
+		if allowInsecure {
+			return nil
+		}
 		host := strings.ToLower(u.Hostname())
 		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
 			return nil
 		}
-		return fmt.Errorf("%w: %s", ErrInsecureScheme, u.Host)
+		return fmt.Errorf("%w: %s (%w)", ErrInsecureScheme, u.Host, ErrPlainHTTPSource)
 	default:
 		return fmt.Errorf("%w: %q", ErrInsecureScheme, u.Scheme)
 	}
@@ -240,7 +250,7 @@ func NewUpdater() *Updater {
 			// back an archive fetched in plaintext, which is then unpacked over
 			// the plugin directory.
 			CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-				return validateDownloadURL(req.URL.String())
+				return validateDownloadURL(req.URL.String(), false)
 			},
 		},
 		maxDownloadBytes: DefaultMaxDownloadBytes,
@@ -249,8 +259,16 @@ func NewUpdater() *Updater {
 }
 
 // DownloadFile downloads a remote file to a local destination with context cancellation.
+// Plain HTTP is refused; UpdatePluginInsecure reaches the opt-in variant below.
 func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error {
-	if err := validateDownloadURL(url); err != nil {
+	return u.downloadFile(ctx, url, destPath, false)
+}
+
+// downloadFile is DownloadFile with a plain-HTTP allowance chosen by the caller.
+// Redirects get the same policy as the first request, or an HTTPS source could
+// quietly bounce the archive to plaintext.
+func (u *Updater) downloadFile(ctx context.Context, url, destPath string, allowInsecure bool) error {
+	if err := validateDownloadURL(url, allowInsecure); err != nil {
 		return err
 	}
 	// Announce the source before the request so mirror attempts are visible in
@@ -263,7 +281,15 @@ func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error 
 	}
 	req.Header.Set("User-Agent", "TotalPlug/1.0 (Total Commander Plugin Manager)")
 
-	resp, err := u.client.Do(req)
+	client := u.client
+	if allowInsecure {
+		permissive := *u.client
+		permissive.CheckRedirect = func(req *http.Request, _ []*http.Request) error {
+			return validateDownloadURL(req.URL.String(), true)
+		}
+		client = &permissive
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("performing download request: %w", err)
 	}
@@ -736,32 +762,29 @@ func forgetPackage(rawURL, keepDir string) {
 	_ = os.Remove(filepath.Join(keepDir, packageKey(rawURL)))
 }
 
-// tryDownloadCandidates secures one usable package from an ordered URL list,
-// returning the first one and the format to read it with. A package this run kept
-// earlier answers before the network is touched, in the same candidate order. An
-// empty format means every candidate failed; lastErr is the most recent failure.
-func (u *Updater) tryDownloadCandidates(ctx context.Context, urls []string, archiveFile, keepDir string) (securedPackage, error) {
-	var lastErr error
+// All failures are retained so a later dead mirror cannot hide an HTTP refusal.
+func (u *Updater) tryDownloadCandidates(ctx context.Context, urls []string, archiveFile, keepDir string, allowInsecure bool) (securedPackage, error) {
+	var failures []error
 	for _, candidate := range urls {
 		if kept, ok := takeKeptPackage(candidate, keepDir); ok {
 			return kept, nil
 		}
-		if err := u.DownloadFile(ctx, candidate, archiveFile); err != nil {
-			lastErr = fmt.Errorf("download failed: %w", err)
+		if err := u.downloadFile(ctx, candidate, archiveFile, allowInsecure); err != nil {
+			failures = append(failures, fmt.Errorf("download failed: %w", err))
 			continue
 		}
 		format, err := detectArchiveFormat(archiveFile)
 		if err != nil {
-			lastErr = err
+			failures = append(failures, err)
 			continue
 		}
 		if !isExtractable(format) {
-			lastErr = fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format)
+			failures = append(failures, fmt.Errorf("%w: downloaded file is %s", ErrUnsupportedArchive, format))
 			continue
 		}
 		return securedPackage{path: archiveFile, source: candidate, format: format}, nil
 	}
-	return securedPackage{}, lastErr
+	return securedPackage{}, errors.Join(failures...)
 }
 
 // tcExeNames are the executables that only ever sit in a Total Commander install
@@ -824,6 +847,16 @@ func validatePluginFolder(pluginDir string) error {
 // the run ends, so retrying a plugin the update could not write starts from those
 // bytes rather than fetching them a second time.
 func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outcome, error) {
+	return u.updatePlugin(ctx, plugin, false)
+}
+
+// UpdatePluginInsecure is UpdatePlugin for an archive the user explicitly chose
+// to fetch over plain HTTP after the GUI warning. The CLI never calls it.
+func (u *Updater) UpdatePluginInsecure(ctx context.Context, plugin domain.Plugin) (Outcome, error) {
+	return u.updatePlugin(ctx, plugin, true)
+}
+
+func (u *Updater) updatePlugin(ctx context.Context, plugin domain.Plugin, allowInsecure bool) (Outcome, error) {
 	candidates := downloadCandidates(plugin)
 	if len(candidates) == 0 {
 		return Outcome{}, ErrEmptyDownloadURL
@@ -844,6 +877,10 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outco
 	// nobody until the run ends: it is what a retry reads back.
 	tmpDir := filepath.Join(runDir, updateSpace)
 	keepDir := filepath.Join(runDir, keptSpace)
+	if allowInsecure {
+		// Permissive redirects must never populate another plugin's strict cache.
+		keepDir = filepath.Join(keepDir, "http", packageKey(plugin.Path))
+	}
 	if err := os.RemoveAll(tmpDir); err != nil {
 		return Outcome{}, fmt.Errorf("clearing temp directory: %w", err)
 	}
@@ -853,31 +890,25 @@ func (u *Updater) UpdatePlugin(ctx context.Context, plugin domain.Plugin) (Outco
 	defer os.RemoveAll(tmpDir)
 
 	archiveFile := filepath.Join(tmpDir, "package.archive")
-	pkg, lastErr := u.tryDownloadCandidates(ctx, candidates, archiveFile, keepDir)
+	pkg, downloadErr := u.tryDownloadCandidates(ctx, candidates, archiveFile, keepDir, allowInsecure)
 
 	if pkg.format == "" {
-		// All catalog sources failed: for totalcmd.net links, lazily parse the
-		// plugin page for mirrors and retry them (fallback maintained by the
-		// community, e.g. wincmd.ru).
+		// All catalog sources failed; discover mirrors lazily.
 		if mirrors := u.resolveTotalCmdMirrors(ctx, plugin.DownloadURL); len(mirrors) > 0 {
-			// DownloadFile announces each candidate URL, so mirror attempts are
-			// already visible in the UI.
 			var mirrorErr error
-			pkg, mirrorErr = u.tryDownloadCandidates(ctx, mirrors, archiveFile, keepDir)
-			if mirrorErr != nil {
-				lastErr = mirrorErr
-			}
+			pkg, mirrorErr = u.tryDownloadCandidates(ctx, mirrors, archiveFile, keepDir, allowInsecure)
+			downloadErr = errors.Join(downloadErr, mirrorErr)
 		}
 	}
 	if pkg.format == "" {
 		// Broken catalog/upstream links are common (totalcmd.net download
 		// counters redirect to dead hosts), so point at the plugin page.
-		err := lastErr
+		err := downloadErr
 		if plugin.WebURL != "" {
-			err = fmt.Errorf("%w; plugin page: %s", lastErr, plugin.WebURL)
+			err = fmt.Errorf("%w; plugin page: %s", downloadErr, plugin.WebURL)
 		}
 		if len(candidates) > 1 {
-			err = fmt.Errorf("all %d download sources failed, last: %w", len(candidates), err)
+			err = fmt.Errorf("all %d download sources failed: %w", len(candidates), err)
 		}
 		return Outcome{}, err
 	}

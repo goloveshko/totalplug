@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -341,6 +342,141 @@ func TestARetriedUpdateReusesThePackageItKept(t *testing.T) {
 	}
 }
 
+func TestKeptHTTPPackageRequiresConsentForEachPlugin(t *testing.T) {
+	for _, redirected := range []bool{false, true} {
+		t.Run(fmt.Sprintf("redirect=%t", redirected), func(t *testing.T) {
+			var hits int32
+			payload := buildTestZip(t, map[string]string{"demo.dll": "new", "b.txt": "new"})
+			plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&hits, 1)
+				_, _ = w.Write(payload)
+			}))
+			defer plain.Close()
+			plainURL := "http://plugins.example.com/consent.zip"
+			source := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, plainURL, http.StatusFound)
+			}))
+			defer source.Close()
+
+			transport := source.Client().Transport.(*http.Transport).Clone()
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if addr == "plugins.example.com:80" {
+					addr = plain.Listener.Addr().String()
+				}
+				return (&net.Dialer{}).DialContext(ctx, network, addr)
+			}
+			defer transport.CloseIdleConnections()
+			u := NewUpdater()
+			u.client.Transport = transport
+			downloadURL := plainURL
+			if redirected {
+				downloadURL = source.URL + "/package.zip"
+			}
+
+			root := t.TempDir()
+			a := domain.Plugin{Path: filepath.Join(root, "a", "demo.dll"), DownloadURL: downloadURL}
+			b := domain.Plugin{Path: filepath.Join(root, "b", "demo.dll"), DownloadURL: downloadURL}
+			for _, p := range []domain.Plugin{a, b} {
+				writeTestFile(t, p.Path, "old")
+				writeTestFile(t, filepath.Join(filepath.Dir(p.Path), "b.txt"), "old")
+			}
+			locked := filepath.Join(filepath.Dir(a.Path), "b.txt")
+			if err := os.Chmod(locked, 0444); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(locked, 0644) })
+			if _, err := u.UpdatePluginInsecure(context.Background(), a); err == nil {
+				t.Fatal("expected the first plugin's apply to fail")
+			}
+			if got := atomic.LoadInt32(&hits); got != 1 {
+				t.Fatalf("first download hits = %d, want 1", got)
+			}
+
+			for _, p := range []domain.Plugin{b, a} {
+				if _, err := u.UpdatePlugin(context.Background(), p); !errors.Is(err, ErrPlainHTTPSource) {
+					t.Fatalf("strict update of %s = %v, want HTTP consent", p.Path, err)
+				}
+				if got := readTestFile(t, p.Path); got != "old" {
+					t.Fatalf("strict update changed %s to %q", p.Path, got)
+				}
+			}
+			if err := os.Chmod(locked, 0644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := u.UpdatePluginInsecure(context.Background(), a); err != nil {
+				t.Fatalf("consented retry: %v", err)
+			}
+			if got := atomic.LoadInt32(&hits); got != 1 {
+				t.Fatalf("consented retry downloaded again, hits = %d", got)
+			}
+			if _, err := u.UpdatePluginInsecure(context.Background(), b); err != nil {
+				t.Fatalf("second plugin with its own consent: %v", err)
+			}
+			if got := atomic.LoadInt32(&hits); got != 2 {
+				t.Errorf("second plugin reused another plugin's consent cache, hits = %d", got)
+			}
+		})
+	}
+}
+
+func TestHTTPConsentSurvivesOtherCandidateFailures(t *testing.T) {
+	payload := buildTestZip(t, map[string]string{"demo.dll": "new"})
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(payload)
+	}))
+	defer plain.Close()
+	mirror := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/good.zip" {
+			_, _ = w.Write(payload)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mirror.Close()
+	plainURL := "http://plugins.example.com/fallback.zip"
+	for _, plainFirst := range []bool{true, false} {
+		t.Run(fmt.Sprintf("plain-first=%t", plainFirst), func(t *testing.T) {
+			transport := mirror.Client().Transport.(*http.Transport).Clone()
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if addr == "plugins.example.com:80" {
+					addr = plain.Listener.Addr().String()
+				}
+				return (&net.Dialer{}).DialContext(ctx, network, addr)
+			}
+			defer transport.CloseIdleConnections()
+			u := NewUpdater()
+			u.client.Transport = transport
+			urls := []string{plainURL, mirror.URL + "/dead.zip"}
+			if !plainFirst {
+				urls[0], urls[1] = urls[1], urls[0]
+			}
+			p := domain.Plugin{Path: filepath.Join(t.TempDir(), "demo", "demo.dll"), DownloadURLs: urls}
+			writeTestFile(t, p.Path, "old")
+			if _, err := u.UpdatePlugin(context.Background(), p); !errors.Is(err, ErrPlainHTTPSource) || !strings.Contains(err.Error(), "404") {
+				t.Fatalf("candidate errors = %v, want both HTTP consent and 404", err)
+			}
+			if got := readTestFile(t, p.Path); got != "old" {
+				t.Fatalf("refused update changed plugin to %q", got)
+			}
+			if _, err := u.UpdatePluginInsecure(context.Background(), p); err != nil {
+				t.Fatalf("consented update: %v", err)
+			}
+		})
+	}
+	t.Run("usable-https-needs-no-consent", func(t *testing.T) {
+		u := NewUpdater()
+		u.client.Transport = mirror.Client().Transport
+		p := domain.Plugin{
+			Path:         filepath.Join(t.TempDir(), "demo", "demo.dll"),
+			DownloadURLs: []string{plainURL, mirror.URL + "/good.zip"},
+		}
+		writeTestFile(t, p.Path, "old")
+		if _, err := u.UpdatePlugin(context.Background(), p); err != nil {
+			t.Fatalf("usable HTTPS fallback: %v", err)
+		}
+	})
+}
+
 // Magic bytes alone do not make a package readable, so one that fails to unpack
 // must not be held back: a retry has to be free to download another copy.
 func TestAPackageThatWillNotUnpackIsNotKept(t *testing.T) {
@@ -457,12 +593,38 @@ func TestValidateDownloadURL(t *testing.T) {
 		{"/relative/path.zip", true},
 	}
 	for _, tc := range cases {
-		err := validateDownloadURL(tc.url)
+		err := validateDownloadURL(tc.url, false)
 		if tc.wantErr && !errors.Is(err, ErrInsecureScheme) {
 			t.Errorf("validateDownloadURL(%q) = %v, want ErrInsecureScheme", tc.url, err)
 		}
 		if !tc.wantErr && err != nil {
 			t.Errorf("validateDownloadURL(%q) = %v, want nil", tc.url, err)
+		}
+	}
+}
+
+func TestValidateDownloadURLInsecureOptIn(t *testing.T) {
+	// The GUI asks the user before passing this flag; the opt-in must not also
+	// open non-network schemes such as a local file.
+	if err := validateDownloadURL("http://plugins.example.com/a.zip", true); err != nil {
+		t.Errorf("opted-in http: %v", err)
+	}
+	for _, raw := range []string{"ftp://example.com/a.zip", "file:///C:/Windows/x.zip"} {
+		if err := validateDownloadURL(raw, true); !errors.Is(err, ErrInsecureScheme) {
+			t.Errorf("validateDownloadURL(%q, true) = %v, want ErrInsecureScheme", raw, err)
+		}
+	}
+}
+
+// The GUI reads ErrPlainHTTPSource to decide whether to offer a retry over plain
+// HTTP, so only the source the opt-in would actually accept may carry it.
+func TestInsecureRefusalIsRetryableOnlyForPlainHTTP(t *testing.T) {
+	if err := validateDownloadURL("http://plugins.example.com/a.zip", false); !errors.Is(err, ErrPlainHTTPSource) {
+		t.Errorf("http refusal = %v, want ErrPlainHTTPSource", err)
+	}
+	for _, raw := range []string{"ftp://example.com/a.zip", "file:///C:/Windows/x.zip", "/relative/path.zip"} {
+		if err := validateDownloadURL(raw, false); errors.Is(err, ErrPlainHTTPSource) {
+			t.Errorf("validateDownloadURL(%q) = %v, must not be offered for a retry", raw, err)
 		}
 	}
 }
@@ -492,6 +654,12 @@ func TestDownloadFileRejectsInsecureRedirect(t *testing.T) {
 	if !errors.Is(err, ErrInsecureScheme) {
 		t.Fatalf("error = %v, want ErrInsecureScheme", err)
 	}
+	// This redirect is the shape a totalcmd.net download link has: the catalog
+	// hands out https and the author's server answers over plaintext. The GUI
+	// offers the user a retry only when the refusal carries this signal.
+	if !errors.Is(err, ErrPlainHTTPSource) {
+		t.Errorf("error = %v, want the plain-HTTP signal a retry could clear", err)
+	}
 	if _, e := os.Stat(dest); !os.IsNotExist(e) {
 		t.Error("a download refused mid-redirect must not leave a destination file")
 	}
@@ -517,6 +685,23 @@ func TestDownloadFileRejectsInsecureRedirect(t *testing.T) {
 	}
 	if string(body) != "mirror payload" {
 		t.Errorf("downloaded %q, want the payload behind the redirect", body)
+	}
+}
+
+// The retry the GUI offers after a plain-HTTP refusal must get past the policy
+// instead of refusing again: the failure it ends in is a network one, so the
+// user sees the real reason the author's server did not answer.
+func TestDownloadFileInsecureOptInDoesNotRefusePlainHTTP(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	dest := filepath.Join(t.TempDir(), "out.zip")
+	err := NewUpdater().downloadFile(ctx, "http://totalplug.invalid/pkg.zip", dest, true)
+	if errors.Is(err, ErrInsecureScheme) {
+		t.Fatalf("the opt-in refused a plain HTTP source: %v", err)
+	}
+	if err == nil {
+		t.Fatal("a host that cannot exist must not download")
 	}
 }
 
