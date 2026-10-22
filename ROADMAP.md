@@ -40,7 +40,8 @@ next release (v2), and the accepted debt we deliberately postponed.
   (0 days deletes nothing). Defaults: 3 copies, 30 days.
 - Windows file-lock detection (error codes 5/32/33) with a
   "close Total Commander and run again" hint.
-- Downloads restricted to https (loopback http allowed for tests) and capped at 256 MiB.
+- Downloads default to https (loopback http allowed for tests) and are capped at 256 MiB.
+  The GUI can retry a plain-HTTP source with explicit per-plugin consent; the CLI stays strict.
 - Mirror fallback, in two layers. The catalog-declared one (`7c6b18d`): the checker collects
   ordered download URLs per plugin from the catalog's `available_sources` (resolved first, then
   same-version mirrors, stable order) and the updater tries each until one delivers a usable
@@ -49,12 +50,14 @@ next release (v2), and the accepted debt we deliberately postponed.
   Giving the catalog a mirror field is decided against (2026-10-20): publishing ~1200 mirrors
   would mean scraping ~1200 plugin pages on every build, so this layer stays dormant by design
   and the search below is the mechanism.
-  The layer that works today (`5c2ae8c`): once every known source has failed, the updater fetches
-  the plugin's plugring page from the user's own machine and retries the `Mirror` links found
-  there, restricted to https and to a trusted-host allowlist (`wincmd.ru`). That is what carries
-  a dead totalcmd.net download counter through to a working archive with no catalog change, and
-  it costs one page per actually broken download instead of scraping ~1200 pages from CI. Parsing
-  trouble degrades to the ordinary error naming the plugin page.
+  The lazy layer (`5c2ae8c`, adapted to the site redesign in `607f048`): once every known
+  source has failed, the updater reads the current totalcmd.net plugin page and its linked
+  Russian counterpart. It verifies the counterpart advertises the exact requested release,
+  then resolves its main download; both HEAD and archive GET redirects must stay on trusted
+  HTTPS hosts (`wincmd.ru` and its subdomains). Both old `download.php?id=` and current
+  `/download/<id>/main` source URLs are recognised. No catalog change or bulk scraping is
+  needed: only broken downloads fetch pages. Missing markup, a different release or an
+  untrusted redirect degrades to the ordinary error naming the plugin page.
 - Zip-slip guarded extraction.
 - Total decompressed output of one archive capped at 1 GiB (`DefaultMaxExtractBytes`,
   one `extractLimiter` shared by the ZIP/RAR/7z loops in `internal/updater`), so a small
@@ -156,8 +159,8 @@ next release (v2), and the accepted debt we deliberately postponed.
   `FileVersion`) and fails otherwise — that is the failure worth a gate, because the
   fallback would publish a `1.0.0` archive under a new tag. It then opens a **draft**
   release with the zip and its checksum: the notes are bilingual and pasted by hand, and
-  publishing is what moves `releases/latest`. The first run is the v1.1 tag, so until
-  then this job is the untested layer `ci.yml` used to be.
+  publishing is what moves `releases/latest`. The first target was the v1.1 tag; this roadmap
+  does not yet record a verified remote run.
 - Prettier over the whole tree, not just the frontend: `.prettierrc` keeps 4 spaces and
   single quotes for JS/CSS/HTML/Markdown (how `frontend/src` is written by hand) and
   overrides JSON/YAML back to 2 spaces and double quotes (how npm, Wails and a pasted
@@ -244,7 +247,8 @@ next release (v2), and the accepted debt we deliberately postponed.
    changed without recreating the window. The window is now always solid; the effect
    dropdown, `html[data-effect]` styling and i18n keys are removed. `window_effect.go`
    and the Get/SetWindowEffect bindings stay as dormant plumbing for a future
-   full effects/theme pass. See Accepted debt below.
+   full effects/theme pass. Re-enabled in stage 18 with the missing theme sync that
+   caused the wash-out.
 4. **Update progress dialog** — done (`981efbb`): «Обновить» now opens a dialog right
    after the confirm that streams `update:progress` events from the updater
    (download percent via a counting reader over the response body, then extract and
@@ -252,6 +256,8 @@ next release (v2), and the accepted debt we deliberately postponed.
    download source URL; the final result (success + backup path, locked warning, or
    friendly error with technical details) replaces the progress in the same dialog.
    Not dismissable while running (Esc blocked, OK/✕ hidden until the end).
+   Superseded in stage 18: progress and single-plugin outcomes moved into the row;
+   the dialog now carries only errors, locks and the batch summary.
 5. **Catalog freshness dot** — done (`6b50114`): the refresh icon carries a colored
    dot instead of status-bar wording — amber while the table shows cached catalog
    data, green when the background update lands, red when it fails; the tooltip
@@ -408,6 +414,124 @@ next release (v2), and the accepted debt we deliberately postponed.
     later group, a filtered view labelling only the surviving run, sticky `thead` above the
     headings, contrast 5.21 dark / 4.82 light, and no horizontal scrollbar at the width the
     six-column table used. A plain `npm run build` reports 103.22 kB JS (gzip 36.42).
+18. **UX/UI review pass** — done (`353cd2e`, `61396df`): the 14-point list from
+    2026-10-21, implemented whole.
+    - Quiet table: up-to-date rows carry no badge, an offer is an accent latest version
+      plus one tonal button, and status/action share the last column — badges remain only
+      for exceptions. The refresh and scan icons became one «Check for updates» button
+      (`#btn-check`, still `runScan(false)`), the freshness dot riding on it. A 1120 px
+      content cap, thin themed scrollbars, tabular UI-font numbers, and one accent:
+      `#005FB8` light / `#60CDFF` with dark text in dark, disabled fills included.
+    - The «N updates» band is a filter toggle (`updatesOnly`) that resets itself when
+      nothing is offered; `data-idx` still indexes the full plugin list.
+    - Single-plugin updates no longer open the progress dialog: the row streams its own
+      bar and states the outcome in place. Dialogs are left to errors and locks, the batch
+      confirm/summary, and the card. `ProgressOverlay.svelte`/`progress.js` are deleted,
+      and the success message no longer recites the backup path.
+    - Card actions: «Update to X» primary, «Change…» secondary, the version/source editor
+      only behind the latter; an unknown installed version explains itself and focuses the
+      field. Cancel restores focus after a `tick()` — the Change button it returns to is
+      removed together with the editor. The card shows the release date; `published_at`
+      now travels from the catalog and the GitHub release cache into `domain.Plugin`.
+    - Settings: the selected section is a tint plus an inset accent rail instead of a solid
+      pill, and uppercase/letter-spacing labels are gone. Ctrl+F focuses search, Esc clears
+      it. Settings content shares the table's 1120 px cap.
+    - Mica: `internal/gui/backdrop.go` picks the backdrop before the window exists — Mica
+      on Windows 11 build 22621+, a solid fallback elsewhere — and `GetWindowEffect` tells
+      the page which one it got (`data-backdrop="mica"`). Only the page background goes
+      transparent; the table, dialogs and settings panel stay opaque cards. The app theme
+      now calls `WindowSetDarkTheme`/`WindowSetLightTheme`, so DWM tints the backdrop to
+      match instead of to the system theme — the cause of the 2026-09-25 wash-out. No
+      setting toggle: the backdrop still cannot change without recreating the window.
+    - Verified in the dev harness in both languages: filter/count, keyboard, card editor
+      and focus return, single update, lock and error paths, batch summary incl. technical
+      details, theme switch, and Mica transparencies; `gofmt`, `go vet`, `go test`,
+      `prettier --check` and `vite build` all pass (103.50 kB JS, gzip 36.88).
+19. **Plain-HTTP consent, and a table that holds still** — done and accepted
+    (2026-10-22; `74b9f3d`, `61396df`): the two defects the first real run after
+    stage 18 turned up.
+    - FileInfo exposed the ordinary plaintext-redirect case:
+      `https://totalcmd.net/download.php?id=fileinfo` answers 302 to
+      `http://st.free.fr/phpmyvisites.php?url=http%3A//fg.tcplugins.free.fr/...`. The strict
+      redirect guard refuses that hop; consenting removes the policy refusal, not the dead
+      tracking URL. Plaintext consent is the user's decision, not a catalog edit.
+      `validateDownloadURL` takes an `allowInsecure` argument that only the `http` branch
+      honours — ftp and file stay refused. `UpdatePluginInsecure` carries it through the
+      catalog candidate list; discovered mirrors still require trusted HTTPS hosts even
+      after consent. A refusal names itself `ErrPlainHTTPSource` next to `ErrInsecureScheme`,
+      so the CLI keeps one message and the bridge can tell the retryable case from the rest.
+      `App.UpdatePlugin` reports it as `UpdateResult{Insecure: true}`, the channel the lock
+      already uses, and the row then asks one question per plugin: Cancel leaves the row
+      exactly as it was, OK re-runs that plugin with the opt-in. Asking where the refusal
+      happens rather than predicting it from the record is the point — the plaintext hop is
+      only visible mid-redirect. In a batch the question arrives inside the queue: the row
+      stops animating while the dialog is open, a decline lands among the skipped rows and
+      the queue carries on, because allowing one author's server says nothing about the next.
+    - The table shifted while an update ran, and the progress bar is the reason: an
+      auto-laid column grows to fit its widest cell, and the inline block is wider than the
+      button it replaces — at a 1280 px window the status column went 195 → 269 px and took
+      the difference off the other three, sliding every row's version numbers and actions.
+      The column is now reserved (`#view-main thead th:last-child { width: 170px }`) and
+      anchored right, so the buttons sit at the edge of the cell whatever the column is
+      worth. Re-measured across all three phases in both languages: nothing moves by more
+      than 0 px and «Распаковка архива» fits the reserved width.
+    - Known and deliberately open: the consent does not rescue FileInfo itself. The chain
+      above ends in a 404 because the `st.free.fr` tracking script is gone, and the author's
+      live file is a direct link the override editor cannot express — `CustomSource` only
+      takes `github:Owner/Repo`.
+    - Measured the same day, after totalcmd.net shipped its redesign: the old `Mirror`
+      anchor is absent from the sampled FileInfo and PEViewer pages, so the old parser
+      finds no candidate there (the page itself is still reachable — `/plugring/<id>.html`
+      301s to `/plugins/<id>`). The sampled pages offer `/download/<id>/main`, and on the
+      PEViewer RU copy the host serves the archive itself —
+      `https://wincmd.ru/download/PEViewer3/main` lands on
+      `https://wincmd.ru/mirror/files/9924391/wlx_peviewer_3.0.18.rar` (https, and
+      `wincmd.ru` is already on the trusted-host list).
+      FileInfo is the exception: both hosts redirect to the same dead counter, and the site
+      still advertises 2.23 while the author has 2.24. The published catalog is unaffected
+      for now — 1216 entries, all `download.php?id=`. The new URL format and mirror layout
+      are supported by the repair in stage 20 below. Options for a direct-archive override
+      or a local release list remain under discussion; neither is decided or built.
+    - Verified: `TestInsecureRefusalIsRetryableOnlyForPlainHTTP` and the redirect tests pin
+      the sentinel split, `TestDownloadFileInsecureOptInDoesNotRefusePlainHTTP` that the
+      opt-in reaches the network instead of refusing; the harness drove both dialogs in EN
+      and RU, cancel and accept, the mid-queue decline and the summary row. `gofmt`,
+      `go vet`, `go test`, `prettier --check` and `vite build` pass (104.35 kB JS, gzip 37.17).
+20. **Review repairs and current-site mirrors** — implemented (2026-10-22;
+    `74b9f3d`, `607f048`, `61396df`; browser interaction recheck pending).
+    - A retained permissive download is scoped to that plugin's path and cannot answer a
+      strict call, including when an HTTPS URL redirected to HTTP. `errors.Join` keeps the
+      HTTP-consent signal alongside later source failures, rather than letting a dead mirror
+      overwrite it; a usable HTTPS candidate still succeeds without asking.
+    - Dialog requests use a FIFO: a background scan error waits behind an HTTP question
+      instead of abandoning the question's promise. Queued requests reuse the native modal,
+      and each confirmation focuses Cancel. Escape declines only the current question;
+      delayed close events cannot dismiss a new request.
+    - The card's open transition and editor flag, not its draft object, drive input focus.
+      Native closure synchronizes state before resetting the editor; the displayed record
+      follows the live plugin list without overwriting drafts. An updated plugin no longer
+      keeps an obsolete update offer in an already open card. Indeterminate row progress
+      removes its inline width so the stylesheet's moving bar is visible.
+    - The mirror resolver recognises both download URL formats and the current EN/RU page
+      structure. It follows only the same-plugin RU counterpart, requires the exact requested
+      version, and selects the main download button, not screenshot links. Both HEAD and GET
+      redirects stay on trusted HTTPS hosts, even with primary-source HTTP consent. Mirror
+      packages have a separate cache namespace so an ordinary source's retained package
+      cannot bypass that allowlist. A failed apply still reuses its own verified mirror
+      package on retry, and success forgets it.
+    - Regression tests cover both HTTP cache shapes, both HTTP/404 candidate orders,
+      different mirror versions, untrusted links and redirects, HEAD/GET disagreement,
+      cache-policy separation and mirror retries. The unsafe cache cases failed before
+      their repairs and pass afterwards. Eleven synthetic GUI test groups passed, including
+      an overlapping scan error and a declined HTTP item in the middle of a batch. Live
+      PEViewer mirror HEAD resolves over HTTPS to a 200 RAR response. The fixes do not
+      recover FileInfo's dead tracking script or add a local release list.
+    - Every implementation commit was checked from its archived index tree with `go vet`
+      and `go test`; the Mica and GUI snapshots also built their own frontend. One rollback
+      cleanup assertion failed once; three focused reruns and a complete rerun passed
+      without changing or skipping the test. Its intermittent failure is not diagnosed.
+      Final-source checks also passed `go test -race`, a production Go build, formatting
+      and the Wails GUI build. A real-browser interaction recheck is still pending.
 
 ## Before the first public release (v1) — shipped
 
@@ -484,10 +608,10 @@ next release (v2), and the accepted debt we deliberately postponed.
 
 ## Accepted debt / as needed
 
-- **Mica/Acrylic window effect** — temporarily disabled (see stage 3). Re-enabling needs
-  a proper theme pass: panels readable over any desktop backdrop, opaque titlebar,
-  solid fallback — with the `window_effect` value in settings.json + the
-  Get/SetWindowEffect bindings already in place.
+- ~~**Mica/Acrylic window effect** — temporarily disabled (see stage 3).~~ Shipped in
+  stage 18: Mica only (no Acrylic), Windows 11 22H2+ with a solid fallback, opaque
+  panels over the backdrop, and DWM theme sync. The no-op `window_effect` setting and
+  setter are gone; `GetWindowEffect` reports the backdrop selected at startup.
 - ~~**Unstable plugin IDs** — IDs are derived as `<type>_<folder-name>` and break when a
   plugin moves or is renamed; needs a stable identity scheme before update history
   and overrides can be fully trusted.~~ Shipped in `d32a2a1`: IDs are now
@@ -552,8 +676,8 @@ next release (v2), and the accepted debt we deliberately postponed.
   re-resolves the entry by stable id after the confirm and drops what is no longer offerable.
 - ~~**Dead i18n keys** — `settings.about` and `about.version` are defined in both languages and
   read nowhere; the About panel renders its labels from other keys.~~ Removed in `4a9f6de`.
-- **Frontend migration (Svelte 5, then Wails v3)** — in progress, one slice at a time, each slice
-  merged into `main` as a working app: no long-lived port branch and no double bugfixes. What
+- **Frontend migration (Svelte 5, then Wails v3)** — Svelte migration completed in six slices,
+  each merged into `main` as a working app; Wails v3 remains a separate future step. What
   decides the framework is the stage 13 policy, not taste: `style-src 'self'` without
   `'unsafe-inline'` rules out CSS-in-JS, `script-src 'self'` without `'unsafe-eval'` rules out
   Vue's runtime template compiler, and what survives is the compiled-template group — Svelte

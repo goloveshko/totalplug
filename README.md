@@ -112,11 +112,13 @@ path you choose.
   Checks updates against the open [totalplug-catalog](https://github.com/goloveshko/totalplug-catalog) database. The on-disk copy is revalidated by ETag on every launch — a newly published plugin shows up on the next start, an unchanged catalog costs a 304 instead of a full download — and it is what answers when the network does not.
 - 🔁 **Mirror Search on a Dead Download Link:**  
   A totalcmd.net download counter sometimes redirects to a host that no longer answers. When
-  every source the catalog names has failed, TotalPlug opens that plugin's plugring page from
-  your own machine and retries the mirror links it shows there — https only, and only from
-  hosts on a small allowlist (`wincmd.ru`). Nothing is scraped in advance: one page is fetched
-  per actually broken download. When the page offers no usable mirror, the update fails with
-  the plugin's web address in the message.
+  every catalog source fails, TotalPlug reads that plugin's current page and its linked
+  `wincmd.ru` counterpart from your own machine. The counterpart must advertise the exact
+  requested version before its main download is tried; the archive's redirects must stay on
+  trusted HTTPS hosts (`wincmd.ru` and its subdomains). Both legacy `download.php?id=` links
+  and current `/download/<id>/main` links are supported. Nothing is scraped in advance: pages
+  are fetched only for actually broken downloads. When no usable mirror is found, the update
+  fails with the plugin's web address in the message.
 - 🗜️ **Archive-Format Aware Updater:**  
   Plugin packages are dispatched by their magic bytes, so ZIP, RAR and 7z all
   install, while an unsupported container is refused with a clear message
