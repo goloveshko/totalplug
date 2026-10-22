@@ -42,12 +42,11 @@ type windowGeometry struct {
 }
 
 // settings is the persisted state. Window geometry is what the next launch
-// restores; WindowEffect is the backdrop a future effects pass will apply, kept
-// here because it, like the size, has to be known before the window exists. The
-// theme, language and font scale stay in the frontend's localStorage.
+// restores. The theme, language and font scale stay in the frontend's
+// localStorage, and the Mica backdrop is decided from the Windows build rather
+// than stored, because DWM cannot change it after the window exists.
 type settings struct {
-	Window       windowGeometry `json:"window"`
-	WindowEffect string         `json:"window_effect"`
+	Window windowGeometry `json:"window"`
 	// TcIni is a manual wincmd.ini, for a Total Commander the registry does not
 	// know about. Empty means auto-detect. It belongs to this file rather than
 	// localStorage because the scanner reads it before any page exists, and a
@@ -129,16 +128,6 @@ func (a *App) snapshotSettings() settings {
 	a.settingsMu.Lock()
 	defer a.settingsMu.Unlock()
 	return a.state
-}
-
-// setWindowEffect replaces the backdrop choice and persists it right away, so
-// the value survives even if the app dies before a close writes the mirror.
-func (a *App) setWindowEffect(effect string) error {
-	a.settingsMu.Lock()
-	a.state.WindowEffect = effect
-	s := a.state
-	a.settingsMu.Unlock()
-	return writeSettings(s)
 }
 
 // setTcIni stores the manual wincmd.ini choice, persisted right away for the

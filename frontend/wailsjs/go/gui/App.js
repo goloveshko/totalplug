@@ -54,10 +54,6 @@ export function SetTcConfig(arg1) {
   return window['go']['gui']['App']['SetTcConfig'](arg1);
 }
 
-export function SetWindowEffect(arg1) {
-  return window['go']['gui']['App']['SetWindowEffect'](arg1);
-}
-
 export function UpdatePlugin(arg1) {
   return window['go']['gui']['App']['UpdatePlugin'](arg1);
 }

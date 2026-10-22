@@ -6,3 +6,7 @@ html {
 html[data-theme='dark'] {
     background: #1e1e24;
 }
+/* Set by backdrop.js once the Go side says the window has Mica behind it. */
+html[data-backdrop='mica'] {
+    background: transparent;
+}

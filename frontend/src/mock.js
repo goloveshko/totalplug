@@ -71,6 +71,15 @@ function installMockBackend() {
         WindowToggleMaximise() {
             console.log('[mock] WindowToggleMaximise');
         },
+        WindowSetDarkTheme() {
+            console.log('[mock] WindowSetDarkTheme');
+        },
+        WindowSetLightTheme() {
+            console.log('[mock] WindowSetLightTheme');
+        },
+        WindowSetSystemDefaultTheme() {
+            console.log('[mock] WindowSetSystemDefaultTheme');
+        },
         Quit() {
             console.log('[mock] Quit');
         },
@@ -149,12 +158,10 @@ function installMockBackend() {
             });
         },
 
+        // The real bridge answers from the Windows build; in the browser the
+        // query string stands in, so `?mica` is how the backdrop CSS gets demoed.
         GetWindowEffect() {
-            return Promise.resolve('none');
-        },
-        SetWindowEffect(effect) {
-            console.log('[mock] SetWindowEffect', effect);
-            return Promise.resolve(null);
+            return Promise.resolve(location.search.includes('mica') ? 'mica' : 'none');
         },
 
         // Settings > Backups. The settings file holds these numbers in the real

@@ -1,4 +1,5 @@
 import { get, writable } from 'svelte/store';
+import { WindowSetDarkTheme, WindowSetLightTheme } from '../wailsjs/runtime';
 
 // Theme and font-scale persistence: choices live in localStorage and are
 // applied to <html> before first paint to avoid a flash of the wrong theme.
@@ -14,6 +15,9 @@ export const theme = writable(knownTheme ? savedTheme : 'system');
 function applyTheme(value) {
     const resolved = value === 'system' ? (darkQuery.matches ? 'dark' : 'light') : value;
     document.documentElement.dataset.theme = resolved;
+    // Mica is tinted by the DWM dark/light mode, so on Windows 11 the app's own
+    // choice has to reach the window and not only the page.
+    (resolved === 'dark' ? WindowSetDarkTheme : WindowSetLightTheme)();
 }
 
 // A subscriber rather than a setter: the value read at startup has to be applied

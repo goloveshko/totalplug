@@ -65,6 +65,23 @@ body {
     user-select: none;
 }
 
+/* Mica (Windows 11 22H2+): DWM paints the window, so the page must not paint a
+   background over it. Panels and dialogs keep their own opaque surfaces; only
+   the page behind them gives way. */
+html[data-backdrop='mica'],
+html[data-backdrop='mica'] body {
+    background-color: transparent;
+}
+/* Settings is the one full-window view without a card of its own; on Mica its
+   body gets one, so the nav and the panel do not float over the wallpaper. */
+html[data-backdrop='mica'] .settings-body {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-top: 14px;
+    overflow: hidden;
+}
+
 #app {
     display: flex;
     flex-direction: column;

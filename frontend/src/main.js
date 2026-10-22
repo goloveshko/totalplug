@@ -9,6 +9,7 @@ import PluginCard from './PluginCard.svelte';
 import HistoryDialog from './HistoryDialog.svelte';
 import Settings from './Settings.svelte';
 import { loadAppInfo } from './about.js';
+import { initBackdrop } from './backdrop.js';
 import { initCatalogEvents, runScan } from './catalog.js';
 import { initProgressEvents } from './progress.js';
 
@@ -24,6 +25,7 @@ const settingsRoot = document.getElementById('settings');
 
 initCatalogEvents();
 initProgressEvents();
+initBackdrop();
 
 mount(Titlebar, { target: chrome });
 mount(PluginTable, { target: tableRoot });

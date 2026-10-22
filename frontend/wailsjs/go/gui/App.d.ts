@@ -29,6 +29,4 @@ export function SetBackupPolicy(arg1:config.BackupPolicy):Promise<void>;
 
 export function SetTcConfig(arg1:string):Promise<void>;
 
-export function SetWindowEffect(arg1:string):Promise<void>;
-
 export function UpdatePlugin(arg1:domain.Plugin):Promise<domain.UpdateResult>;

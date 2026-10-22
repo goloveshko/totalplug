@@ -195,20 +195,12 @@ func (a *App) CheckForAppUpdate() (domain.AppUpdate, error) {
 	return checker.CheckAppRelease(ctx, buildinfo.Version)
 }
 
-// GetWindowEffect returns the backdrop applied at startup ("none", "mica"
-// or "acrylic"); the frontend mirrors it in the settings select and decides
-// whether to render a transparent body.
+// GetWindowEffect reports the backdrop the window was actually created with
+// ("mica" or "none"): DWM applies it before the page exists, and a build below
+// Windows 11 22H2 gets the solid background. The frontend uses this to decide
+// whether its own surfaces may stay transparent.
 func (a *App) GetWindowEffect() string {
-	return normalizeWindowEffect(a.snapshotSettings().WindowEffect)
-}
-
-// SetWindowEffect persists the backdrop choice; it is read once before the
-// window is created, so a restart is required to apply it.
-func (a *App) SetWindowEffect(effect string) error {
-	if !validWindowEffect(effect) {
-		return fmt.Errorf("unknown window effect %q", effect)
-	}
-	return a.setWindowEffect(effect)
+	return backdrop
 }
 
 // GetBackupPolicy returns the retention the updater applies to the copies it

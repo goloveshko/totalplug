@@ -34,7 +34,7 @@ func Run(assets embed.FS) error {
 
 	// Restore the last size, position and maximised state; a first run gets the
 	// compiled-in defaults. The whole loaded state is mirrored in the app, so the
-	// save on close cannot drop the backdrop choice.
+	// save on close cannot drop the Total Commander path.
 	loaded, hasSettings := loadSettings()
 	saved := loaded.Window
 	width, height := defaultWidth, defaultHeight
@@ -43,9 +43,21 @@ func Run(assets embed.FS) error {
 	}
 	app.seedSettings(loaded)
 
-	// Frameless window with a frontend-drawn titlebar. The Mica/Acrylic backdrop
-	// is temporarily disabled: a translucent window washes out the themed UI,
-	// and a proper effects pass needs its own design work (see ROADMAP).
+	// Frameless window with a frontend-drawn titlebar. On Windows 11 22H2+ the
+	// window gets the Mica backdrop and the page stays transparent above it; on
+	// anything older the same layout sits on a solid background. The attribute
+	// cannot be changed after creation, which is why there is no toggle.
+	background := &options.RGBA{R: 244, G: 244, B: 247, A: 255}
+	windowsOptions := &windows.Options{
+		WebviewUserDataPath: webviewUserDataPath(),
+	}
+	if backdrop == backdropMica {
+		background = &options.RGBA{}
+		windowsOptions.BackdropType = windows.Mica
+		windowsOptions.WebviewIsTransparent = true
+		windowsOptions.WindowIsTranslucent = true
+	}
+
 	return wails.Run(&options.App{
 		Title:  "totalplug",
 		Width:  width,
@@ -59,7 +71,7 @@ func Run(assets embed.FS) error {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 244, G: 244, B: 247, A: 255},
+		BackgroundColour: background,
 		// Width and Height place the window where the OS puts a new one; the
 		// saved position can only be applied once the HWND exists.
 		OnStartup: func(ctx context.Context) {
@@ -88,9 +100,7 @@ func Run(assets embed.FS) error {
 		OnShutdown: func(context.Context) {
 			config.ReleaseRunScratch()
 		},
-		Windows: &windows.Options{
-			WebviewUserDataPath: webviewUserDataPath(),
-		},
+		Windows: windowsOptions,
 		Bind: []interface{}{
 			app,
 		},
