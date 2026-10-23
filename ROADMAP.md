@@ -497,8 +497,9 @@ next release (v2), and the accepted debt we deliberately postponed.
       opt-in reaches the network instead of refusing; the harness drove both dialogs in EN
       and RU, cancel and accept, the mid-queue decline and the summary row. `gofmt`,
       `go vet`, `go test`, `prettier --check` and `vite build` pass (104.35 kB JS, gzip 37.17).
-20. **Review repairs and current-site mirrors** — implemented (2026-10-22;
-    `74b9f3d`, `607f048`, `61396df`; browser interaction recheck pending).
+20. **Review repairs and current-site mirrors** — done (2026-10-22;
+    `74b9f3d`, `607f048`, `61396df`; interaction rechecked in the browser and on the live
+    window 2026-10-23).
     - A retained permissive download is scoped to that plugin's path and cannot answer a
       strict call, including when an HTTPS URL redirected to HTTP. `errors.Join` keeps the
       HTTP-consent signal alongside later source failures, rather than letting a dead mirror
@@ -531,7 +532,17 @@ next release (v2), and the accepted debt we deliberately postponed.
       cleanup assertion failed once; three focused reruns and a complete rerun passed
       without changing or skipping the test. Its intermittent failure is not diagnosed.
       Final-source checks also passed `go test -race`, a production Go build, formatting
-      and the Wails GUI build. A real-browser interaction recheck is still pending.
+      and the Wails GUI build.
+    - Re-checked on 2026-10-23 in the dev harness and, after rebuilding `bin\totalplug.exe`
+      from the clean tree, on the live window. The row bar keeps every column to the same
+      width through download, extract and install; the indeterminate phase drops its inline
+      width so the stylesheet's moving bar paints; a consent question silences its row;
+      declining leaves the offer and the queue intact, accepting patches the row in place;
+      three queued requests (consent, scan error, lock notice) each kept their promise; the
+      updates filter resets itself to the full list once nothing is left to update, and the
+      drafts survive a language switch. The compiler logged no warnings. This harness never
+      dispatches a dialog `close` event, so the card's focus return and keyboard activation
+      were confirmed on the live window, where the Mica backdrop also tracks the desktop.
 
 ## Before the first public release (v1) — shipped
 
