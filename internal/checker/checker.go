@@ -30,10 +30,19 @@ func cleanVersionString(v string) string {
 	if idx := strings.Index(v, "("); idx != -1 {
 		v = v[:idx]
 	}
-	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	v = strings.TrimSpace(v)
+	v = strings.TrimPrefix(v, "v")
+	v = strings.TrimPrefix(v, "V")
 	return v
 }
 
+// parseVersionParts extracts the leading dotted-numeric core of a version
+// string. Parsing stops at the first character that is neither a digit nor a
+// separator, so a tag that follows cannot corrupt the comparison: digits after
+// such a character used to merge into the previous component ("2.0 x64" read as
+// [2, 64] and beat "2.1"), while a beta tag now reads equal to its base version
+// ("1.0beta2" vs "1.0" is 0), which is the conservative answer — no update is
+// offered on a difference the numeric core cannot vouch for.
 func parseVersionParts(v string) []int {
 	var parts []int
 	var current int
@@ -49,6 +58,8 @@ func parseVersionParts(v string) []int {
 				current = 0
 				hasNum = false
 			}
+		} else {
+			break
 		}
 	}
 	if hasNum {

@@ -23,11 +23,23 @@ func TestCompareVersions(t *testing.T) {
 		{"1.2.0", "1.2.5", -1},
 		{"2.0.1", "1.9.9", 1},
 		{"v1.8.6.1", "1.8.6.1", 0},
+		{"V2.0", "2.0", 0},
 		{"1.8.6.0", "1.8.6.1", -1},
 		{"1.2 (build 200)", "1.2", 0},
 		{"2.0", "2.0.0.0", 0},
 		{"0.9.9", "1.0.0", -1},
 		{"10.0.1", "2.0.5", 1},
+		// Digits after a letter used to merge into the previous component:
+		// "2.0 x64" parsed as [2, 64] and beat "2.1", hiding a real update.
+		{"2.0 x64", "2.1", -1},
+		{"2.0 x64", "2.0", 0},
+		{"1.0beta2", "1.0", 0},
+		{"2.2.1b", "2.2.1", 0},
+		{"1.0 beta 2", "1.0.1", -1},
+		// A leading word carries no comparable core. Nothing resolvable parses
+		// out of it, so against a real version it compares as 0.0.0 —
+		// classifyUpdate keeps such rows uncertain before any comparison runs.
+		{"build 45", "1.0", -1},
 	}
 
 	for _, tt := range tests {
@@ -72,7 +84,7 @@ func TestIsResolvableVersion(t *testing.T) {
 			t.Errorf("isResolvableVersion(%q) = false, want true", v)
 		}
 	}
-	unresolvable := []string{"Unknown", "N/A", "", "n/a", "no version info"}
+	unresolvable := []string{"Unknown", "N/A", "", "n/a", "no version info", "build 45"}
 	for _, v := range unresolvable {
 		if isResolvableVersion(v) {
 			t.Errorf("isResolvableVersion(%q) = true, want false", v)
