@@ -503,15 +503,29 @@ td code,
 }
 
 /* The row action is tonal rather than a filled button: an update is worth
-   offering, not worth shouting on every line. */
+   offering, not worth shouting on every line. The tint and the hairline ring
+   are what keep it reading as a live button in the dark theme, where a 12%
+   tonal fill alone sat so close to the disabled gray that the main row action
+   looked inert. */
 .btn-update {
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
     color: var(--accent);
     padding: 4px 10px;
     font-size: 0.8rem;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 .btn-update:hover {
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 48%, transparent);
+}
+
+/* The table's "up to date" badge answers "is this row all right" for whoever
+   scans the column, so no cell is an unexplained void — but it is quiet, so a
+   few dozen green chips cannot outshout the rows that actually need attention. */
+.badge.quiet {
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: normal;
 }
 
 /* A sortable header is a button dressed as its th, so the whole heading stays

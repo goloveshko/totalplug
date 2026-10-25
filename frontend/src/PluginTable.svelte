@@ -270,12 +270,20 @@
                                             type="button"
                                             class="btn-update"
                                             data-update={plugin.id}
+                                            title={$msg('btn.update.hint')}
                                             disabled={$progressRunning}
                                         >
                                             {$msg('btn.update')}
                                         </button>
-                                    {:else if plugin.status !== 'up_to_date'}
-                                        <span class="badge {mark.cls}">{mark.glyph} {mark.label}</span>
+                                    {:else}
+                                        <!-- Every row answers here: exceptions carry
+                                             their badge, an up-to-date row a quiet
+                                             one, so the column is never an
+                                             unexplained void. -->
+                                        <span class="badge {mark.cls}" class:quiet={plugin.status === 'up_to_date'}>
+                                            {mark.glyph}
+                                            {mark.label}
+                                        </span>
                                     {/if}
                                 </td>
                             </tr>

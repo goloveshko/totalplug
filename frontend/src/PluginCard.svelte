@@ -209,6 +209,7 @@
                         type="button"
                         class="btn-save"
                         id="card-update"
+                        title={$tr('btn.update.hint')}
                         disabled={$progressRunning}
                         onclick={onUpdate}
                     >
