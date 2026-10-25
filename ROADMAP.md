@@ -192,6 +192,21 @@ next release (v2), and the accepted debt we deliberately postponed.
   evidence the install took, and `-NoRuntime` skips the whole thing to reproduce the
   missing-runtime first run.
 - Corrupt storage JSON is quarantined to `<file>.corrupt` and reported, not silently dropped.
+- Hardening pass from the 1.2 audit (2026-10-24): the version comparator stops at the
+  first non-numeric character, so a `2.0 x64` stamp reads as 2.0 and no longer beats
+  2.1 (digits after a letter used to merge into the previous component); the scanner
+  clamps the PE translation-array count, so a resource claiming more than 64K entries
+  panics nothing; `totalcmd.exe` joined the launcher list and the list moved to
+  `config.TCLaunchers`, shared by install-dir detection and the updater's root
+  bounding (a root one of them did not know made the updater refuse a valid
+  rollback); settings writes take a mutex — binding goroutines and OnBeforeClose all
+  staged through the same `.tmp`; the checker's HTTP clients re-check the scheme on
+  every redirect (the https→http downgrade the updater already refused); the GitHub
+  release cache and the release-asset pick (first archive-named asset) are fixed; a
+  `github:` override that resolves to nothing stays unresolved with its repo link
+  instead of silently re-matching against the catalog; a 304 against an unusable
+  cache says so instead of "HTTP error: 304"; wincmd.ini splits `flags,path` only
+  when the part before the comma is a number, so a comma inside a path survives.
 
 ## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt
 
@@ -609,10 +624,14 @@ next release (v2), and the accepted debt we deliberately postponed.
   references; adding one is the reverse pass: pick a catalog entry, download it,
   extract it into its own folder under the plugins root and write the matching ini
   section. This is the "next release" the v1 scope notes point at.
-- **Sorting inside a type group** (at least status and name) — the stage 17 headings fix
-  the order of the types, so sorting is now about the rows within one run: a sort state in
-  `catalog.js`, stable ordering with the search filter, and the rule that a row keeps its
-  index into the full plugin list rather than into what is on screen.
+- ~~**Sorting inside a type group** (at least status and name)~~ Shipped before v2
+  (2026-10-24): the three content columns sort within each type group — name,
+  installed version, catalog version (version-aware, the same leading-numeric-core
+  rule the Go checker compares by, `frontend/src/plugin.js` `compareVersions`) —
+  with an ascending → descending → off cycle, `aria-sort` on the header, and F5
+  wired as the rescan shortcut. The search box also matches the type and the
+  folder now, not only the name, through one shared predicate the count chip
+  uses too (`matchesQuery`).
 - **`--json` CLI output** and a documented exit-code contract for scripting.
 - **Total Commander integration docs** — README section on wiring a "check for updates"
   user-menu button to the CLI.
@@ -645,7 +664,11 @@ next release (v2), and the accepted debt we deliberately postponed.
   and an older line no longer describes the folder. A copy retention already deleted
   stops offering it, and lines written by older versions have nothing to roll back to.
   The delete button was dropped: with a rollback there is nothing left to clean by hand.
-- **`FileHash` verification** — field exists on records but nothing computes or checks it.
+- ~~**`FileHash` verification** — field exists on records but nothing computes or
+  checks it.~~ Resolved by removal (2026-10-24): the field was never written or read,
+  and a hash of the _installed_ folder is the wrong shape for the need behind it —
+  the updater's lock-aware rename and the backup it keeps are what guard an apply.
+  Records written by older versions with a `file_hash` key simply ignore it.
 - ~~**Non-ZIP plugin archives** — totalcmd.net serves many plugins as RAR; since `b332687`
   they are rejected with a clear "unsupported archive format" hint instead of a cryptic
   zip error. Supporting RAR/7z extraction would make those updates work.~~
