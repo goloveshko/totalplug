@@ -1,6 +1,7 @@
 <script>
     import { Quit, WindowMinimise, WindowToggleMaximise } from '../wailsjs/runtime';
     import { tr, trp } from './i18n.js';
+    import { buildSuggestions } from './plugin.js';
     import {
         catalogStatus,
         pluginCount,
@@ -10,7 +11,8 @@
         setSearchQuery,
         updatesOnly,
     } from './catalog.js';
-    import { settingsOpen } from './state.js';
+    import { plugins, settingsOpen } from './state.js';
+    import { openCard } from './card.js';
     import { openHistory } from './history.js';
     import { openSettings } from './settings.js';
 
@@ -58,6 +60,67 @@
 
     let search = $state(null);
 
+    // The search box doubles as the type filter's front door: what it can
+    // filter by is offered under it. Types come first — they are the
+    // discoverable way to a whole group — and name matches follow; a type
+    // fills the box (the table already filters on it), a name opens the card.
+    const suggestions = $derived(buildSuggestions($plugins, $searchQuery));
+    const suggested = $derived(suggestions.types.length + suggestions.names.length);
+    let suggestOpen = $state(false);
+    let suggestActive = $state(-1);
+
+    function openSuggestions() {
+        suggestOpen = true;
+        suggestActive = -1;
+    }
+
+    function closeSuggestions() {
+        suggestOpen = false;
+        suggestActive = -1;
+    }
+
+    function pickSuggestion(item) {
+        closeSuggestions();
+        if (item.kind === 'type') {
+            setSearchQuery(item.type);
+            search?.focus();
+        } else {
+            openCard(item.index, search);
+        }
+    }
+
+    function onSearchKey(event) {
+        if (event.key === 'ArrowDown' && !suggestOpen && suggested > 0) {
+            event.preventDefault();
+            openSuggestions();
+            suggestActive = 0;
+            return;
+        }
+        if (!suggestOpen || suggested === 0) return;
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            suggestActive =
+                event.key === 'ArrowDown'
+                    ? (suggestActive + 1) % suggested
+                    : (suggestActive - 1 + suggested) % suggested;
+        } else if (event.key === 'Enter' && suggestActive >= 0) {
+            event.preventDefault();
+            const flat = [
+                ...suggestions.types.map((t) => ({ kind: 'type', ...t })),
+                ...suggestions.names.map((n) => ({ kind: 'name', ...n })),
+            ];
+            // A background refresh can shrink the list under an open popup.
+            const item = flat[suggestActive];
+            if (item) pickSuggestion(item);
+        } else if (event.key === 'Escape') {
+            // The first Esc closes the list; the window handler's clear-the-box
+            // answer stays one Esc behind it.
+            event.preventDefault();
+            event.stopPropagation();
+            closeSuggestions();
+        }
+    }
+
     // Ctrl+F is the one shortcut a list like this is expected to have, and an
     // empty search box leaves Esc with nothing to do: while it has text, Esc
     // clears it. F5 is the rescan the table is expected to answer to. All stay
@@ -90,17 +153,73 @@
         <span class="titlebar-title">TotalPlug</span>
         <span class="titlebar-count" id="plugin-count" hidden={count.hidden}>{count.text}</span>
     </div>
-    <input
-        type="search"
-        id="plugin-search"
-        bind:this={search}
-        placeholder={$tr('search.ph')}
-        aria-label={$tr('search.ph')}
-        autocomplete="off"
-        value={$searchQuery}
-        oninput={(event) => setSearchQuery(event.target.value)}
-        hidden={$settingsOpen}
-    />
+    <span class="search-wrap" hidden={$settingsOpen}>
+        <input
+            type="search"
+            id="plugin-search"
+            bind:this={search}
+            placeholder={$tr('search.ph')}
+            aria-label={$tr('search.ph')}
+            autocomplete="off"
+            role="combobox"
+            aria-expanded={suggestOpen && suggested > 0}
+            aria-controls="search-suggestions"
+            aria-autocomplete="list"
+            aria-activedescendant={suggestActive >= 0 ? `search-sugg-${suggestActive}` : undefined}
+            value={$searchQuery}
+            oninput={(event) => {
+                setSearchQuery(event.target.value);
+                openSuggestions();
+            }}
+            onfocus={openSuggestions}
+            onfocusout={closeSuggestions}
+            onkeydown={onSearchKey}
+        />
+        {#if suggestOpen && suggested > 0}
+            <!-- pointerdown keeps focus in the box, so the click lands before
+                 any focusout could close the list under the cursor. -->
+            <ul
+                class="search-suggest"
+                id="search-suggestions"
+                role="listbox"
+                aria-label={$tr('search.ph')}
+                onpointerdown={(event) => event.preventDefault()}
+            >
+                {#if suggestions.types.length}
+                    <li class="ss-head" role="presentation">{$tr('search.suggest.types')}</li>
+                {/if}
+                {#each suggestions.types as item, i (item.type)}
+                    <li
+                        id={`search-sugg-${i}`}
+                        role="option"
+                        aria-selected={suggestActive === i}
+                        class="ss-item"
+                        class:active={suggestActive === i}
+                        onclick={() => pickSuggestion({ kind: 'type', ...item })}
+                    >
+                        <span class="ss-type">{item.type}</span>
+                        <span class="ss-count">{$trp('count.plugins', item.count)}</span>
+                    </li>
+                {/each}
+                {#if suggestions.names.length}
+                    <li class="ss-head" role="presentation">{$tr('search.suggest.plugins')}</li>
+                {/if}
+                {#each suggestions.names as item, j (item.plugin.id)}
+                    <li
+                        id={`search-sugg-${suggestions.types.length + j}`}
+                        role="option"
+                        aria-selected={suggestActive === suggestions.types.length + j}
+                        class="ss-item"
+                        class:active={suggestActive === suggestions.types.length + j}
+                        onclick={() => pickSuggestion({ kind: 'name', ...item })}
+                    >
+                        <span class="ss-name">{item.plugin.name}</span>
+                        <span class="ss-kind">{item.plugin.type}</span>
+                    </li>
+                {/each}
+            </ul>
+        {/if}
+    </span>
     <div class="titlebar-actions" id="titlebar-actions" hidden={$settingsOpen}>
         <button
             type="button"

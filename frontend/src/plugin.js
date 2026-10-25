@@ -71,6 +71,33 @@ export function compareVersions(a, b) {
     return String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
 }
 
+// What the search box offers under it: the types whose name the query matches
+// (typing "w" offers WLX, WFX, WDX — the filter nobody can discover from
+// outside, because typing "wlx" already works through matchesQuery), then the
+// plugins whose name matches. Picking a type fills the box with it, which the
+// table already answers as a filter; picking a plugin opens its card. Pure
+// data: the titlebar draws it.
+const TYPE_ORDER = ['WCX', 'WLX', 'WFX', 'WDX'];
+const NAME_SUGGESTION_CAP = 6;
+
+export function buildSuggestions(list, query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return { types: [], names: [] };
+
+    const types = [];
+    for (const type of TYPE_ORDER) {
+        if (!type.toLowerCase().includes(q)) continue;
+        const count = list.filter((p) => p.type === type).length;
+        if (count) types.push({ type, count });
+    }
+
+    const names = [];
+    for (let index = 0; index < list.length && names.length < NAME_SUGGESTION_CAP; index++) {
+        if (list[index].name.toLowerCase().includes(q)) names.push({ index, plugin: list[index] });
+    }
+    return { types, names };
+}
+
 // One source for how a status looks, so the table and the card cannot grow a
 // second set of glyphs. Each screen labels the key through the language store.
 export function badgeFor(status) {
