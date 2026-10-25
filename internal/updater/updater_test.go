@@ -631,7 +631,7 @@ func TestInsecureRefusalIsRetryableOnlyForPlainHTTP(t *testing.T) {
 
 func TestDownloadFileRejectsInsecureURLBeforeNetwork(t *testing.T) {
 	dest := filepath.Join(t.TempDir(), "out.zip")
-	err := NewUpdater().DownloadFile(context.Background(), "http://plugins.example.com/pkg.zip", dest)
+	err := NewUpdater().downloadFile(context.Background(), "http://plugins.example.com/pkg.zip", dest, false)
 	if !errors.Is(err, ErrInsecureScheme) {
 		t.Fatalf("error = %v, want ErrInsecureScheme", err)
 	}
@@ -650,7 +650,7 @@ func TestDownloadFileRejectsInsecureRedirect(t *testing.T) {
 	defer srv.Close()
 
 	dest := filepath.Join(t.TempDir(), "out.zip")
-	err := NewUpdater().DownloadFile(context.Background(), srv.URL+"/pkg.zip", dest)
+	err := NewUpdater().downloadFile(context.Background(), srv.URL+"/pkg.zip", dest, false)
 	if !errors.Is(err, ErrInsecureScheme) {
 		t.Fatalf("error = %v, want ErrInsecureScheme", err)
 	}
@@ -676,7 +676,7 @@ func TestDownloadFileRejectsInsecureRedirect(t *testing.T) {
 	}))
 	defer source.Close()
 
-	if err := NewUpdater().DownloadFile(context.Background(), source.URL+"/pkg.zip", dest); err != nil {
+	if err := NewUpdater().downloadFile(context.Background(), source.URL+"/pkg.zip", dest, false); err != nil {
 		t.Fatalf("an allowed redirect failed: %v", err)
 	}
 	body, err := os.ReadFile(dest)
@@ -730,7 +730,7 @@ func TestDownloadFileEnforcesSizeCap(t *testing.T) {
 
 	for _, url := range []string{sized.URL, streamed.URL} {
 		dest := filepath.Join(t.TempDir(), "out.zip")
-		err := upd.DownloadFile(context.Background(), url, dest)
+		err := upd.downloadFile(context.Background(), url, dest, false)
 		if !errors.Is(err, ErrDownloadTooLarge) {
 			t.Errorf("DownloadFile(%s) error = %v, want ErrDownloadTooLarge", url, err)
 		}

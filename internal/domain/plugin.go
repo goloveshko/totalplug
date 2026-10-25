@@ -49,7 +49,6 @@ type Plugin struct {
 	LatestVersion    string            `json:"latest_version,omitempty"`
 	Confidence       VersionConfidence `json:"confidence"`
 	CustomSource     string            `json:"custom_source,omitempty"`
-	FileHash         string            `json:"file_hash,omitempty"`
 	DownloadURL      string            `json:"download_url,omitempty"`
 	// DownloadURLs lists ordered candidate sources (primary first, then
 	// catalog mirrors); empty means only DownloadURL is known.

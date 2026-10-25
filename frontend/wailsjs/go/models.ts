@@ -84,7 +84,6 @@ export namespace domain {
 	    latest_version?: string;
 	    confidence: string;
 	    custom_source?: string;
-	    file_hash?: string;
 	    download_url?: string;
 	    download_urls?: string[];
 	    web_url?: string;
@@ -109,7 +108,6 @@ export namespace domain {
 	        this.latest_version = source["latest_version"];
 	        this.confidence = source["confidence"];
 	        this.custom_source = source["custom_source"];
-	        this.file_hash = source["file_hash"];
 	        this.download_url = source["download_url"];
 	        this.download_urls = source["download_urls"];
 	        this.web_url = source["web_url"];

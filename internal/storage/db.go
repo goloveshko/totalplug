@@ -16,7 +16,6 @@ import (
 type Record struct {
 	ID        string    `json:"id"`
 	Version   string    `json:"version"`
-	FileHash  string    `json:"file_hash,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -113,12 +112,6 @@ func (db *Database) saveHistoryLocked() error {
 // saveOverridesLocked serializes the current overrides map; callers must hold mu.
 func (db *Database) saveOverridesLocked() error {
 	return writeJSONAtomic(db.overridesPath, db.overrides)
-}
-
-func (db *Database) SaveOverrides() error {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-	return db.saveOverridesLocked()
 }
 
 func (db *Database) SetUserOverride(pluginID string, override domain.Override) error {

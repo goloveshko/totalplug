@@ -258,15 +258,11 @@ func NewUpdater() *Updater {
 	}
 }
 
-// DownloadFile downloads a remote file to a local destination with context cancellation.
-// Plain HTTP is refused; UpdatePluginInsecure reaches the opt-in variant below.
-func (u *Updater) DownloadFile(ctx context.Context, url, destPath string) error {
-	return u.downloadFile(ctx, url, destPath, false)
-}
-
-// downloadFile is DownloadFile with a plain-HTTP allowance chosen by the caller.
-// Redirects get the same policy as the first request, or an HTTPS source could
-// quietly bounce the archive to plaintext.
+// downloadFile fetches url to destPath with context cancellation. Plain HTTP is
+// refused unless the caller opts in (the GUI retry after explicit consent);
+// UpdatePluginInsecure reaches the permissive variant. Redirects get the same
+// policy as the first request, or an HTTPS source could quietly bounce the
+// archive to plaintext.
 func (u *Updater) downloadFile(ctx context.Context, url, destPath string, allowInsecure bool) error {
 	if err := validateDownloadURL(url, allowInsecure); err != nil {
 		return err

@@ -48,7 +48,7 @@ func cleanIniPath(raw string) string {
 func ResolveIni(flagPath string) (iniPath string, tcDir string, err error) {
 	flagPath = cleanIniPath(flagPath)
 	if flagPath == "" {
-		iniPath, tcDir = config.FindDefaultIniPath("")
+		iniPath, tcDir = config.FindDefaultIniPath()
 		if iniPath == "" {
 			return "", "", fmt.Errorf("could not automatically locate wincmd.ini via Registry or AppData; point TotalPlug at it (Settings > Total Commander, or --ini <path> on the command line)")
 		}

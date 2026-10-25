@@ -240,7 +240,7 @@ func main() {
 	} else if res.FromCache {
 		fmt.Println("[i] Using cached catalog (revalidated with the CDN, or served offline). Use --refresh-cache to force a re-download.")
 	} else {
-		fmt.Println("[+] Fetched fresh catalog from GitHub CDN!")
+		fmt.Println("[+] Fetched fresh catalog from the community catalog site!")
 	}
 
 	categories := []struct {
