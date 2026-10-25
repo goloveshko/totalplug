@@ -60,7 +60,8 @@
 
     // Ctrl+F is the one shortcut a list like this is expected to have, and an
     // empty search box leaves Esc with nothing to do: while it has text, Esc
-    // clears it. Both stay out of modal dialogs, which have their own Esc.
+    // clears it. F5 is the rescan the table is expected to answer to. All stay
+    // out of modal dialogs, which have their own keys.
     function onWindowKey(event) {
         if ($settingsOpen || document.querySelector('dialog[open]')) return;
 
@@ -68,6 +69,11 @@
             event.preventDefault();
             search?.focus();
             search?.select();
+            return;
+        }
+        if (event.key === 'F5' && !$scanRunning) {
+            event.preventDefault();
+            runScan(false);
             return;
         }
         if (event.key === 'Escape' && (document.activeElement === search || $searchQuery !== '')) {

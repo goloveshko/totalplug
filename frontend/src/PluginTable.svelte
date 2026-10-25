@@ -5,7 +5,7 @@
     // guess whether `<tr>` is the element or a component.
     import { lang, tr as msg, trp as plural } from './i18n.js';
     import { scanFailure, scanRunning, searchQuery, updatesOnly } from './catalog.js';
-    import { badgeFor, isUpdatable } from './plugin.js';
+    import { badgeFor, compareVersions, isUpdatable, matchesQuery } from './plugin.js';
     import { plugins, progressRunning, settingsOpen } from './state.js';
     import { activeUpdate, handleUpdate, handleUpdateAll } from './update.js';
     import { openCard } from './card.js';
@@ -20,25 +20,58 @@
     // card and both update paths look a plugin up by that index, and a background
     // refresh is free to swap the list underneath them.
     const rows = derived([plugins, searchQuery, updatesOnly], ([$plugins, $query, $updatesOnly]) => {
-        const q = $query.trim().toLowerCase();
         return $plugins
             .map((plugin, index) => ({ plugin, index }))
-            .filter(
-                ({ plugin }) => (!q || plugin.name.toLowerCase().includes(q)) && (!$updatesOnly || isUpdatable(plugin)),
-            );
+            .filter(({ plugin }) => matchesQuery(plugin, $query) && (!$updatesOnly || isUpdatable(plugin)));
     });
+
+    // Sorting is a table-local affordance: it reorders rows inside each type
+    // group (the groups are the table's structure, not a side effect of the
+    // scan order) and cycles ascending → descending → off, off handing the
+    // rows back to the order the scan handed over.
+    let sort = $state({ key: '', dir: 1 });
+
+    const comparators = {
+        plugin: (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+        installed: (a, b) => compareVersions(a.installed_version, b.installed_version),
+        latest: (a, b) => compareVersions(a.latest_version, b.latest_version),
+    };
+
+    function toggleSort(key) {
+        if (sort.key !== key) {
+            sort = { key, dir: 1 };
+        } else if (sort.dir === 1) {
+            sort = { key, dir: -1 };
+        } else {
+            sort = { key: '', dir: 1 };
+        }
+    }
+
+    function ariaSort(column) {
+        if (sort.key !== column) return 'none';
+        return sort.dir === 1 ? 'ascending' : 'descending';
+    }
 
     // One group per run of equal types. The scan hands rows over in ini order and
     // the sections are parsed Packer, Lister, FileSystem, Content, so a type does
     // not normally reappear after its run ended — but the key carries the first row
     // anyway, because a run is what a group is and two runs of one type must not
-    // collide onto one key. The filters only shorten a run or drop it whole.
-    const groups = derived(rows, ($rows) => {
+    // collide onto one key. The filters only shorten a run or drop it whole, and
+    // the sort reorders rows inside a run, so a group stays one run.
+    // A $derived rune, not a derived() store: it reads the component-local sort
+    // state, which a store callback cannot track.
+    let groups = $derived.by(() => {
         const out = [];
         for (const row of $rows) {
             const last = out[out.length - 1];
             if (last && last.type === row.plugin.type) last.rows.push(row);
             else out.push({ type: row.plugin.type, key: groupKey(row), rows: [row] });
+        }
+        if (sort.key) {
+            const cmp = comparators[sort.key];
+            for (const group of out) {
+                group.rows.sort((a, b) => cmp(a.plugin, b.plugin) * sort.dir);
+            }
         }
         return out;
     });
@@ -140,7 +173,24 @@
             <thead>
                 <tr>
                     {#each columns as column}
-                        <th>{$msg(`col.${column}`)}</th>
+                        <th scope="col" aria-sort={ariaSort(column)}>
+                            {#if column !== 'status'}
+                                <button
+                                    type="button"
+                                    class="th-sort"
+                                    class:active={sort.key === column}
+                                    title={$msg('table.sort', { column: $msg(`col.${column}`) })}
+                                    onclick={() => toggleSort(column)}
+                                >
+                                    {$msg(`col.${column}`)}
+                                    <span class="sort-arrow" aria-hidden="true">
+                                        {sort.key === column ? (sort.dir === 1 ? '↑' : '↓') : ''}
+                                    </span>
+                                </button>
+                            {:else}
+                                {$msg(`col.${column}`)}
+                            {/if}
+                        </th>
                     {/each}
                 </tr>
             </thead>
@@ -164,7 +214,7 @@
                         </td>
                     </tr>
                 {:else}
-                    {#each $groups as group (group.key)}
+                    {#each groups as group (group.key)}
                         <tr class="group-head">
                             <th colspan={columns.length} scope="colgroup">
                                 {group.type} ·

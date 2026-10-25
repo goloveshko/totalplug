@@ -3,7 +3,7 @@ import { EventsOn } from '../wailsjs/runtime';
 import { derived, writable } from 'svelte/store';
 import { t } from './i18n.js';
 import { plugins } from './state.js';
-import { isUpdatable } from './plugin.js';
+import { isUpdatable, matchesQuery } from './plugin.js';
 import { openAppDialog, errorDialogHtml } from './dialog.js';
 
 // The plugin view's state and its one backend call. The markup is
@@ -29,8 +29,7 @@ export const catalogStatus = writable({ state: '', detail: '' });
 // either filter hides some. Derived, so the chip and the table cannot disagree
 // about what a row is.
 export const pluginCount = derived([plugins, searchQuery, updatesOnly], ([$plugins, $query, $updatesOnly]) => {
-    const q = $query.trim().toLowerCase();
-    const matches = (p) => (!q || p.name.toLowerCase().includes(q)) && (!$updatesOnly || isUpdatable(p));
+    const matches = (p) => matchesQuery(p, $query) && (!$updatesOnly || isUpdatable(p));
     return {
         shown: $plugins.filter(matches).length,
         total: $plugins.length,

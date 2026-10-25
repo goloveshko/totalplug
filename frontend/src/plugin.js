@@ -15,6 +15,62 @@ export const isUpdatable = (p) => p.status === 'update_avail' && !!p.download_ur
 export const isUnknownInstalled = (p) =>
     !!p && (p.confidence === 'Unknown' || !p.installed_version || /^(unknown|n\/a)/i.test(p.installed_version));
 
+// What the search box matches a row by: the name, the type it is grouped under
+// and the folder it lives in — typing "wdx" or a folder name is a way to find
+// a plugin, not a second feature. Shared by the table and the count chip so
+// the two cannot disagree about what a row matches.
+export function matchesQuery(plugin, query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+        plugin.name.toLowerCase().includes(q) ||
+        plugin.type.toLowerCase().includes(q) ||
+        (plugin.path || '').toLowerCase().includes(q)
+    );
+}
+
+// The numeric core a version string compares by: a port of the Go checker's
+// parseVersionParts, so the order the table sorts by cannot disagree with the
+// status the backend computed. Digits accumulate into components, .-_ separate
+// them, a parenthesized tail is dropped and the first any other character ends
+// the core — so "2.0 x64" sorts as 2.0 and never as 2.64.
+function versionCore(v) {
+    const parts = [];
+    let current = null;
+    const s = String(v ?? '')
+        .split('(')[0]
+        .trim()
+        .replace(/^[vV]/, '');
+    for (const ch of s) {
+        if (ch >= '0' && ch <= '9') {
+            current = (current ?? 0) * 10 + Number(ch);
+        } else if (ch === '.' || ch === '-' || ch === '_') {
+            if (current !== null) {
+                parts.push(current);
+                current = null;
+            }
+        } else {
+            break;
+        }
+    }
+    if (current !== null) parts.push(current);
+    return parts;
+}
+
+// Version-aware ordering for the sortable columns. Equal cores ("1.0" vs
+// "1.0.0", a beta tag) fall back to the raw strings, so the sort stays
+// deterministic; strings with no numeric core at all sort by string.
+export function compareVersions(a, b) {
+    const pa = versionCore(a);
+    const pb = versionCore(b);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+        const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+        if (d !== 0) return d;
+    }
+    return String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
+}
+
 // One source for how a status looks, so the table and the card cannot grow a
 // second set of glyphs. Each screen labels the key through the language store.
 export function badgeFor(status) {
