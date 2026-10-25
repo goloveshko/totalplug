@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/goloveshko/totalplug/internal/config"
@@ -90,9 +91,20 @@ func loadSettings() (settings, bool) {
 	return s, true
 }
 
+// writeMu serializes the file write itself. settingsMu only guards the state
+// snapshot, while writeSettings runs from binding goroutines (setTcIni,
+// setBackupPolicy) and from OnBeforeClose at the same time: they all stage the
+// write through the same sibling temp file, so two unsynchronized writers could
+// rename an interleaved one into place and silently drop whatever the loser
+// had — geometry, the manual wincmd.ini, the backup policy.
+var writeMu sync.Mutex
+
 // writeSettings persists the settings. It queries no window, which is what makes
 // it safe to call while the app is tearing down.
 func writeSettings(s settings) error {
+	writeMu.Lock()
+	defer writeMu.Unlock()
+
 	path := settingsPath()
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
