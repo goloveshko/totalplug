@@ -9,6 +9,8 @@ if (import.meta.env.DEV) {
 function installMockBackend() {
     const plugins = makePlugins();
     const handlers = new Map();
+    // The window state the caption buttons reflect.
+    let maximised = false;
     // Update history, newest first, in the shape the Go side gives it. The 7-Zip
     // line has no kept copy left, so it offers no rollback.
     const history = [
@@ -69,7 +71,10 @@ function installMockBackend() {
             console.log('[mock] WindowMinimise');
         },
         WindowToggleMaximise() {
-            console.log('[mock] WindowToggleMaximise');
+            maximised = !maximised;
+        },
+        WindowIsMaximised() {
+            return maximised;
         },
         WindowSetDarkTheme() {
             console.log('[mock] WindowSetDarkTheme');

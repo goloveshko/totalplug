@@ -1,5 +1,5 @@
 <script>
-    import { Quit, WindowMinimise, WindowToggleMaximise } from '../wailsjs/runtime';
+    import { Quit, WindowIsMaximised, WindowMinimise, WindowToggleMaximise } from '../wailsjs/runtime';
     import { tr, trp } from './i18n.js';
     import { buildSuggestions } from './plugin.js';
     import {
@@ -56,6 +56,24 @@
     function onTitlebarDblclick(event) {
         if (event.target.closest('input, button')) return;
         WindowToggleMaximise();
+    }
+
+    // The caption glyphs come from the system icon font — the same strokes the
+    // OS caption buttons draw — and the maximise button reads the live state so
+    // it can offer restore. The resize sync keeps that honest however the state
+    // changed: the button, the drag-area double click, or Aero Snap.
+    let maximised = $state(false);
+
+    $effect(() => {
+        const syncMaximised = () => Promise.resolve(WindowIsMaximised()).then((v) => (maximised = v));
+        syncMaximised();
+        window.addEventListener('resize', syncMaximised);
+        return () => window.removeEventListener('resize', syncMaximised);
+    });
+
+    async function onMaximiseClick() {
+        await WindowToggleMaximise();
+        maximised = await Promise.resolve(WindowIsMaximised());
     }
 
     let search = $state(null);
@@ -274,16 +292,16 @@
     </div>
     <div class="caption-buttons">
         <button type="button" id="win-min" title={$tr('win.min')} aria-label={$tr('win.min')} onclick={WindowMinimise}>
-            &#8722;
+            {'\uE921'}
         </button>
         <button
             type="button"
             id="win-max"
-            title={$tr('win.max')}
-            aria-label={$tr('win.max')}
-            onclick={WindowToggleMaximise}
+            title={maximised ? $tr('win.restore') : $tr('win.max')}
+            aria-label={maximised ? $tr('win.restore') : $tr('win.max')}
+            onclick={onMaximiseClick}
         >
-            &#9633;
+            {maximised ? '\uE923' : '\uE922'}
         </button>
         <button
             type="button"
@@ -293,7 +311,7 @@
             aria-label={$tr('win.close')}
             onclick={Quit}
         >
-            &#10005;
+            {'\uE8BB'}
         </button>
     </div>
 </div>

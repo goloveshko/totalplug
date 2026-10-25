@@ -145,6 +145,7 @@ const STRINGS = {
         'about.build': 'Built with',
         'win.min': 'Minimize',
         'win.max': 'Maximize',
+        'win.restore': 'Restore',
         'win.close': 'Close',
     },
     ru: {
@@ -296,6 +297,7 @@ const STRINGS = {
         'about.build': 'Собрано',
         'win.min': 'Свернуть',
         'win.max': 'Развернуть',
+        'win.restore': 'Свернуть в окно',
         'win.close': 'Закрыть',
     },
 };

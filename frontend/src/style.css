@@ -306,7 +306,12 @@ html[data-backdrop='mica'] .settings-body {
     width: 2.75rem;
     height: 100%;
     padding: 0;
-    font-size: 0.85rem;
+    /* The system caption glyphs (ChromeMinimize/Maximize/Restore/Close): the
+        same strokes the OS caption buttons draw, so the frameless titlebar
+        stops reading as a row of text symbols. Fluent ships with Windows 11,
+        MDL2 with Windows 10 — both carry these codepoints. */
+    font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets';
+    font-size: 0.625rem;
     font-weight: 400;
 }
 .caption-buttons button:hover {
@@ -317,7 +322,7 @@ html[data-backdrop='mica'] .settings-body {
     outline-offset: -3px;
 }
 .caption-buttons .win-close:hover {
-    background: #e81123;
+    background: #c42b1c;
     color: white;
 }
 
