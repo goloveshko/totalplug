@@ -185,10 +185,15 @@
                 aria-label={$tr('search.ph')}
                 onpointerdown={(event) => event.preventDefault()}
             >
+                <!-- The options are keyboard-reachable through the combobox
+                     itself: the input owns ArrowDown/Enter while the list is
+                     open, which is what ARIA prescribes for a listbox — so the
+                     click-only warning on each option is answered by design. -->
                 {#if suggestions.types.length}
                     <li class="ss-head" role="presentation">{$tr('search.suggest.types')}</li>
                 {/if}
                 {#each suggestions.types as item, i (item.type)}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <li
                         id={`search-sugg-${i}`}
                         role="option"
@@ -205,6 +210,7 @@
                     <li class="ss-head" role="presentation">{$tr('search.suggest.plugins')}</li>
                 {/if}
                 {#each suggestions.names as item, j (item.plugin.id)}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <li
                         id={`search-sugg-${suggestions.types.length + j}`}
                         role="option"

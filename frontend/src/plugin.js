@@ -74,22 +74,26 @@ export function compareVersions(a, b) {
 // What the search box offers under it: the types whose name the query matches
 // (typing "w" offers WLX, WFX, WDX — the filter nobody can discover from
 // outside, because typing "wlx" already works through matchesQuery), then the
-// plugins whose name matches. Picking a type fills the box with it, which the
-// table already answers as a filter; picking a plugin opens its card. Pure
-// data: the titlebar draws it.
+// plugins whose name matches. An empty query lists every installed type: the
+// box doubles as the type filter's front door, so clicking into it shows what
+// it can filter by before a single letter is typed. Picking a type fills the
+// box with it, which the table already answers as a filter; picking a plugin
+// opens its card. Pure data: the titlebar draws it.
 const TYPE_ORDER = ['WCX', 'WLX', 'WFX', 'WDX'];
 const NAME_SUGGESTION_CAP = 6;
 
 export function buildSuggestions(list, query) {
     const q = query.trim().toLowerCase();
-    if (!q) return { types: [], names: [] };
 
     const types = [];
     for (const type of TYPE_ORDER) {
-        if (!type.toLowerCase().includes(q)) continue;
+        if (q && !type.toLowerCase().includes(q)) continue;
+        // An uninstalled type is not a filter this machine can use.
         const count = list.filter((p) => p.type === type).length;
         if (count) types.push({ type, count });
     }
+
+    if (!q) return { types, names: [] };
 
     const names = [];
     for (let index = 0; index < list.length && names.length < NAME_SUGGESTION_CAP; index++) {
