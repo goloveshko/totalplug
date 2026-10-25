@@ -33,6 +33,11 @@ type LANGANDCODEPAGE struct {
 	CodePage uint16
 }
 
+// maxTranslations caps how many entries the translation array is read through:
+// the fixed-size slice type that wraps the API's pointer cannot address more,
+// and a real plugin never carries more than a handful.
+const maxTranslations = 1 << 16
+
 var (
 	modversion                  = windows.NewLazySystemDLL("version.dll")
 	procGetFileVersionInfoSizeW = modversion.NewProc("GetFileVersionInfoSizeW")
@@ -80,8 +85,15 @@ func getVersionFromStrings(buf []byte) string {
 
 	var langCodePages []string
 	if ret != 0 && lpBuffer != nil && lenInfo >= 4 {
+		// lenInfo is the byte size of the translation array; the typed slice
+		// below can only address maxTranslations entries, so a resource that
+		// claims more than that — a crafted or corrupt DLL — must be clamped
+		// instead of slicing past the type and panicking the whole scan.
 		count := lenInfo / 4
-		translations := (*[1 << 16]LANGANDCODEPAGE)(unsafe.Pointer(lpBuffer))[:count:count]
+		if count > maxTranslations {
+			count = maxTranslations
+		}
+		translations := (*[maxTranslations]LANGANDCODEPAGE)(unsafe.Pointer(lpBuffer))[:count:count]
 		for _, t := range translations {
 			langCodePages = append(langCodePages, fmt.Sprintf("%04x%04x", t.Language, t.CodePage))
 		}
