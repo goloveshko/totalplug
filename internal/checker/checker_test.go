@@ -167,10 +167,12 @@ func TestCheckUpdatesCacheOnly(t *testing.T) {
 	if !demo.PublishedAt.Equal(published) {
 		t.Errorf("catalog release date lost: got %v, want %v", demo.PublishedAt, published)
 	}
-	// A github source is skipped offline and the plugin matches no catalog
-	// entry, so it cannot be claimed up to date: an unresolved row is uncertain.
-	if ghost.LatestVersion != "N/A (Not in catalog)" || ghost.Status != domain.StatusUncertain {
-		t.Errorf("unresolved plugin must be uncertain, got: %+v", ghost)
+	// A github override skipped offline must not be silently re-resolved
+	// against the community catalog — the override is the source the user
+	// chose. The row stays uncertain and says why, until the network pass
+	// either fetches the release or leaves this answer standing.
+	if ghost.LatestVersion != "N/A (GitHub unreachable)" || ghost.Status != domain.StatusUncertain {
+		t.Errorf("unresolved github override must be uncertain, got: %+v", ghost)
 	}
 }
 

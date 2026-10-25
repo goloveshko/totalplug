@@ -226,9 +226,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 				if ghRelease, err := FetchLatestGitHubRelease(ctx, ghRepo); err == nil && ghRelease != nil && ghRelease.TagName != "" {
 					version = ghRelease.TagName
 					publishedAt = ghRelease.PublishedAt
-					if len(ghRelease.Assets) > 0 {
-						downloadURL = ghRelease.Assets[0].BrowserDownloadURL
-					}
+					downloadURL = pickGitHubAsset(ghRelease.Assets)
 					found = true
 					saveGitHubRelease(ghRepo, version, downloadURL, publishedAt)
 				}
@@ -255,6 +253,16 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 				p.Status = classifyUpdate(p.InstalledVersion, version, p.Confidence)
 				continue
 			}
+
+			// The override names this repo as the only update source, and neither
+			// a live lookup nor the remembered release answered. Falling through
+			// to the community catalog would overwrite Source and DownloadURL
+			// behind the user's back while CustomSource still says github:, so
+			// the row stays unresolved and says why instead.
+			p.LatestVersion = "N/A (GitHub unreachable)"
+			p.WebURL = fmt.Sprintf("https://github.com/%s", ghRepo)
+			p.Status = domain.StatusUncertain
+			continue
 		}
 
 		// 2. Match against community catalog
@@ -321,6 +329,25 @@ func downloadCandidates(entry CatalogEntry) []string {
 		add(src.DownloadURL)
 	}
 	return urls
+}
+
+// pickGitHubAsset chooses which release asset a github: override downloads: the
+// first one named like an archive the updater can unpack. Without the filter the
+// first asset was taken blindly, and a repo that attaches a checksums or notes
+// file ahead of the archive delivered a file the updater then refused as an
+// unsupported format. The fallback keeps repos with unusually named archives
+// working exactly as before.
+func pickGitHubAsset(assets []GitHubAsset) string {
+	if len(assets) == 0 {
+		return ""
+	}
+	for _, a := range assets {
+		switch strings.ToLower(filepath.Ext(a.Name)) {
+		case ".zip", ".rar", ".7z":
+			return a.BrowserDownloadURL
+		}
+	}
+	return assets[0].BrowserDownloadURL
 }
 
 // resolvedSourceName picks the catalog source key the resolved entry came
