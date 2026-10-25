@@ -368,9 +368,10 @@ td {
 th {
     background-color: var(--th-bg);
     color: var(--text-muted);
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
+    /* Sentence case, not caps: the caps read as shouting over a 28-plugin
+       table, and the muted color and the small size already say "heading". */
+    font-size: 0.78rem;
+    letter-spacing: 0.2px;
     font-variant-numeric: tabular-nums;
 }
 
