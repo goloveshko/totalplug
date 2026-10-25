@@ -304,7 +304,12 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 			}
 
 			pluginPath := val
-			if idx := strings.Index(val, ","); idx != -1 {
+			// A packer entry can carry its flags before the path ("7z=31,<path>").
+			// Only a pure number before the comma is a flag: splitting at any
+			// comma cut a path that itself contains one — "C:\my,dir\x.wcx"
+			// turned into "dir\x.wcx" — and a real path never opens with a bare
+			// digit run followed by a comma.
+			if idx := strings.Index(val, ","); idx != -1 && isNumeric(val[:idx]) {
 				pluginPath = val[idx+1:]
 			}
 			pluginPath = strings.TrimSpace(pluginPath)

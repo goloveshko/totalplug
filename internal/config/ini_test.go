@@ -133,6 +133,36 @@ CloudPlugin=%COMMANDER_PATH%\plugins\wfx\cloud.wfx
 	}
 }
 
+// A comma in a path is the path's own: only a numeric flags prefix before the
+// comma may be split off, so the entry keeps scanning as a real plugin.
+func TestParsePluginsFromIniKeepsCommaInPath(t *testing.T) {
+	tempDir := t.TempDir()
+	iniContent := `
+[PackerPlugins]
+ZIP=C:\my,dir\zip.wcx
+7z=31,%COMMANDER_PATH%\plugins\wcx\Total7zip\Total7zip64.wcx
+`
+	iniPath := filepath.Join(tempDir, "wincmd.ini")
+	if err := os.WriteFile(iniPath, []byte(iniContent), 0600); err != nil {
+		t.Fatalf("failed to write test ini: %v", err)
+	}
+
+	plugins, err := ParsePluginsFromIni(iniPath, `C:\TotalCmd`)
+	if err != nil {
+		t.Fatalf("ParsePluginsFromIni failed: %v", err)
+	}
+
+	var zipPath string
+	for _, p := range plugins {
+		if filepath.Base(p.Path) == "zip.wcx" {
+			zipPath = p.Path
+		}
+	}
+	if zipPath != `C:\my,dir\zip.wcx` {
+		t.Errorf("path with a comma was not kept whole: %q", zipPath)
+	}
+}
+
 func TestStablePluginID(t *testing.T) {
 	tests := []struct {
 		name       string
