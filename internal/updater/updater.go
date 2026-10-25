@@ -787,17 +787,12 @@ func (u *Updater) tryDownloadCandidates(ctx context.Context, urls []string, arch
 	return securedPackage{}, errors.Join(failures...)
 }
 
-// tcExeNames are the executables that only ever sit in a Total Commander install
-// root, which is how one is recognised from a plugin folder.
-var tcExeNames = []string{"wincmd.exe", "totalcmd64.exe"}
-
+// isTotalCommanderRoot answers through the shared launcher list, so the
+// updater recognises exactly the install roots install-dir detection does: a
+// root missing from one of the two lists makes the updater refuse an update or
+// rollback inside an install the rest of the app considers valid.
 func isTotalCommanderRoot(dir string) bool {
-	for _, exe := range tcExeNames {
-		if _, err := os.Stat(filepath.Join(dir, exe)); err == nil {
-			return true
-		}
-	}
-	return false
+	return config.HasTCLauncher(dir)
 }
 
 // pluginInsideTCRoot reports whether dir sits under a Total Commander install,

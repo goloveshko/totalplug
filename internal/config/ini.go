@@ -80,17 +80,10 @@ func FindIniFromRegistry() (iniPath string, installDir string) {
 	return "", ""
 }
 
-func FindDefaultIniPath(tcDir string) (string, string) {
+func FindDefaultIniPath() (string, string) {
 	regIni, regDir := FindIniFromRegistry()
 	if regIni != "" {
 		return regIni, regDir
-	}
-
-	if tcDir != "" {
-		localIni := filepath.Join(tcDir, "wincmd.ini")
-		if _, err := os.Stat(localIni); err == nil {
-			return localIni, tcDir
-		}
 	}
 
 	appData := os.Getenv("APPDATA")
@@ -111,18 +104,22 @@ func FindDefaultIniPath(tcDir string) (string, string) {
 	return "", ""
 }
 
-// tcLaunchers are the executables that mark a folder as a Total Commander root.
-// wincmd.exe is the 32-bit launcher and the one everyone names, but a 64-bit
-// install can ship only totalcmd64.exe, so accepting one name misses every
-// machine like that - which is most of them.
-var tcLaunchers = []string{"wincmd.exe", "totalcmd64.exe"}
+// TCLaunchers are the executables that mark a folder as a Total Commander
+// root. All three names must stay in one list shared by whoever asks the
+// question: install-dir detection (this package) and the updater's bounding of
+// what a plugin folder may live under — a root the updater does not recognise
+// makes it refuse an otherwise valid rollback. wincmd.exe is the stub the
+// installers keep launching, totalcmd.exe the 32-bit binary and totalcmd64.exe
+// the 64-bit one; a 64-bit install can ship only totalcmd64.exe, so accepting
+// one name misses most machines.
+var TCLaunchers = []string{"wincmd.exe", "totalcmd.exe", "totalcmd64.exe"}
 
-// hasTCLauncher reports whether dir holds a Total Commander executable.
-func hasTCLauncher(dir string) bool {
+// HasTCLauncher reports whether dir holds a Total Commander executable.
+func HasTCLauncher(dir string) bool {
 	if dir == "" {
 		return false
 	}
-	for _, name := range tcLaunchers {
+	for _, name := range TCLaunchers {
 		if info, err := os.Stat(filepath.Join(dir, name)); err == nil && !info.IsDir() {
 			return true
 		}
@@ -162,15 +159,15 @@ func IniInstallDir(iniPath string) string {
 // Commander the user did not select.
 func ResolveTCDir(iniPath string) string {
 	iniDir := filepath.Dir(iniPath)
-	if hasTCLauncher(iniDir) {
+	if HasTCLauncher(iniDir) {
 		return iniDir
 	}
 	// One level up is the whole depth of TC's documented layouts; walking further
 	// would search for a launcher outside the tree the user chose.
-	if parent := filepath.Dir(iniDir); hasTCLauncher(parent) {
+	if parent := filepath.Dir(iniDir); HasTCLauncher(parent) {
 		return parent
 	}
-	if recorded := IniInstallDir(iniPath); recorded != "" && hasTCLauncher(recorded) {
+	if recorded := IniInstallDir(iniPath); recorded != "" && HasTCLauncher(recorded) {
 		return recorded
 	}
 	return ""
