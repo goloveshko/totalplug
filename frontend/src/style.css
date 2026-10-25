@@ -548,7 +548,13 @@ td code,
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
+/* The global `button:hover` paints solid accent-hover behind whatever button
+   lacks a hover background of its own, and its specificity beats the `none`
+   above — on a header that is a dark slab with the label lost inside it. The
+   filter chip's hover is the house recipe for a quiet answer: a neutral tint
+   and the ink the row already uses. */
 .th-sort:hover {
+    background: var(--row-hover);
     color: var(--text-main);
 }
 .th-sort.active {
