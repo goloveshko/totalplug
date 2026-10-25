@@ -175,7 +175,7 @@ func FetchCatalog(ctx context.Context, forceRefresh bool) ([]CatalogEntry, bool,
 		req.Header.Set("If-None-Match", cache.ETag)
 	}
 
-	client := &http.Client{Timeout: HTTPTimeout}
+	client := newCheckClient(HTTPTimeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		// 2. Offline fallback: serve the cache when the network is unavailable.

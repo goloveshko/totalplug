@@ -45,7 +45,7 @@ func FetchLatestGitHubRelease(ctx context.Context, repo string) (*GitHubRelease,
 	req.Header.Set("User-Agent", "TotalPlug/"+buildinfo.Version+" (Total Commander Plugin Manager)")
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{Timeout: 8 * time.Second}
+	client := newCheckClient(8 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
