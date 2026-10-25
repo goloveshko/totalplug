@@ -123,13 +123,28 @@ func saveGitHubRelease(repo, tagName, downloadURL string, publishedAt time.Time)
 	if err != nil {
 		return
 	}
-	file, err := os.Create(path)
+	// Written beside the target and renamed over it, as every other cache file
+	// here is: os.Create truncates before a byte of the new content exists, so
+	// a crash mid-write — or the GUI and a CLI scan racing on the same file —
+	// left a half-written cache that every later load silently ignored.
+	tmp := path + ".tmp"
+	file, err := os.Create(tmp)
 	if err != nil {
 		return
 	}
-	defer file.Close()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(cache)
+	if err := encoder.Encode(cache); err != nil {
+		file.Close()
+		os.Remove(tmp)
+		return
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(tmp)
+		return
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+	}
 }

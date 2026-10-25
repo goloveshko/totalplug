@@ -193,6 +193,14 @@ func FetchCatalog(ctx context.Context, forceRefresh bool) ([]CatalogEntry, bool,
 		return cache.Snapshot.Plugins, true, nil
 	}
 
+	if resp.StatusCode == http.StatusNotModified {
+		// The CDN agrees our copy is current, but that copy holds nothing
+		// usable — unreadable, or zero plugins. Reporting the status code here
+		// read as "HTTP error: 304 Not Modified", which says nothing a user can
+		// act on; the fix is a forced re-download.
+		return nil, false, fmt.Errorf("catalog is unchanged upstream, but the local cache holds no plugins; refresh it (--refresh-cache)")
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, false, fmt.Errorf("HTTP error: %s", resp.Status)
 	}
