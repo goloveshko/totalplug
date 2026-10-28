@@ -26,6 +26,8 @@ const STRINGS = {
         'badge.missing': 'Missing',
         'badge.unknown': 'Unknown',
         'scan.error_friendly': "Couldn't scan plugins.",
+        'scan.error_no_ini':
+            'TotalPlug could not find wincmd.ini. Point it at your Total Commander install in Settings → Total Commander and scan again.',
         'btn.update': 'Update',
         'btn.update.hint': 'A backup is taken first; History can put it back.',
         'editor.title': 'Plugin version',
@@ -174,6 +176,8 @@ const STRINGS = {
         'badge.missing': 'Отсутствует',
         'badge.unknown': 'Неизвестно',
         'scan.error_friendly': 'Не удалось просканировать плагины.',
+        'scan.error_no_ini':
+            'TotalPlug не нашёл wincmd.ini. Укажите путь к установленному Total Commander в настройках (Настройки → Total Commander) и просканируйте снова.',
         'btn.update': 'Обновить',
         'btn.update.hint': 'Сначала создаётся резервная копия; «История» сможет её вернуть.',
         'editor.title': 'Версия плагина',

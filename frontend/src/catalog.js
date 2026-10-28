@@ -61,8 +61,14 @@ export async function runScan(forceRefresh = false) {
         // later through plugins:refreshed.
         setCatalogState('cache');
     } catch (err) {
-        scanFailure.set(String(err?.message ?? err));
-        openAppDialog(errorDialogHtml(err, t('scan.error_friendly'), t('about.catalog')));
+        const message = String(err?.message ?? err);
+        scanFailure.set(message);
+        // The scan could not even start: TotalPlug did not find wincmd.ini. The
+        // remedy has to be in the visible text, not behind a disclosure — a
+        // portable Total Commander is a common case, and an empty table with
+        // "couldn't scan" is how the app looks broken.
+        const remedy = message.includes('wincmd.ini') ? t('scan.error_no_ini') : t('scan.error_friendly');
+        openAppDialog(errorDialogHtml(err, remedy, t('about.catalog')));
         console.error(err);
     } finally {
         scanRunning.set(false);
