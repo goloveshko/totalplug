@@ -207,6 +207,28 @@ next release (v2), and the accepted debt we deliberately postponed.
   instead of silently re-matching against the catalog; a 304 against an unusable
   cache says so instead of "HTTP error: 304"; wincmd.ini splits `flags,path` only
   when the part before the comma is a number, so a comma inside a path survives.
+- Hardening pass from the first public issue (2026-10-28), catalog and versions: the match
+  tells the two builds of a plugin apart — the loose name match dropped the bit marker, so a
+  64-bit plugin answered to the 32-bit entry and the update unpacked the other build's
+  archive over it (the update history on this machine shows exactly that) — and it walks the
+  catalog by tier now, keeping the marker, letting the newest release win among the entries
+  that match, skipping an entry whose architecture cannot serve the installed build, and
+  matching nothing when a name normalizes to nothing (a Russian-named plugin used to answer
+  to the first Cyrillic entry); the version a plugin declares in its own `pluginst.inf` is
+  read as a key (`version=1.2`) and trusted like a binary version — the text rule wanted
+  whitespace after the word, so the key every plugin writes was invisible — while a version
+  read out of prose no longer authorizes an update; a catalog that cannot be reached marks
+  the rows uncertain instead of handing on the ini's "up to date".
+- Hardening pass from the first public issue (2026-10-28), files and window: every writer
+  takes a temp name of its own, the run folder is named after the process and not after a
+  pid (Windows reuses pids, and the stale archive of an earlier run was installed instead of
+  the current one), two copies of a plugin in the same second stay apart, and a named mutex
+  keeps the window and the command line from writing the same data folder at once; a data
+  file holding `null` no longer panics the window; the command line prints a help, answers a
+  script with an exit code (3 for a Total Commander it did not find) and says so when an
+  update went through but could not be logged; the page's content security policy keeps the
+  inline style attribute the progress bar needs, the first-run dialog says where the ini is,
+  and the table takes the width of the window instead of a centred measure.
 
 ## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt
 
