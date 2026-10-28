@@ -13,6 +13,7 @@ import (
 	"github.com/goloveshko/totalplug/internal/checker"
 	"github.com/goloveshko/totalplug/internal/config"
 	"github.com/goloveshko/totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/lock"
 	"github.com/goloveshko/totalplug/internal/pipeline"
 	"github.com/goloveshko/totalplug/internal/rollback"
 	"github.com/goloveshko/totalplug/internal/storage"
@@ -240,15 +241,21 @@ func (a *App) updatePlugin(plugin domain.Plugin, allowInsecure bool) (domain.Upd
 	a.updateMu.Lock()
 	defer a.updateMu.Unlock()
 
+	// One writer at a time per data folder. The window and the command line
+	// can both be open, and two runs replacing the same plugin folder leave a
+	// plugin that is half one version and half the other.
+	guard, err := lock.Acquire(config.DataDir(), 10*time.Second)
+	if err != nil {
+		return domain.UpdateResult{}, err
+	}
+	defer guard.Release()
+
 	a.updater.SetProgressListener(func(p domain.UpdateProgress) {
 		runtime.EventsEmit(a.ctx, updateProgressEvent, p)
 	})
 	defer a.updater.SetProgressListener(nil)
 
-	var (
-		outcome updater.Outcome
-		err     error
-	)
+	var outcome updater.Outcome
 	if allowInsecure {
 		outcome, err = a.updater.UpdatePluginInsecure(a.ctx, plugin)
 	} else {
