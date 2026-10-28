@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/goloveshko/totalplug/internal/buildinfo"
 	"github.com/goloveshko/totalplug/internal/config"
 	"github.com/goloveshko/totalplug/internal/domain"
+	"github.com/goloveshko/totalplug/internal/lock"
 	"github.com/goloveshko/totalplug/internal/pipeline"
 	"github.com/goloveshko/totalplug/internal/storage"
 	"github.com/goloveshko/totalplug/internal/updater"
@@ -24,9 +26,42 @@ type cliOptions struct {
 	history      bool
 	rollbackKey  string
 	showVersion  bool
+	showHelp     bool
 }
 
-const usageLine = "Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>] [-u|--update | --update-all | --history | --rollback <plugin>] [-v|--version]"
+// The exit codes a script can tell apart. A run that says "nothing to do" and a
+// run that says "I could not find your Total Commander" are not the same
+// answer, and before this they both answered with a zero.
+const (
+	exitOK        = 0 // done, or there was nothing to do
+	exitFailed    = 1 // an update or a rollback failed
+	exitUsage     = 2 // the command line was not understood
+	exitNoTCFound = 3 // Total Commander or its wincmd.ini was not found
+)
+
+const usageLine = "Usage: totalplug [-r|--refresh-cache] [-c|--ini <path>] [-u|--update | --update-all | --history | --rollback <plugin>] [-v|--version] [-h|--help]"
+
+const helpText = `TotalPlug - Total Commander plugin manager, version auditor and updater.
+
+Usage:
+  totalplug [options]
+
+Options:
+  -r, --refresh-cache    Re-download the community catalog instead of revalidating the cached one.
+  -c, --ini <path>       Path to wincmd.ini. Point TotalPlug at a portable Total Commander here.
+  -u, --update           Apply the updates that were found, asking first.
+      --update-all       Apply every update that was found, without asking.
+      --history          Print the updates that were applied so far.
+      --rollback <name>  Put a plugin back to the version it had before an update.
+  -v, --version          Print the version and exit.
+  -h, --help             Print this help and exit.
+
+Exit codes:
+  0  done, or there was nothing to do
+  1  an update or a rollback failed
+  2  the command line was not understood
+  3  Total Commander or its wincmd.ini was not found
+`
 
 func parseArgs(args []string) (cliOptions, error) {
 	var opts cliOptions
@@ -58,6 +93,8 @@ func parseArgs(args []string) (cliOptions, error) {
 			opts.rollbackKey = strings.TrimPrefix(arg, "--rollback=")
 		case arg == "--version" || arg == "-v":
 			opts.showVersion = true
+		case arg == "--help" || arg == "-h":
+			opts.showHelp = true
 		default:
 			return opts, fmt.Errorf("unknown option %q", arg)
 		}
@@ -94,7 +131,12 @@ func confirm(in *bufio.Reader, prompt string) bool {
 // runUpdates applies every queued plugin update and reports per-plugin results.
 // After each success the applied version is remembered in db (may be nil) so
 // blind updates stop resurfacing as uncertain on the next scan.
-func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Database) (succeeded int, failed int) {
+//
+// An update that went through but could not be written to the history file is
+// counted apart from the failures: the plugin folder did change, but the log
+// has no line for it, so the next scan cannot tell what was applied and
+// --rollback has nothing to roll back.
+func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Database) (succeeded int, failed int, unlogged int) {
 	upd := updater.NewUpdater()
 	// One scratch folder for the whole batch, taken away again on the way out:
 	// a CLI run that finished should leave nothing in %TEMP%.
@@ -123,11 +165,12 @@ func runUpdates(ctx context.Context, plugins []domain.Plugin, db *storage.Databa
 		if db != nil {
 			if err := db.RecordChange(storage.ChangeFromUpdate(p, outcome.BackupPath, outcome.AppliedFiles)); err != nil {
 				fmt.Printf("      ↳ Could not remember version %s in history: %v\n", p.LatestVersion, err)
+				unlogged++
 			}
 		}
 		succeeded++
 	}
-	return succeeded, failed
+	return succeeded, failed, unlogged
 }
 
 // readBlindAnswer prompts for one per-item decision: y = update this item,
@@ -180,12 +223,26 @@ func main() {
 	if err != nil {
 		fmt.Printf("[!] %v\n", err)
 		fmt.Println(usageLine)
-		os.Exit(1)
+		os.Exit(exitUsage)
+	}
+	if opts.showHelp {
+		fmt.Print(helpText)
+		return
 	}
 	if opts.showVersion {
 		fmt.Printf("totalplug %s\n", buildinfo.Version)
 		return
 	}
+
+	// One run at a time per data folder. The window and the command line can
+	// both be open, and two runs writing the same plugin folder, the same
+	// history file and the same caches is how a plugin ends up half updated.
+	guard, lockErr := lock.Acquire(config.DataDir(), 30*time.Second)
+	if lockErr != nil {
+		fmt.Printf("[!] %v\n", lockErr)
+		os.Exit(exitFailed)
+	}
+	defer guard.Release()
 
 	fmt.Println("================================================================================")
 	fmt.Println("                     TotalPlug - Total Commander Updater                        ")
@@ -227,9 +284,13 @@ func main() {
 
 	// The dir is empty when the ini came from %APPDATA% and the registry had no
 	// InstallDir, i.e. when TotalPlug genuinely does not know where TC is installed.
+	// Nothing was scanned in that case, so saying "0 plugins found" and exiting
+	// with a zero would be a lie a script cannot see through.
 	tcDir := res.TCDir
 	if tcDir == "" {
-		tcDir = "(unresolved; pass --ini <path to wincmd.ini> next to the install)"
+		fmt.Printf("[!] Total Commander's install folder could not be resolved from %s.\n", res.IniPath)
+		fmt.Println("[!] Pass --ini <path to wincmd.ini> next to the install, or --ini <path to the folder holding it>.")
+		os.Exit(exitNoTCFound)
 	}
 	fmt.Printf("[+] Total Commander Dir: %s\n", tcDir)
 	fmt.Printf("[+] Found wincmd.ini:    %s\n", res.IniPath)
@@ -341,7 +402,7 @@ func main() {
 		return
 	}
 
-	totalSucceeded, totalFailed := 0, 0
+	totalSucceeded, totalFailed, totalUnlogged := 0, 0, 0
 
 	if len(updatable) > 0 {
 		fmt.Printf("\nPending updates (%d):\n", len(updatable))
@@ -357,9 +418,10 @@ func main() {
 
 		if proceed {
 			fmt.Println()
-			s, f := runUpdates(context.Background(), updatable, db)
+			s, f, u := runUpdates(context.Background(), updatable, db)
 			totalSucceeded += s
 			totalFailed += f
+			totalUnlogged += u
 		} else {
 			fmt.Println("[i] Verified updates skipped.")
 		}
@@ -372,9 +434,10 @@ func main() {
 			selected := promptBlindUpdates(in, unverified)
 			if len(selected) > 0 {
 				fmt.Println()
-				s, f := runUpdates(context.Background(), selected, db)
+				s, f, u := runUpdates(context.Background(), selected, db)
 				totalSucceeded += s
 				totalFailed += f
+				totalUnlogged += u
 			}
 		}
 	}
@@ -383,7 +446,10 @@ func main() {
 		return
 	}
 	fmt.Printf("\nUPDATE SUMMARY: %d succeeded, %d failed\n", totalSucceeded, totalFailed)
-	if totalFailed > 0 {
-		os.Exit(1)
+	if totalUnlogged > 0 {
+		fmt.Printf("[!] %d update(s) went through but could not be written to the history file.\n", totalUnlogged)
+	}
+	if totalFailed > 0 || totalUnlogged > 0 {
+		os.Exit(exitFailed)
 	}
 }
