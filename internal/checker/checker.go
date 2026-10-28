@@ -113,12 +113,18 @@ func isResolvableVersion(v string) bool {
 // version. When either side cannot be resolved, or the installed version is
 // only a low-confidence fallback, the result is StatusUncertain so that no
 // automatic update is offered for a version we cannot actually verify.
+//
+// A version read out of a readme is not trusted for the decision either: it
+// is a number found in prose, and the plugin that wrote it may have meant
+// something else by it. Such a row is reported as uncertain, which is where
+// the command line offers it for a manual look instead of applying it.
 func classifyUpdate(installed, latest string, confidence domain.VersionConfidence) domain.PluginStatus {
 	if !isResolvableVersion(installed) || !isResolvableVersion(latest) {
 		return domain.StatusUncertain
 	}
 	if CompareVersions(installed, latest) < 0 {
-		if confidence == domain.ConfidenceFallback {
+		switch confidence {
+		case domain.ConfidenceFallback, domain.ConfidenceText:
 			return domain.StatusUncertain
 		}
 		return domain.StatusUpdateAvail

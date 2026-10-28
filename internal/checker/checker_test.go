@@ -106,6 +106,8 @@ func TestClassifyUpdate(t *testing.T) {
 		{"unknown installed never auto-updates", "Unknown", "1.8.6.3", domain.ConfidenceFallback, domain.StatusUncertain},
 		{"NA installed never auto-updates", "N/A", "1.8.6.3", domain.ConfidenceExact, domain.StatusUncertain},
 		{"fallback confidence blocks update", "1.0.0", "2.0.0", domain.ConfidenceFallback, domain.StatusUncertain},
+		{"a version read out of prose blocks update", "1.0.0", "2.0.0", domain.ConfidenceText, domain.StatusUncertain},
+		{"a version the plugin declares is trusted", "1.0.0", "2.0.0", domain.ConfidenceINF, domain.StatusUpdateAvail},
 		{"unparseable latest is uncertain", "1.0.0", "latest", domain.ConfidenceExact, domain.StatusUncertain},
 	}
 
