@@ -26,10 +26,11 @@ const (
 type VersionConfidence string
 
 const (
-	ConfidenceExact    VersionConfidence = "PE Binary"  // Exact version from PE Resource (.dll / .wlx)
-	ConfidenceText     VersionConfidence = "Readme/INF" // Extracted from text docs
-	ConfidenceManual   VersionConfidence = "Manual DB"  // User manually set the version in DB
-	ConfidenceFallback VersionConfidence = "Unknown"    // Could not determine
+	ConfidenceExact    VersionConfidence = "PE Binary"    // Exact version from PE Resource (.dll / .wlx)
+	ConfidenceINF      VersionConfidence = "Pluginst.inf" // Version the plugin declares in its own pluginst.inf
+	ConfidenceText     VersionConfidence = "Readme/INF"   // Extracted from text docs
+	ConfidenceManual   VersionConfidence = "Manual DB"    // User manually set the version in DB
+	ConfidenceFallback VersionConfidence = "Unknown"      // Could not determine
 )
 
 // Override allows user to manually fix name, version, or update source for a plugin.

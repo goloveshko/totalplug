@@ -1,8 +1,9 @@
 // Package scanner determines the installed version of a Total Commander plugin by
 // trying, in order, the PE version resource of the plugin binary, the resources of
-// DLLs shipped beside it, and a version string in its documentation files. Only the
-// first two are trusted as exact: a version read out of a readme, or none at all,
-// leaves the plugin uncertain.
+// DLLs shipped beside it, the version the plugin declares in its pluginst.inf, and
+// a version string in its documentation files. The first three are trusted as
+// exact: a version read out of a readme, or none at all, leaves the plugin
+// uncertain.
 package scanner
 
 import "github.com/goloveshko/totalplug/internal/domain"
@@ -32,7 +33,16 @@ func EnrichPluginVersions(plugins []domain.Plugin) []domain.Plugin {
 			continue
 		}
 
-		// Tier 3: Try Readme / INF / History files
+		// Tier 3: Try the version the plugin declares in its own pluginst.inf.
+		// It is a structured field the plugin's author wrote, not a number
+		// scraped out of prose, so it is trusted like a binary version.
+		if infVer := versionFromPluginstInf(plugins[i].Path); infVer != "" {
+			plugins[i].InstalledVersion = infVer
+			plugins[i].Confidence = domain.ConfidenceINF
+			continue
+		}
+
+		// Tier 4: Try Readme / INF / History files
 		if txtVer := getVersionFromReadme(plugins[i].Path); txtVer != "" {
 			plugins[i].InstalledVersion = txtVer
 			plugins[i].Confidence = domain.ConfidenceText
@@ -40,7 +50,7 @@ func EnrichPluginVersions(plugins []domain.Plugin) []domain.Plugin {
 			continue
 		}
 
-		// Tier 4: Unknown
+		// Tier 5: Unknown
 		plugins[i].InstalledVersion = "Unknown"
 		plugins[i].Confidence = domain.ConfidenceFallback
 		plugins[i].Status = domain.StatusUncertain

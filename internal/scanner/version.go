@@ -45,8 +45,15 @@ var (
 	procVerQueryValueW          = modversion.NewProc("VerQueryValueW")
 
 	verRegexes = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)(?:version|ver\b|release)\s+:?\s*v?([0-9]+(?:\.[0-9]+)+)`),
-		regexp.MustCompile(`(?i)v([0-9]+\.[0-9]+(?:\.[0-9]+)?)`),
+		// "Version 1.2", "version=1.2" and "Version: 1.2" all say the same
+		// thing. The separator is optional and the keyword may sit right
+		// against the number, which is how an INI file writes it — a rule that
+		// demanded whitespace after the keyword missed every pluginst.inf.
+		regexp.MustCompile(`(?i)\b(?:version|release)\b\s*[:=]?\s*v?([0-9]+(?:\.[0-9]+){1,3})`),
+		regexp.MustCompile(`(?i)\bver\.?\b\s*[:=]?\s*v?([0-9]+(?:\.[0-9]+){1,3})`),
+		// A bare "v1.2.3.4" in a sentence. The word boundary keeps it out of
+		// words that merely end in a v ("TLSv1.2").
+		regexp.MustCompile(`(?i)\bv([0-9]+(?:\.[0-9]+){1,3})`),
 	}
 )
 
