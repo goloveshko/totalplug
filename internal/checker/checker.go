@@ -173,6 +173,15 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		var err error
 		catalog, fromCache, err = FetchCatalog(ctx, c.forceRefresh)
 		if err != nil {
+			// Nothing was compared against anything, so the "up to date" the
+			// ini parser starts every row with is a claim the catalog cannot
+			// support. Report the rows as uncertain instead: a green check
+			// here hides every update the user is missing.
+			for i := range plugins {
+				if plugins[i].Status != domain.StatusNotFound {
+					plugins[i].Status = domain.StatusUncertain
+				}
+			}
 			return plugins, false, err
 		}
 	}

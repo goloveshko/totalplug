@@ -128,9 +128,10 @@ func Scan(ctx context.Context, opts Options, db *storage.Database) (Result, erro
 
 	chk := checker.NewChecker(opts.ForceRefresh, opts.CacheOnly)
 	resolved, fromCache, catalogErr := chk.CheckUpdates(ctx, plugins)
-	if catalogErr == nil {
-		plugins = resolved
-	}
+	// The checker hands back the rows it resolved — and, when the catalog
+	// could not be reached, the same rows marked uncertain, because nothing
+	// was compared. Either way these are the rows to show.
+	plugins = resolved
 
 	return Result{
 		IniPath:    iniPath,
