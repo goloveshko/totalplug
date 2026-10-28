@@ -103,11 +103,12 @@ path you choose.
   Automatically discovers `wincmd.ini` from Windows Registry (`HKCU`/`HKLM` 32-bit & 64-bit) or `%APPDATA%`, and resolves `%COMMANDER_PATH%` / `%COMMANDER_DRIVE%`. The installation folder is recognised by the Total Commander launcher found next to the ini or one level above it — the layout a portable install uses (`<install>\ini\wincmd.ini`, with `totalcmd64.exe` on a 64-bit copy) — so pointing TotalPlug at any `wincmd.ini` scans the install it belongs to, not the one the registry happens to know. When no launcher is found around the ini, the folder is reported as unresolved instead of guessing.
 - 📦 **Smart Plugin Parser & Deduplication:**  
   Extracts all Packer (`WCX`), Lister (`WLX`), File System (`WFX`), and Content (`WDX`) plugins, merging duplicate archive extensions into single logical plugins.
-- 🧬 **4-Tier Version Extraction Engine:**
+- 🧬 **5-Tier Version Extraction Engine:**
     1. **Tier 1 (PE Binary Resources):** Reads exact `VS_FIXEDFILEINFO` and `StringFileInfo` via Windows API `version.dll`.
     2. **Tier 2 (Companion DLLs):** Inspects companion libraries (e.g. `MediaInfo64.dll`) if the wrapper lacks metadata.
-    3. **Tier 3 (Docs / INF Scanner):** Extracts version strings from `pluginst.inf`, `readme.txt`, and `history.txt`.
-    4. **Tier 4 (Confidence Tags):** Transparently labels confidence (`[PE Binary]`, `[Readme/INF]`, `[Manual DB]`, `[Unknown]`).
+    3. **Tier 3 (pluginst.inf):** Reads the `version=` key the plugin declares in its own `pluginst.inf` — a structured field, so it is trusted like a binary version.
+    4. **Tier 4 (Docs / INF Scanner):** Extracts version strings from `readme.txt` and `history.txt`. A number found in prose is not trusted for the update decision on its own: the row is reported as uncertain and can be applied by hand.
+    5. **Tier 5 (Confidence Tags):** Transparently labels confidence (`[PE Binary]`, `[Pluginst.inf]`, `[Readme/INF]`, `[Manual DB]`, `[Unknown]`).
 - 🌐 **Powered by TotalPlug Community Catalog:**  
   Checks updates against the open [totalplug-catalog](https://github.com/goloveshko/totalplug-catalog) database. The on-disk copy is revalidated by ETag on every launch — a newly published plugin shows up on the next start, an unchanged catalog costs a 304 instead of a full download — and it is what answers when the network does not.
 - 🔁 **Mirror Search on a Dead Download Link:**  
@@ -216,6 +217,23 @@ go run cmd/totalplug/main.go --update-all
 > previous state.
 > Plugins whose installed version cannot be determined are never auto-updated: in `--update` they
 > are offered separately with a per-item `[y]es / [N]o / [a]ll` prompt, and `--update-all` skips them.
+
+### Exit Codes
+
+The command line answers a script with a code, not only with text:
+
+| Code | Meaning                                                                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------- |
+| `0`  | done, or there was nothing to do                                                                        |
+| `1`  | an update or a rollback failed (or an update went through but could not be written to the history file) |
+| `2`  | the command line was not understood                                                                     |
+| `3`  | Total Commander or its `wincmd.ini` was not found                                                       |
+
+`--help` prints the flags and these codes.
+
+Only one run works on a data folder at a time: the window and the command line
+both take the same lock, so a scheduled task and a manual run cannot replace the
+same plugin folder at the same moment.
 
 ### Read the Update Log and Undo an Update
 
