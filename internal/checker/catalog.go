@@ -133,24 +133,27 @@ func saveCacheAtomically(cache *CatalogCache) error {
 	if err != nil {
 		return err
 	}
-	tmpFile := cacheFile + ".tmp"
-
-	file, err := os.Create(tmpFile)
+	tmpFile, err := os.CreateTemp(filepath.Dir(cacheFile), filepath.Base(cacheFile)+".tmp-*")
 	if err != nil {
 		return err
 	}
+	tmpName := tmpFile.Name()
+	defer func() {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpName)
+	}()
 
 	// Compact JSON, mirroring catalog.min.json on the CDN.
-	if err := json.NewEncoder(file).Encode(cache); err != nil {
-		file.Close()
-		os.Remove(tmpFile)
+	if err := json.NewEncoder(tmpFile).Encode(cache); err != nil {
 		return err
 	}
-	if err := file.Close(); err != nil {
-		os.Remove(tmpFile)
+	if err := tmpFile.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpFile, cacheFile)
+	if err := os.Chmod(tmpName, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, cacheFile)
 }
 
 // FetchCatalog always revalidates the catalog against the CDN with

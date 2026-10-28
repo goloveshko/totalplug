@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -114,13 +115,28 @@ func writeSettings(s settings) error {
 	// os.WriteFile truncates the settings before a byte of the new content
 	// exists, so a crash or a full disk there left a half-written file that the
 	// next start answered with defaults — the geometry, theme and language gone
-	// for a write that never finished.
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0644); err != nil {
-		return fmt.Errorf("write settings to %s: %w", tmp, err)
+	// for a write that never finished. The temp name is this writer's own, so
+	// two windows cannot share one.
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("write settings to %s: %w", path, err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
+	tmpName := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		return fmt.Errorf("write settings to %s: %w", tmpName, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("write settings to %s: %w", tmpName, err)
+	}
+	if err := os.Chmod(tmpName, 0644); err != nil {
+		return fmt.Errorf("write settings to %s: %w", tmpName, err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("put the settings in place at %s: %w", path, err)
 	}
 	return nil

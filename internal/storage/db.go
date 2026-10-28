@@ -148,25 +148,32 @@ func (db *Database) saveRecordsLocked() error {
 // .corrupt and save the empty in-memory state over it, which loses records the
 // user never touched. Same shape as checker.saveCacheAtomically.
 func writeJSONAtomic(path string, value any) error {
-	tmpFile := path + ".tmp"
-
-	file, err := os.Create(tmpFile)
+	// A temp name of its own for every writer. A fixed one was shared by
+	// everyone writing this file at the same moment — a GUI window and a CLI
+	// scan — and the loser of that race either failed its rename or renamed a
+	// half-written file over the good one.
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return err
 	}
+	tmpName := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+	}()
 
-	encoder := json.NewEncoder(file)
+	encoder := json.NewEncoder(tmp)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(value); err != nil {
-		file.Close()
-		os.Remove(tmpFile)
 		return err
 	}
-	if err := file.Close(); err != nil {
-		os.Remove(tmpFile)
+	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpFile, path)
+	if err := os.Chmod(tmpName, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 // AppliedChange is one change the updater applied, as the history log records it.

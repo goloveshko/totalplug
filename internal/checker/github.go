@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -126,25 +127,30 @@ func saveGitHubRelease(repo, tagName, downloadURL string, publishedAt time.Time)
 	// Written beside the target and renamed over it, as every other cache file
 	// here is: os.Create truncates before a byte of the new content exists, so
 	// a crash mid-write — or the GUI and a CLI scan racing on the same file —
-	// left a half-written cache that every later load silently ignored.
-	tmp := path + ".tmp"
-	file, err := os.Create(tmp)
+	// left a half-written cache that every later load silently ignored. The
+	// temp name is this writer's own, so two writers cannot share one.
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return
 	}
+	tmpName := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+	}()
 
-	encoder := json.NewEncoder(file)
+	encoder := json.NewEncoder(tmp)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(cache); err != nil {
-		file.Close()
-		os.Remove(tmp)
 		return
 	}
-	if err := file.Close(); err != nil {
-		os.Remove(tmp)
+	if err := tmp.Close(); err != nil {
 		return
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
+	if err := os.Chmod(tmpName, 0644); err != nil {
+		return
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		_ = os.Remove(tmpName)
 	}
 }
