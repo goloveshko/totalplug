@@ -59,7 +59,7 @@ func Run(assets embed.FS) error {
 	}
 
 	return wails.Run(&options.App{
-		Title:  "totalplug",
+		Title:  "TotalPlug",
 		Width:  width,
 		Height: height,
 		// A geometry saved before the limit existed is clamped here by Wails' own
