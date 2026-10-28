@@ -75,6 +75,10 @@ func NewDatabase(dbPath string) (*Database, error) {
 // error. A file that exists but cannot be decoded is quarantined by renaming it
 // to <path>.corrupt so the (now empty) in-memory state can be rewritten cleanly
 // without silently clobbering the user's data.
+//
+// A file holding the JSON value null decodes without an error and leaves a map
+// target nil. Writing to a nil map panics, and the window that called it dies
+// with it, so the nil is turned into an empty map here.
 func readJSONFile(path string, target any) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -88,6 +92,17 @@ func readJSONFile(path string, target any) error {
 		quarantine := path + ".corrupt"
 		_ = os.Rename(path, quarantine)
 		return fmt.Errorf("invalid JSON in %s (moved to %s): %w", path, quarantine, decErr)
+	}
+
+	switch v := target.(type) {
+	case *map[string]Record:
+		if *v == nil {
+			*v = map[string]Record{}
+		}
+	case *map[string]domain.Override:
+		if *v == nil {
+			*v = map[string]domain.Override{}
+		}
 	}
 	return nil
 }
