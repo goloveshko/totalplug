@@ -39,7 +39,18 @@ func (u *Updater) BackupPlugin(pluginDir string) (string, error) {
 	}
 	relocateLegacyBackups(pluginDir, space)
 
-	backupDir := filepath.Join(space, filepath.Base(pluginDir)+backupSuffix+strconv.FormatInt(time.Now().Unix(), 10))
+	stamp := strconv.FormatInt(time.Now().Unix(), 10)
+	backupDir := filepath.Join(space, filepath.Base(pluginDir)+backupSuffix+stamp)
+	// Two copies of the same plugin taken within the same second would land in
+	// the same folder and merge into it, which is not what a copy of the
+	// folder as it was is meant to be. The suffix keeps the copies apart, and
+	// backupStamp reads it back.
+	for i := 2; ; i++ {
+		if _, err := os.Stat(backupDir); os.IsNotExist(err) {
+			break
+		}
+		backupDir = filepath.Join(space, fmt.Sprintf("%s%s%s-%d", filepath.Base(pluginDir), backupSuffix, stamp, i))
+	}
 	if _, err := copyTree(pluginDir, backupDir); err != nil {
 		return "", fmt.Errorf("creating backup of %s: %w", pluginDir, err)
 	}
@@ -88,13 +99,19 @@ func sanitizeName(name string) string {
 // backupStamp parses one name out of a plugin's namespace folder. A stamp is
 // returned only for "<plugin>.bak_<unix>" — a copy this tool wrote for this
 // plugin directory — so nothing here claims to know what a folder the user made
-// beside it holds.
+// beside it holds. A copy taken within the same second carries a "-<n>" suffix
+// so two copies cannot merge into one folder; the suffix is not part of the
+// stamp.
 func backupStamp(name, pluginDir string) (int64, bool) {
 	prefix := filepath.Base(pluginDir) + backupSuffix
 	if !strings.HasPrefix(name, prefix) {
 		return 0, false
 	}
-	ts, err := strconv.ParseInt(strings.TrimPrefix(name, prefix), 10, 64)
+	rest := strings.TrimPrefix(name, prefix)
+	if idx := strings.Index(rest, "-"); idx >= 0 {
+		rest = rest[:idx]
+	}
+	ts, err := strconv.ParseInt(rest, 10, 64)
 	return ts, err == nil
 }
 

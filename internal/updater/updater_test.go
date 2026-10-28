@@ -196,7 +196,11 @@ func TestUpdatePluginSuccessKeepsBackup(t *testing.T) {
 
 func TestUpdatePluginRollsBackOnApplyFailure(t *testing.T) {
 	root := t.TempDir()
-	pluginDir := filepath.Join(root, "wdx", "demo")
+	// Its own group folder: the backup space is shared by the whole package,
+	// and another test keeps a copy of a plugin of the same name there on
+	// purpose. The rollback has to remove the copy this test made, not every
+	// copy in the space.
+	pluginDir := filepath.Join(root, "rollbackgroup", "demo")
 	dllPath := filepath.Join(pluginDir, "demo.dll")
 	writeTestFile(t, dllPath, "old-dll")
 	writeTestFile(t, filepath.Join(pluginDir, "a.txt"), "a-old")
