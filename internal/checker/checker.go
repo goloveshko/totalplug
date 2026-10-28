@@ -158,35 +158,6 @@ func normalizeName(s string) string {
 	return result
 }
 
-// matchesPlugin performs multi-tier matching of local installed plugin to catalog entry.
-func matchesPlugin(localPlugin domain.Plugin, entry CatalogEntry) bool {
-	// Tier 1: Match by exact binary filename (e.g. "cudalister.wlx64", "mdview.wlx")
-	localBaseFilename := strings.ToLower(filepath.Base(localPlugin.Path))
-	for _, fn := range entry.Match.Filenames {
-		if strings.ToLower(fn) == localBaseFilename {
-			return true
-		}
-	}
-
-	// Tier 2: Match by normalized name and ID
-	normLocal := normalizeName(localPlugin.Name)
-	normCatalogName := normalizeName(entry.Name)
-	normCatalogID := normalizeName(entry.ID)
-
-	if normLocal == normCatalogName || normLocal == normCatalogID {
-		return true
-	}
-
-	// Tier 3: Match by explicit aliases
-	for _, alias := range entry.Match.Aliases {
-		if normalizeName(alias) == normLocal {
-			return true
-		}
-	}
-
-	return false
-}
-
 // CheckUpdates resolves installed plugins against the community catalog.
 func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]domain.Plugin, bool, error) {
 	var catalog []CatalogEntry
@@ -266,13 +237,7 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		}
 
 		// 2. Match against community catalog
-		var matchedEntry *CatalogEntry
-		for _, entry := range catalog {
-			if matchesPlugin(*p, entry) {
-				matchedEntry = &entry
-				break
-			}
-		}
+		matchedEntry := matchCatalogEntry(*p, catalog)
 
 		if matchedEntry != nil && matchedEntry.Resolved != nil {
 			p.LatestVersion = matchedEntry.Resolved.Version
