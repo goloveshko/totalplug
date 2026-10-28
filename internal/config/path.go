@@ -207,8 +207,17 @@ func SweepScratch(maxAge time.Duration) int {
 }
 
 // runDirName is this process's folder name inside the scratch root.
+//
+// The pid alone is not enough: Windows hands a pid to a later process once the
+// first one is gone, and that process then finds the earlier run's folder —
+// with the packages it had already downloaded — waiting under its own name. A
+// run that starts there reads that copy instead of fetching the current one.
+// The clock makes the name this process's own, and it is computed once, so
+// every update of a run still shares one folder.
+var runDir = fmt.Sprintf("%s%d-%d", runPrefix, os.Getpid(), time.Now().UnixNano())
+
 func runDirName() string {
-	return fmt.Sprintf("%s%d", runPrefix, os.Getpid())
+	return runDir
 }
 
 func resolveDataDir() string {

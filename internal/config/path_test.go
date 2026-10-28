@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -163,8 +164,13 @@ func TestRunScratchIsOneFolderPerProcess(t *testing.T) {
 	if first != second {
 		t.Errorf("a run must reuse one folder, got %q then %q", first, second)
 	}
-	if want := fmt.Sprintf("%s%d", runPrefix, os.Getpid()); filepath.Base(first) != want {
-		t.Errorf("run folder = %q, want %q", filepath.Base(first), want)
+	// The folder carries the pid and something that makes it this process's
+	// own: Windows hands a pid to a later process, and that process must not
+	// find an earlier run's folder — with the packages it downloaded — under
+	// its own name.
+	base := filepath.Base(first)
+	if !strings.HasPrefix(base, fmt.Sprintf("%s%d-", runPrefix, os.Getpid())) {
+		t.Errorf("run folder = %q, want it to start with %q", base, fmt.Sprintf("%s%d-", runPrefix, os.Getpid()))
 	}
 }
 
