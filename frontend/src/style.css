@@ -17,8 +17,9 @@
     --row-hover: rgba(0, 0, 0, 0.04);
     --track-bg: #d8d8e2;
     --scroll-thumb: #c6c6d2;
-    /* The list and the strip over it share one measure, so the table does not
-       stretch to 3440px while its header text stays at the left edge. */
+    /* The settings keep a reading measure: the nav and the panel are a page of
+       prose, not a table of rows, and a measure keeps them readable. The main
+       list does not use it — the table takes the width of the window. */
     --content-max: 1120px;
     /* Badge colors carry text on a 15% tint, so they need an AA contrast
        against the card background, not just a pretty hue. */
@@ -367,9 +368,7 @@ button:disabled {
     justify-content: space-between;
     gap: 12px;
     width: 100%;
-    max-width: var(--content-max);
-    /* The flex column has no auto centring for a fixed measure. */
-    margin: 0 auto 10px;
+    margin: 0 0 10px;
     padding: 8px 14px;
     box-sizing: border-box;
     background: var(--card-bg);
@@ -400,13 +399,18 @@ button:disabled {
 }
 
 /* The scroll container. Sticky <th> only sticks to the element that actually
-   scrolls, so #view-main must not be the scroller as well. */
+   scrolls, so #view-main must not be the scroller as well.
+
+   The table takes the whole width of the window. A centred measure left the
+   titlebar's search box and caption buttons at the far right of a wide screen
+   and the list in the middle, with empty margins between them; the list and
+   the chrome now share one width. The columns that carry data keep theirs and
+   the plugin name takes the slack, the way a file manager's details view does
+   on the same screen. */
 .table-container {
     flex: 1;
     min-height: 0;
     width: 100%;
-    max-width: var(--content-max);
-    margin-inline: auto;
     box-sizing: border-box;
     overflow: auto;
     background: var(--card-bg);
@@ -638,6 +642,23 @@ td code,
 #view-main thead th:last-child {
     width: 170px;
     text-align: right;
+}
+
+/* The two version columns are as wide as what they hold and never wider: on a
+   wide window the extra space belongs to the name, the way a file manager's
+   details view gives it to the file name. An auto table layout shares the
+   slack between all the columns instead, and the row then reads as four
+   separate fields drifting apart from each other.
+
+   The cells need their own rule: a cell inherits from its row, not from the
+   heading above it, so nowrap on the th alone left the release date to wrap
+   under the version it belongs to. */
+#view-main thead th:nth-child(2),
+#view-main thead th:nth-child(3),
+#view-main tbody td:nth-child(2),
+#view-main tbody td:nth-child(3) {
+    width: 1%;
+    white-space: nowrap;
 }
 .row-status {
     text-align: right;
