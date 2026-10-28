@@ -4,10 +4,15 @@
         <meta charset="UTF-8" />
         <!-- Production-only (vite dev strips it — see vite.config.js). Wails prepends its
          own runtime scripts to <head> and delivers Go->JS callbacks through WebView2
-         ExecuteScript; neither is affected by a page CSP meta tag. -->
+         ExecuteScript; neither is affected by a page CSP meta tag.
+
+         style-src-attr 'unsafe-inline' allows the one inline style attribute the table
+         uses — the width of the download progress bar. Without it the browser drops
+         the attribute and the bar stays empty while the download runs; the
+         stylesheets themselves stay as strict as before. -->
         <meta
             http-equiv="Content-Security-Policy"
-            content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+            content="default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
         />
         <meta content="width=device-width, initial-scale=1.0" name="viewport" />
         <title>TotalPlug</title>
