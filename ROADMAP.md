@@ -239,6 +239,22 @@ next release (v2), and the accepted debt we deliberately postponed.
   the first DLL that answered was taken as the version of the plugin, so only a helper whose
   name belongs to the plugin counts now; the card names the source of the installed version
   in the user's language instead of showing the internal token the backend answers with.
+- What the totalcmd.net redesign showed (2026-10-29), catalog and site: a plugin page is
+  served under `https://totalcmd.net/plugins/<id>` now and the old `/plugring/<id>.html`
+  only redirects to it, so the catalog entries and the app's own mirror list point at the
+  address the site answers with instead of the one that used to; the feed row grew to
+  eight fields and two of them were dropped on the floor — the second build (`x64`) and
+  the flag that says a plugin was published with sources — so a 64-bit plugin was answered
+  with the 32-bit entry and a plugin that ships sources lost them; the feed also lists the
+  same plugin twice, once under the id it was first published under and once under the id
+  it carries today, and the older upload was the one the catalog kept: the installed
+  PEViewer 3.0.18 matched the 2.0 entry from 2012, so the app offered the page of a
+  version that is thirteen years old. The catalog folds such a pair into one entry now,
+  and only on narrow evidence — the same normalised name, and an id that is the other's
+  stem plus a version — because the bit marker in an id and the words "beta" or "patched"
+  in it mean two different builds of one plugin, not two versions of it. The client folds
+  nothing: "one name → the newer one" is wrong for a plugin that ships several builds
+  side by side, so only the catalog, which sees the whole feed at once, decides.
 
 ## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt
 
