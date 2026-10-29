@@ -31,7 +31,7 @@
         "totalcmd": {
           "version": "1.8.6.1",
           "download_url": "https://totalcmd.net/download.php?id=CudaLister",
-          "web_url": "https://totalcmd.net/plugring/CudaLister.html",
+          "web_url": "https://totalcmd.net/plugins/CudaLister",
           "arch": "x32+x64",
           "published_at": "2026-04-05T00:00:00Z",
           "resolved_from": "totalcmd"
@@ -50,7 +50,7 @@
       "resolved": {
         "version": "2.0.1.0",
         "download_url": "https://totalcmd.net/download.php?id=gitcmd64",
-        "web_url": "https://totalcmd.net/plugring/gitcmd64.html",
+        "web_url": "https://totalcmd.net/plugins/gitcmd64",
         "arch": "x32+x64",
         "published_at": "2021-02-01T00:00:00Z",
         "resolved_from": "totalcmd"
@@ -79,7 +79,7 @@
       "resolved": {
         "version": "2.0b",
         "download_url": "https://totalcmd.net/download.php?id=13954",
-        "web_url": "https://totalcmd.net/plugring/13954.html",
+        "web_url": "https://totalcmd.net/plugins/13954",
         "arch": "x32+x64",
         "published_at": "2026-09-04T00:00:00Z",
         "resolved_from": "totalcmd"

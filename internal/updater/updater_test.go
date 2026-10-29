@@ -1088,9 +1088,9 @@ func TestUpdatePluginDownloadFailurePointsAtPluginPage(t *testing.T) {
 	_, err := NewUpdater().UpdatePlugin(context.Background(), domain.Plugin{
 		Path:        pluginFile,
 		DownloadURL: srv.URL,
-		WebURL:      "https://totalcmd.net/plugring/fileinfo.html",
+		WebURL:      "https://totalcmd.net/plugins/fileinfo",
 	})
-	if err == nil || !strings.Contains(err.Error(), "plugin page: https://totalcmd.net/plugring/fileinfo.html") {
+	if err == nil || !strings.Contains(err.Error(), "plugin page: https://totalcmd.net/plugins/fileinfo") {
 		t.Fatalf("error should point at the plugin page, got: %v", err)
 	}
 	if readTestFile(t, pluginFile) != "original" {

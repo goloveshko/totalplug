@@ -6,6 +6,67 @@ import (
 	"github.com/goloveshko/totalplug/internal/domain"
 )
 
+// peViewerCatalog is the shape the live catalog holds for PE Viewer after the
+// builder folded the upload from 2012 into the one from 2025: one entry, the
+// current version, the page of the current upload, and the file name of the
+// older page — which is the name the installed copy answers to.
+func peViewerCatalog() []CatalogEntry {
+	return []CatalogEntry{
+		{
+			ID:   "totalcmd_PEViewer3",
+			Name: "PE Viewer",
+			Arch: "x32+x64",
+			Match: MatchRule{
+				Aliases:   []string{"pe viewer", "PEViewer3", "peviewer"},
+				Filenames: []string{"peviewer3.wlx", "peviewer.wlx"},
+			},
+			Resolved: &ResolvedSource{
+				Version:     "3.0.18",
+				DownloadURL: "https://totalcmd.net/download.php?id=PEViewer3",
+				WebURL:      "https://totalcmd.net/plugins/PEViewer3",
+			},
+		},
+	}
+}
+
+// The plugin the site calls PE Viewer installs as "PEViewer.wlx", and the
+// entry that carries the current release is the one the site serves under
+// "PEViewer3". Before the catalog folded the older upload into it, the
+// installed copy was answered with the 2012 release and a page of 2012.
+func TestMatchCatalogEntryFindsTheCurrentUpload(t *testing.T) {
+	catalog := peViewerCatalog()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "the 32-bit build", path: `C:\Program Files\Total Commander\Plug-Ins\wlx\PEViewer\PEViewer.wlx`},
+		{name: "the 64-bit build", path: `C:\Program Files\Total Commander\Plug-Ins\wlx\PEViewer\PEViewer.wlx64`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			local := domain.Plugin{
+				Name:             "PEViewer",
+				Path:             tt.path,
+				Type:             domain.TypeLister,
+				InstalledVersion: "3.0.18",
+			}
+
+			entry := matchCatalogEntry(local, catalog)
+			if entry == nil {
+				t.Fatal("no catalog entry matched")
+			}
+			if entry.Resolved.Version != "3.0.18" {
+				t.Errorf("version = %q, want 3.0.18", entry.Resolved.Version)
+			}
+			if want := "https://totalcmd.net/plugins/PEViewer3"; entry.Resolved.WebURL != want {
+				t.Errorf("site = %q, want %q", entry.Resolved.WebURL, want)
+			}
+		})
+	}
+}
+
 // uninstallerCatalog is the shape the live catalog holds for a plugin that
 // ships in two builds under names that differ only in the bit suffix: the
 // 32-bit entry comes first and carries the newer version, so a matcher that

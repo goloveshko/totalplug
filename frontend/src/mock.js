@@ -430,7 +430,7 @@ function makePlugins() {
             source: 'wincmd_ru',
             download_url: 'http://example.invalid/uninstall-1.5.2.zip',
             published_at: iso(-400, 11),
-            web_url: 'https://totalcmd.net/plugring/uninstall_list.html',
+            web_url: 'https://totalcmd.net/plugins/uninstall_list',
             description: 'Content plugin: список установленных программ с быстрым удалением.',
         }),
         base({
