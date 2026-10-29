@@ -36,6 +36,27 @@ func TestCompareVersions(t *testing.T) {
 		{"1.0beta2", "1.0", 0},
 		{"2.2.1b", "2.2.1", 0},
 		{"1.0 beta 2", "1.0.1", -1},
+		// Two revision letters are two releases: 0.6a is older than 0.6c, and
+		// the update carrying 0.6c was hidden while they compared as equal.
+		{"0.6a", "0.6c", -1},
+		{"0.6c", "0.6a", 1},
+		{"0.6a", "0.6b", -1},
+		{"1.95c", "1.95c", 0},
+		// A revision letter against the plain version it belongs to stays
+		// equal: the difference is one the numbers cannot vouch for.
+		{"0.6a", "0.6", 0},
+		{"0.99b6", "0.99b7", -1},
+		{"0.99b6", "0.99b6", 0},
+		// Two pre-release words order as words, and by the number after them.
+		{"1.0beta2", "1.0rc1", -1},
+		{"1.0rc1", "1.0rc2", -1},
+		{"1.0alpha1", "1.0beta1", -1},
+		// A revision letter against a pre-release word, and a build the
+		// comparison does not understand, stay equal.
+		{"0.2b", "0.2 beta", 0},
+		{"1.95c", "1.95c_patched", 0},
+		{"1.50", "1.50 Final", 0},
+		{"1.83 beta", "1.83", 0},
 		// A leading word carries no comparable core. Nothing resolvable parses
 		// out of it, so against a real version it compares as 0.0.0 —
 		// classifyUpdate keeps such rows uncertain before any comparison runs.

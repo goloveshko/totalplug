@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,54 +37,174 @@ func cleanVersionString(v string) string {
 	return v
 }
 
-// parseVersionParts extracts the leading dotted-numeric core of a version
-// string. Parsing stops at the first character that is neither a digit nor a
+// versionParts is a version split into the numbers it is made of and the
+// letters that follow them.
+type versionParts struct {
+	numbers []int
+	suffix  string
+}
+
+// parseVersion splits a version into its numeric core and the suffix that
+// follows it. The core is the leading dotted-numeric run and the suffix is
+// everything after it, so "0.6a" is the number 0.6 with the letter a and
+// "1.0beta2" is the number 1.0 with the tag beta2.
+//
+// Parsing the core stops at the first character that is neither a digit nor a
 // separator, so a tag that follows cannot corrupt the comparison: digits after
 // such a character used to merge into the previous component ("2.0 x64" read as
-// [2, 64] and beat "2.1"), while a beta tag now reads equal to its base version
-// ("1.0beta2" vs "1.0" is 0), which is the conservative answer — no update is
-// offered on a difference the numeric core cannot vouch for.
-func parseVersionParts(v string) []int {
-	var parts []int
+// [2, 64] and beat "2.1").
+func parseVersion(v string) versionParts {
+	var numbers []int
 	var current int
 	var hasNum bool
+	end := 0
 
-	for _, ch := range v {
+	for i, ch := range v {
 		if ch >= '0' && ch <= '9' {
 			current = current*10 + int(ch-'0')
 			hasNum = true
+			end = i + 1
 		} else if ch == '.' || ch == '-' || ch == '_' {
 			if hasNum {
-				parts = append(parts, current)
+				numbers = append(numbers, current)
 				current = 0
 				hasNum = false
 			}
+			end = i + 1
 		} else {
 			break
 		}
 	}
 	if hasNum {
-		parts = append(parts, current)
+		numbers = append(numbers, current)
 	}
-	return parts
+	return versionParts{numbers: numbers, suffix: v[end:]}
+}
+
+// parseVersionParts extracts the leading dotted-numeric core of a version
+// string.
+func parseVersionParts(v string) []int {
+	return parseVersion(v).numbers
+}
+
+// The kinds of suffix a version can carry after its numeric core.
+const (
+	suffixNone = iota
+	suffixRev
+	suffixPre
+	suffixOther
+)
+
+// parseSuffix reads the letters that follow the numeric core: a revision
+// letter ("0.6a"), a pre-release word ("1.0beta2", "11.03 rc3"), or something
+// the comparison does not understand ("1.95c_patched").
+func parseSuffix(suffix string) (kind int, word string, number int) {
+	s := strings.ToLower(strings.TrimSpace(suffix))
+
+	end := 0
+	for end < len(s) && isVersionLetter(s[end]) {
+		end++
+	}
+	word = s[:end]
+	if word == "" {
+		return suffixNone, "", 0
+	}
+
+	// A number may follow the word, separated by a space, a dot or nothing.
+	rest := strings.TrimLeft(s[end:], " .-_")
+	digits := 0
+	for digits < len(rest) && rest[digits] >= '0' && rest[digits] <= '9' {
+		digits++
+	}
+	if digits > 0 {
+		number, _ = strconv.Atoi(rest[:digits])
+	}
+
+	switch word {
+	case "alpha", "beta", "rc", "pre":
+		return suffixPre, word, number
+	}
+	if len(word) == 1 {
+		return suffixRev, word, number
+	}
+	return suffixOther, word, number
+}
+
+func isVersionLetter(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// preReleaseRank orders the pre-release words: alpha before beta before rc.
+func preReleaseRank(word string) int {
+	switch word {
+	case "alpha":
+		return 0
+	case "beta":
+		return 1
+	case "rc":
+		return 2
+	}
+	return 0
+}
+
+// compareSuffixes orders the letters that follow the numeric core.
+//
+// The rules are deliberately conservative: a difference the letters cannot
+// vouch for reads as equal, because an update offered on a difference we do
+// not understand puts another archive over a working plugin.
+//
+//   - two revision letters order as letters, so 0.6a is older than 0.6c and
+//     the release that carries 0.6c is not hidden any more
+//   - two pre-release words order as words (alpha before beta before rc) and
+//     by the number that follows them
+//   - anything else reads as equal: a plain version against a tagged one
+//     ("1.0beta2" and "1.0"), a revision letter against a pre-release word,
+//     and a build the comparison does not understand ("1.95c_patched")
+func compareSuffixes(s1, s2 string) int {
+	kind1, word1, num1 := parseSuffix(s1)
+	kind2, word2, num2 := parseSuffix(s2)
+
+	if kind1 != kind2 {
+		return 0
+	}
+	switch kind1 {
+	case suffixRev:
+		if word1 != word2 {
+			return strings.Compare(word1, word2)
+		}
+	case suffixPre:
+		if r1, r2 := preReleaseRank(word1), preReleaseRank(word2); r1 != r2 {
+			return r1 - r2
+		}
+	default:
+		return 0
+	}
+
+	if num1 != num2 {
+		if num1 < num2 {
+			return -1
+		}
+		return 1
+	}
+	return 0
 }
 
 func CompareVersions(v1, v2 string) int {
-	p1 := parseVersionParts(cleanVersionString(v1))
-	p2 := parseVersionParts(cleanVersionString(v2))
+	p1 := parseVersion(cleanVersionString(v1))
+	p2 := parseVersion(cleanVersionString(v2))
 
-	maxLen := len(p1)
-	if len(p2) > maxLen {
-		maxLen = len(p2)
+	maxLen := len(p1.numbers)
+	if len(p2.numbers) > maxLen {
+		maxLen = len(p2.numbers)
 	}
 
 	for i := 0; i < maxLen; i++ {
 		var n1, n2 int
-		if i < len(p1) {
-			n1 = p1[i]
+		if i < len(p1.numbers) {
+			n1 = p1.numbers[i]
 		}
-		if i < len(p2) {
-			n2 = p2[i]
+		if i < len(p2.numbers) {
+			n2 = p2.numbers[i]
 		}
 
 		if n1 < n2 {
@@ -94,7 +215,7 @@ func CompareVersions(v1, v2 string) int {
 		}
 	}
 
-	return 0
+	return compareSuffixes(p1.suffix, p2.suffix)
 }
 
 // isResolvableVersion reports whether the given version string carries any
