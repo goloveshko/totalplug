@@ -327,13 +327,30 @@ html[data-backdrop='mica'] .settings-body {
     color: white;
 }
 
+/* On a wide window this view holds two things side by side: the list of plugins
+   and the card of the plugin the user picked. The grid places them without a
+   wrapper around the table, so the table's own markup stays as it was, and the
+   card's column is empty — and takes no room — while no card is open. */
 #view-main {
     flex: 1;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
     padding: 10px 16px 16px;
+}
+
+/* The strip above the list belongs to the list, but it keeps the whole width:
+   a strip squeezed into the list's column would push its own button out. */
+.update-all {
+    grid-column: 1 / -1;
+    grid-row: 1;
+}
+
+.table-container {
+    grid-column: 1;
+    grid-row: 2;
 }
 
 button {
@@ -982,7 +999,9 @@ dialog {
 dialog::backdrop {
     background: rgba(0, 0, 0, 0.6);
 }
-dialog h2 {
+/* The card's body, wherever it is shown: the rules hang off the body and not
+   off the dialog, because on a wide window the same body stands in the rail. */
+.card-body h2 {
     margin: 0 0 4px;
     font-size: 1.1rem;
 }
@@ -991,6 +1010,26 @@ dialog h2 {
     max-width: 92vw;
     /* Room for the corner close button, same as the app dialog. */
     padding-top: 34px;
+}
+
+/* The rail: the card as the column beside the list. It is the same card the
+   dialog shows, so it carries the same surface — a panel of its own, with the
+   close button in the corner and the body scrolling inside it. */
+.card-rail {
+    grid-column: 2;
+    grid-row: 2;
+    position: relative;
+    box-sizing: border-box;
+    width: 380px;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    /* Room for the corner close button, same as the dialog. */
+    padding: 34px 24px 18px;
+    /* The gap lives on the rail: a gap between the columns would leave a hole
+       at the right edge of the window while the rail is closed. */
+    margin-left: 12px;
 }
 .card-sub {
     color: var(--text-muted);
@@ -1073,13 +1112,13 @@ dialog h2 {
     color: var(--text-muted);
     margin-bottom: 10px;
 }
-dialog label {
+.card-body label {
     display: block;
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-bottom: 12px;
 }
-dialog input {
+.card-body input {
     display: block;
     width: 100%;
     margin-top: 4px;
@@ -1092,7 +1131,7 @@ dialog input {
     font-size: 0.9rem;
     user-select: text;
 }
-dialog input:focus {
+.card-body input:focus {
     outline: none;
     border-color: var(--accent);
 }

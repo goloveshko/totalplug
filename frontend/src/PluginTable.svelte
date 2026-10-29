@@ -9,6 +9,7 @@
     import { plugins, progressRunning, settingsOpen } from './state.js';
     import { activeUpdate, handleUpdate, handleUpdateAll } from './update.js';
     import { openCard } from './card.js';
+    import PluginRail from './PluginRail.svelte';
     import { releaseDate } from './text.js';
 
     // The plugin table as one component: rows, the batch bar over them and the
@@ -293,4 +294,7 @@
             </tbody>
         </table>
     </div>
+    <!-- The card of the picked plugin, as the column beside the list. On a
+         narrow window it draws nothing and the card stays a dialog. -->
+    <PluginRail />
 </div>

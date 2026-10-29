@@ -10,6 +10,7 @@ import Settings from './Settings.svelte';
 import { loadAppInfo } from './about.js';
 import { initBackdrop } from './backdrop.js';
 import { initCatalogEvents, runScan } from './catalog.js';
+import { initLayout } from './layout.js';
 import { initUpdateEvents } from './update.js';
 
 // Composition root: every screen is a Svelte island that stays mounted and reads
@@ -25,6 +26,7 @@ const settingsRoot = document.getElementById('settings');
 initCatalogEvents();
 initUpdateEvents();
 initBackdrop();
+initLayout();
 
 mount(Titlebar, { target: chrome });
 mount(PluginTable, { target: tableRoot });
