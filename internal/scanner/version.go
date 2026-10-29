@@ -185,19 +185,125 @@ func getFileVersionFromCompanionDLLs(pluginPath string) string {
 		return ""
 	}
 
+	names := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext == ".dll" {
-			dllPath := filepath.Join(dir, entry.Name())
-			if ver, err := getFileVersion(dllPath); err == nil && ver != "" {
-				return ver
-			}
-		}
+		names = append(names, entry.Name())
 	}
-	return ""
+
+	chosen := pickCompanionDLL(filepath.Base(pluginPath), names)
+	if chosen == "" {
+		return ""
+	}
+	ver, err := getFileVersion(filepath.Join(dir, chosen))
+	if err != nil {
+		return ""
+	}
+	return ver
+}
+
+// pickCompanionDLL chooses the helper DLL that belongs to the plugin.
+//
+// Only a DLL that belongs to the plugin counts. A plugin folder can hold a
+// shared runtime too, and a plugin that reported the version of the SQLite
+// library beside it was reporting a number that has nothing to do with it.
+// The names are read without their digits, so "MediaInfo64.dll" belongs to
+// "TCMediaInfo.wdx" and to "MediaInfo.wdx", and "sqlite3.dll" belongs to
+// nothing.
+func pickCompanionDLL(pluginFile string, names []string) string {
+	pluginStem := nameStem(pluginFile)
+	if pluginStem == "" {
+		return ""
+	}
+
+	best := ""
+	bestStem := ""
+	bestScore := -1
+
+	for _, name := range names {
+		if strings.ToLower(filepath.Ext(name)) != ".dll" {
+			continue
+		}
+		stem := nameStem(name)
+		if !belongsTo(stem, pluginStem) {
+			continue
+		}
+		// The helper whose name belongs to the plugin most closely is the one
+		// that belongs to it: a folder may hold both "MediaInfo64.dll" and
+		// "MediaInfoTools.dll" next to a plugin called "MediaInfo".
+		if bestScore >= 0 && !betterHelper(stem, bestStem, pluginStem) {
+			continue
+		}
+		best, bestStem, bestScore = name, stem, commonPrefixLen(stem, pluginStem)
+	}
+
+	return best
+}
+
+// betterHelper reports whether the helper a belongs to the plugin more closely
+// than the helper b: the one whose name shares more with the plugin's wins,
+// and the one whose name is closest in length wins a tie — the exact match is
+// the plugin's own library, a longer name is a library it merely starts with.
+func betterHelper(a, b, pluginStem string) bool {
+	prefixA := commonPrefixLen(a, pluginStem)
+	prefixB := commonPrefixLen(b, pluginStem)
+	if prefixA != prefixB {
+		return prefixA > prefixB
+	}
+	return abs(len(a)-len(pluginStem)) < abs(len(b)-len(pluginStem))
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+// nameStem is a file name without its extension and without the digits that
+// mark a build: "MediaInfo64.dll", "multiarc2012.wcx" and "killcopywcx2.wcx"
+// all become a stem the plugin's own name can be compared with.
+func nameStem(name string) string {
+	stem := strings.ToLower(name)
+	if ext := filepath.Ext(stem); ext != "" {
+		stem = strings.TrimSuffix(stem, ext)
+	}
+	for len(stem) > 0 && stem[len(stem)-1] >= '0' && stem[len(stem)-1] <= '9' {
+		stem = stem[:len(stem)-1]
+	}
+	return stem
+}
+
+// belongsTo reports whether a helper's name belongs to the plugin's name: the
+// shorter of the two must be the beginning or the end of the longer, so
+// "mediainfo" belongs to "tcmediainfo", "isowriter" to "iso" and "killcopy"
+// to "killcopywcx" — while "sqlite" belongs to nothing called "foo".
+func belongsTo(helper, plugin string) bool {
+	if helper == "" || plugin == "" {
+		return false
+	}
+	if helper == plugin {
+		return true
+	}
+	shorter, longer := helper, plugin
+	if len(shorter) > len(longer) {
+		shorter, longer = longer, shorter
+	}
+	if len(shorter) < 3 {
+		return false
+	}
+	return strings.HasPrefix(longer, shorter) || strings.HasSuffix(longer, shorter)
+}
+
+// commonPrefixLen counts the characters two names share from the start.
+func commonPrefixLen(a, b string) int {
+	n := 0
+	for n < len(a) && n < len(b) && a[n] == b[n] {
+		n++
+	}
+	return n
 }
 
 func scanFileForVersion(filePath string) string {
