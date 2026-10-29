@@ -1,7 +1,7 @@
 <script>
     import { tick } from 'svelte';
     import { lang, tr } from './i18n.js';
-    import { badgeFor, isUnknownInstalled, isUpdatable } from './plugin.js';
+    import { badgeFor, confidenceKey, isUnknownInstalled, isUpdatable } from './plugin.js';
     import { cardEditing, cardState, requestCardClose, restoreCardOpener, saveCardOverride } from './card.js';
     import { plugins, progressRunning } from './state.js';
     import { handleUpdate } from './update.js';
@@ -113,7 +113,7 @@
             <div class="k">{$tr('col.installed')}</div>
             <div class="v">
                 <span class="num">{plugin.installed_version}</span>
-                <small class="muted">{plugin.confidence}</small>
+                <small class="muted">{$tr(confidenceKey(plugin.confidence))}</small>
             </div>
             <div class="k">{$tr('col.latest')}</div>
             <div class="v">

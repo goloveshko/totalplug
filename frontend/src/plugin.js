@@ -15,6 +15,19 @@ export const isUpdatable = (p) => p.status === 'update_avail' && !!p.download_ur
 export const isUnknownInstalled = (p) =>
     !!p && (p.confidence === 'Unknown' || !p.installed_version || /^(unknown|n\/a)/i.test(p.installed_version));
 
+// Where the installed version came from, as a dictionary key. The backend
+// answers with a fixed English token — the logic compares it, so it stays
+// English — and the card shows it as a word in the user's language.
+const confidenceKeys = {
+    'PE Binary': 'confidence.exact',
+    'Pluginst.inf': 'confidence.inf',
+    'Readme/INF': 'confidence.text',
+    'Manual DB': 'confidence.manual',
+    Unknown: 'confidence.unknown',
+};
+
+export const confidenceKey = (confidence) => confidenceKeys[confidence] || 'confidence.unknown';
+
 // What the search box matches a row by: the name, the type it is grouped under
 // and the folder it lives in — typing "wdx" or a folder name is a way to find
 // a plugin, not a second feature. Shared by the table and the count chip so
