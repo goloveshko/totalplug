@@ -229,6 +229,16 @@ next release (v2), and the accepted debt we deliberately postponed.
   update went through but could not be logged; the page's content security policy keeps the
   inline style attribute the progress bar needs, the first-run dialog says where the ini is,
   and the table takes the width of the window instead of a centred measure.
+- Hardening pass before the 1.3 release (2026-10-29), versions and names: a version that
+  carries a letter was compared as the number alone, so "0.6a" and "0.6c" read as the same
+  version and the release with the newer letter was never offered — the letters are a suffix
+  of their own now, two revision letters order as letters and two pre-release words order
+  as words, while a difference the letters cannot vouch for still reads as equal, because an
+  update offered on a difference we do not understand puts another archive over a working
+  plugin; a plugin folder can hold a shared runtime next to the plugin, and the version of
+  the first DLL that answered was taken as the version of the plugin, so only a helper whose
+  name belongs to the plugin counts now; the card names the source of the installed version
+  in the user's language instead of showing the internal token the backend answers with.
 
 ## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt
 
@@ -580,6 +590,17 @@ next release (v2), and the accepted debt we deliberately postponed.
       drafts survive a language switch. The compiler logged no warnings. This harness never
       dispatches a dialog `close` event, so the card's focus return and keyboard activation
       were confirmed on the live window, where the Mica backdrop also tracks the desktop.
+21. **The card beside the table on a wide window** — done (`62c2317`): a wide window had a
+    table stretched across it and a card that covered that table when it opened, so the
+    plugin the user was reading about was hidden by the card about it. The card has two
+    shapes now: on a narrow window it stays the modal dialog it has always been, and on a
+    window of 1100px and more it stands in a column beside the table, which gives up the
+    width the column takes. A modal makes the rest of the window inert, so the two shapes
+    cannot both be on screen — the window decides which one it is, and the other is not
+    drawn at all. The card's body moved into a component of its own, because the dialog and
+    the rail show the same record and only the frame around it differs; the rail is not a
+    modal, so Escape leaves it from anywhere in the window and the focus goes back to the
+    row the card was opened from, as it does in the dialog.
 
 ## Before the first public release (v1) — shipped
 
