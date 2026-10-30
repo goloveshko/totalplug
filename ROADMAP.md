@@ -255,6 +255,24 @@ next release (v2), and the accepted debt we deliberately postponed.
   in it mean two different builds of one plugin, not two versions of it. The client folds
   nothing: "one name → the newer one" is wrong for a plugin that ships several builds
   side by side, so only the catalog, which sees the whole feed at once, decides.
+- The 1.3.1 pass (2026-10-30), unreadable versions and one file with two plugins: a
+  plugin whose installed version cannot be read had nothing to offer at all — the catalog
+  version was there, but offering it blind was the one thing the app refused to do. It
+  now offers it as a separate action, «Replace», with a warning that says what may
+  happen and how old the installed file is. The date is a hint and never a rule (a
+  copied file carries the time of the copy), the action never runs as part of
+  «Update all», and the version it installs is remembered like any other. The warning
+  was eight lines long and nobody reads eight lines: it is three now, in the user's
+  language, and it says the one thing that matters — what the action may do to a
+  working plugin.
+  Two MDView plugins for Total Commander install `mdview.wlx` each — one on WebView2,
+  one on the older MSHTML engine — and the catalog now holds both, so "the newer number
+  wins" would hand the WebView2 user the MSHTML plugin: that number belongs to the other
+  plugin as often as to the right one. The client tells them apart by the release line
+  the installed version belongs to (0.x is the WebView2 one, 3.x the MSHTML one), takes
+  the nearest line when the catalog is ahead of the installed copy, and refuses the
+  match outright when the installed version cannot be read: a row that cannot name the
+  plugin offers nothing rather than the wrong plugin, and says which of the two happened.
 
 ## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt
 
@@ -880,3 +898,15 @@ today, and all six are now closed:
   already calls it at its start, so a batch keeps the one-hour window moving instead of letting a
   second process decide the first one died. What remains exposed is a single item that runs
   longer than an hour on a batch of one — the download itself still does not move the timestamp.
+- **The identity of a plugin that another plugin shares its file with** — two MDView plugins
+  install `mdview.wlx` each, and the client tells them apart by the release line the installed
+  version belongs to: the WebView2 one counts from zero, the MSHTML one from three. That is
+  evidence, but it is evidence about the numbering, not about the plugin — a plugin that moves
+  from 0.x to 1.0 leaves its users on a line the catalog no longer carries (the nearest line is
+  taken then), and two plugins whose numbering happens to sit close together cannot be told
+  apart at all. The stronger signal is in the binary itself: the PE `ProductName` says which
+  plugin it is ("Markdown Viewer Lister Plugin" against "MDView"). But many plugins leave it
+  empty or write a company name there, so it can only be one signal among several, and the
+  catalog would have to declare which one it expects. Not done: the version line carries the
+  case the catalog actually has, and the honest failure (no version to read) is reported
+  instead of guessed.
