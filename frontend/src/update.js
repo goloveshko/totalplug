@@ -1,10 +1,10 @@
 import { UpdatePlugin, UpdatePluginInsecure } from '../wailsjs/go/gui/App';
 import { EventsOn } from '../wailsjs/runtime';
 import { get, writable } from 'svelte/store';
-import { t, tp } from './i18n.js';
+import { lang, t, tp } from './i18n.js';
 import { plugins, progressRunning } from './state.js';
-import { isUpdatable } from './plugin.js';
-import { escapeHtml, linkify } from './text.js';
+import { isBlindUpdatable, isUpdatable } from './plugin.js';
+import { escapeHtml, fileDate, linkify } from './text.js';
 import { openAppDialog, errorDialogHtml, showConfirm, showMessage } from './dialog.js';
 import { runScan } from './catalog.js';
 
@@ -105,6 +105,13 @@ export async function handleUpdate(id) {
     activeUpdate.set(idle);
     progressRunning.set(false);
 
+    await finishUpdate(plugin, outcome);
+}
+
+// What a finished update leaves behind: the row marked and the list rescanned,
+// or the reason it did not go through said out loud. Both update paths end
+// here, so they cannot drift apart.
+async function finishUpdate(plugin, outcome) {
     if (outcome.kind === 'declined') {
         // The row still offers the same update; nothing happened to report.
         return;
@@ -117,6 +124,69 @@ export async function handleUpdate(id) {
         markUpdated(plugin);
         runScan(false);
     }
+}
+
+// The warning that stands in front of putting the catalog version in place of
+// a version TotalPlug could not read. The installed version is unknown, so the
+// catalog version may be older than the copy on disk, and only the user can
+// say whether that is acceptable. The date of the installed file is named as a
+// hint and nothing more: a copied or reinstalled file carries the time of the
+// copy, so it cannot say which build is installed, and the dialog says so
+// rather than deciding by it.
+function blindUpdateHtml(plugin, language) {
+    const version = plugin.latest_version || '';
+    const lines = [`<p class="ua-head">${escapeHtml(t('update.blind.title', { name: plugin.name, version }))}</p>`];
+
+    // A version read out of prose is a different case than no version at all:
+    // it was read, and it is not trusted to compare.
+    const guessed = plugin.confidence === 'Readme/INF';
+    lines.push(`<p>${escapeHtml(t(guessed ? 'update.blind.explain_text' : 'update.blind.explain_unknown'))}</p>`);
+
+    const released = fileDate(plugin.published_at, language);
+    if (version) {
+        lines.push(
+            `<p>${
+                released
+                    ? escapeHtml(t('update.blind.catalog', { version, date: released }))
+                    : escapeHtml(t('update.blind.catalog_nodate', { version }))
+            }</p>`,
+        );
+    }
+
+    const dated = fileDate(plugin.file_date, language);
+    if (dated) {
+        let key = 'update.blind.date_only';
+        if (released) {
+            const newer = new Date(plugin.file_date).getTime() > new Date(plugin.published_at).getTime();
+            key = newer ? 'update.blind.date_newer' : 'update.blind.date_older';
+        }
+        lines.push(`<p>${escapeHtml(t(key, { date: dated }))}</p>`);
+    }
+
+    lines.push(`<p class="blind-note">${escapeHtml(t('update.blind.remember'))}</p>`);
+    return `<div class="blind-warn">${lines.join('')}</div>`;
+}
+
+// A plugin whose installed version could not be read still has a version in
+// the catalog, and the user may want it. Putting that version in place is not
+// an update: it may be older than the copy on disk, so the question is asked
+// first — and it is asked for this plugin alone, the way the command line
+// keeps the unverified list out of --update-all.
+export async function handleBlindUpdate(id) {
+    if (get(progressRunning)) return;
+
+    const plugin = get(plugins).find((p) => p.id === id);
+    if (!plugin || !isBlindUpdatable(plugin)) return;
+
+    if (!(await openAppDialog(blindUpdateHtml(plugin, get(lang)), true))) return;
+
+    progressRunning.set(true);
+    activeUpdate.set({ id, phase: 'download', percent: -1 });
+    const outcome = await updateWithConsent(plugin);
+    activeUpdate.set(idle);
+    progressRunning.set(false);
+
+    await finishUpdate(plugin, outcome);
 }
 
 // What the batch dialog says when something did not go through. The headline is

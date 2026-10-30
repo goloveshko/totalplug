@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/goloveshko/totalplug/internal/domain"
 )
@@ -130,6 +131,46 @@ CloudPlugin=%COMMANDER_PATH%\plugins\wfx\cloud.wfx
 		if p.Status != domain.StatusNotFound {
 			t.Errorf("expected StatusNotFound for plugin %s, got %s", p.Name, p.Status)
 		}
+	}
+}
+
+// The date of the plugin file itself is read where the file is named. It is
+// only ever a hint — a copied file carries the time of the copy — but the GUI
+// names it next to the warning about an unreadable version, and it can only
+// do that if the scan brings it along.
+func TestParsePluginsFromIniRecordsFileDate(t *testing.T) {
+	tempDir := t.TempDir()
+	pluginPath := filepath.Join(tempDir, "plugins", "wlx", "CudaLister", "cudalister.wlx")
+	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pluginPath, []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	written := time.Date(2026, 10, 28, 19, 5, 42, 0, time.UTC)
+	if err := os.Chtimes(pluginPath, written, written); err != nil {
+		t.Fatal(err)
+	}
+
+	iniPath := filepath.Join(tempDir, "wincmd.ini")
+	iniContent := "[ListerPlugins]\n0=" + pluginPath + "\n"
+	if err := os.WriteFile(iniPath, []byte(iniContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	plugins, err := ParsePluginsFromIni(iniPath, tempDir)
+	if err != nil {
+		t.Fatalf("ParsePluginsFromIni failed: %v", err)
+	}
+	if len(plugins) != 1 {
+		t.Fatalf("expected 1 plugin, got %d", len(plugins))
+	}
+	if plugins[0].FileDate.IsZero() {
+		t.Fatal("file date not recorded")
+	}
+	// A file system may round the stamp, so the day is what has to match.
+	if diff := plugins[0].FileDate.Sub(written); diff > 2*time.Second || diff < -2*time.Second {
+		t.Errorf("file date = %v; want %v", plugins[0].FileDate, written)
 	}
 }
 

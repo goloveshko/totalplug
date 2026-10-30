@@ -8,6 +8,13 @@
 // in the CLI.
 export const isUpdatable = (p) => p.status === 'update_avail' && !!p.download_url;
 
+// A plugin whose installed version could not be compared with the catalog's:
+// the version was never read, or it was read out of prose and is not trusted.
+// The catalog version is offered as a separate action — it is not an update,
+// and it never joins the batch, the way the unverified list stays out of
+// --update-all on the command line.
+export const isBlindUpdatable = (p) => p.status === 'uncertain' && !!p.download_url;
+
 // A record whose installed version was never read: the scanner writes
 // "Unknown"/"N/A" or a low-confidence guess, and the checker refuses to offer an
 // automatic update for it. The card uses this to explain why there is no update

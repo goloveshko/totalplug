@@ -331,7 +331,13 @@ func ParsePluginsFromIni(iniPath string, tcDir string) ([]domain.Plugin, error) 
 				Status:           domain.StatusUpToDate,
 			}
 
-			if _, err := os.Stat(pluginPath); os.IsNotExist(err) {
+			// The file's own date is read here, where the file is named: this is
+			// the only place that knows which file the ini entry points at. It
+			// is a hint for the GUI, never a version — a copied or reinstalled
+			// file carries the time of the copy.
+			if info, err := os.Stat(pluginPath); err == nil {
+				plugin.FileDate = info.ModTime()
+			} else if os.IsNotExist(err) {
 				plugin.Status = domain.StatusNotFound
 			}
 

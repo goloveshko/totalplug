@@ -35,6 +35,9 @@ const STRINGS = {
             'TotalPlug could not find wincmd.ini. Point it at your Total Commander install in Settings → Total Commander and scan again.',
         'btn.update': 'Update',
         'btn.update.hint': 'A backup is taken first; History can put it back.',
+        'btn.replace': 'Replace',
+        'btn.replace.hint':
+            'The installed version could not be read, so this puts the catalog version in its place — and that one may be older.',
         'editor.title': 'Plugin version',
         'editor.version': 'Installed version',
         'editor.version.ph': 'e.g. 1.8.6.3',
@@ -47,6 +50,8 @@ const STRINGS = {
         'card.rail': 'Plugin card',
         'card.source.catalog': 'Catalog',
         'card.update': 'Update to {version}',
+        'card.replace': 'Replace with {version}',
+        'card.replace.lead': 'Or put the catalog version in place:',
         'card.change': 'Change…',
         'card.unknown_hint':
             'The installed version could not be read. Set it so TotalPlug can tell which release is newer.',
@@ -59,6 +64,20 @@ const STRINGS = {
             "Couldn't install the update. The plugin page may be outdated or the file is temporarily unavailable. Try again later or install manually from the plugin page.",
         'update.insecure_confirm':
             '{name} can only be downloaded over unencrypted HTTP, so the archive could be altered in transit. Download and install it anyway?',
+        'update.blind.title': 'Replace {name} with {version}?',
+        'update.blind.explain_unknown':
+            'The installed version could not be read, so TotalPlug cannot tell whether the catalog version is newer than the copy on disk.',
+        'update.blind.explain_text':
+            'The installed version was read out of a text file, and a number found in prose is not something TotalPlug trusts to compare.',
+        'update.blind.catalog': 'The catalog says {version}, released {date}.',
+        'update.blind.catalog_nodate': 'The catalog says {version}.',
+        'update.blind.date_newer':
+            'Your copy is dated {date}, later than that release. A file date is only a hint — copying or reinstalling stamps the copy time — but you may already have a newer build, and this would put an older one in its place.',
+        'update.blind.date_older':
+            'Your copy is dated {date}, before that release. A file date is only a hint — copying or reinstalling stamps the copy time.',
+        'update.blind.date_only':
+            'Your copy is dated {date}. A file date is only a hint — copying or reinstalling stamps the copy time.',
+        'update.blind.remember': 'The version that gets installed is remembered, so the next scan will know it.',
         'update.progress.download': 'Downloading',
         'update.progress.extract': 'Extracting archive',
         'update.progress.install': 'Installing files',
@@ -191,6 +210,9 @@ const STRINGS = {
             'TotalPlug не нашёл wincmd.ini. Укажите путь к установленному Total Commander в настройках (Настройки → Total Commander) и просканируйте снова.',
         'btn.update': 'Обновить',
         'btn.update.hint': 'Сначала создаётся резервная копия; «История» сможет её вернуть.',
+        'btn.replace': 'Заменить',
+        'btn.replace.hint':
+            'Установленную версию прочитать не удалось, поэтому на её место встанет версия из каталога — а она может быть старше.',
         'editor.title': 'Версия плагина',
         'editor.version': 'Установленная версия',
         'editor.version.ph': 'например, 1.8.6.3',
@@ -203,6 +225,8 @@ const STRINGS = {
         'card.rail': 'Карточка плагина',
         'card.source.catalog': 'Каталог',
         'card.update': 'Обновить до {version}',
+        'card.replace': 'Заменить на {version}',
+        'card.replace.lead': 'Или поставить версию из каталога на место:',
         'card.change': 'Изменить…',
         'card.unknown_hint':
             'Установленную версию прочитать не удалось. Укажите её, чтобы TotalPlug понял, какой релиз новее.',
@@ -216,6 +240,20 @@ const STRINGS = {
             'Не удалось установить обновление. Возможно, страница плагина устарела или файл временно недоступен. Попробуйте позже или установите вручную со страницы плагина.',
         'update.insecure_confirm':
             '{name} можно скачать только по незашифрованному HTTP, поэтому архив могут подменить в пути. Всё равно скачать и установить?',
+        'update.blind.title': 'Заменить {name} на {version}?',
+        'update.blind.explain_unknown':
+            'Установленную версию прочитать не удалось, поэтому TotalPlug не может сказать, новее ли версия из каталога той копии, что лежит на диске.',
+        'update.blind.explain_text':
+            'Установленную версию TotalPlug взял из текстового файла, а число, найденное в тексте, не то, чему он доверяет при сравнении.',
+        'update.blind.catalog': 'В каталоге указана версия {version} от {date}.',
+        'update.blind.catalog_nodate': 'В каталоге указана версия {version}.',
+        'update.blind.date_newer':
+            'Ваша копия датирована {date} — позже этого релиза. Дата файла — лишь намёк (при копировании или переустановке она отражает время копирования), но, возможно, у вас уже более новая сборка, и тогда эта заменит её более старой.',
+        'update.blind.date_older':
+            'Ваша копия датирована {date} — раньше этого релиза. Дата файла — лишь намёк (при копировании или переустановке она отражает время копирования).',
+        'update.blind.date_only':
+            'Ваша копия датирована {date}. Дата файла — лишь намёк (при копировании или переустановке она отражает время копирования).',
+        'update.blind.remember': 'Установленная версия будет запомнена, поэтому следующий скан её увидит.',
         'update.progress.download': 'Загрузка',
         'update.progress.extract': 'Распаковка архива',
         'update.progress.install': 'Установка файлов',

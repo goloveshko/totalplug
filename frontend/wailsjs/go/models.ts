@@ -93,6 +93,7 @@ export namespace domain {
 	    status: string;
 	    published_at?: string;
 	    last_checked?: string;
+	    file_date?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Plugin(source);
@@ -117,6 +118,7 @@ export namespace domain {
 	        this.status = source["status"];
 	        this.published_at = source["published_at"];
 	        this.last_checked = source["last_checked"];
+	        this.file_date = source["file_date"];
 	    }
 	}
 	export class TcConfig {

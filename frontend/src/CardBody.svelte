@@ -1,10 +1,10 @@
 <script>
     import { tick } from 'svelte';
     import { lang, tr } from './i18n.js';
-    import { badgeFor, confidenceKey, isUnknownInstalled, isUpdatable } from './plugin.js';
+    import { badgeFor, confidenceKey, isBlindUpdatable, isUnknownInstalled, isUpdatable } from './plugin.js';
     import { cardEditing, cardState, requestCardClose, saveCardOverride } from './card.js';
     import { plugins, progressRunning } from './state.js';
-    import { handleUpdate } from './update.js';
+    import { handleBlindUpdate, handleUpdate } from './update.js';
     import { interceptLinks, releaseDate, safeHttpUrl, shortUrl } from './text.js';
 
     // The card's body, without the frame around it. The card is a modal dialog
@@ -21,6 +21,7 @@
     const site = $derived(safeHttpUrl(plugin?.web_url));
     const mark = $derived(badgeFor(plugin?.status));
     const updatable = $derived(!!plugin && isUpdatable(plugin));
+    const blind = $derived(!!plugin && isBlindUpdatable(plugin));
     const unknown = $derived(isUnknownInstalled(plugin));
     const released = $derived(plugin?.published_at ? releaseDate(plugin.published_at, $lang) : null);
     const cardOpen = $derived($cardState.open);
@@ -47,6 +48,16 @@
         handleUpdate(id);
     }
 
+    // The blind action asks its own question before it touches anything, so
+    // the card steps aside the same way an update does and the warning is
+    // what the user is left looking at.
+    function onReplace() {
+        const id = plugin?.id;
+        if (!id) return;
+        requestCardClose();
+        handleBlindUpdate(id);
+    }
+
     // Change is removed together with the actions row, so the button that has to
     // take the focus back does not exist yet at the moment the flag flips.
     async function closeEditor() {
@@ -71,6 +82,23 @@
         if (cardOpen && $cardEditing) versionInput?.focus();
     });
 </script>
+
+<!-- One button, two places: the card opens in the editor by itself when the
+     installed version is unreadable, and the editor hides the row of actions —
+     so the button has to stand next to the hint as well, or the one case it
+     exists for is the one case that cannot reach it. -->
+{#snippet replaceButton(id)}
+    <button
+        type="button"
+        class="btn-replace"
+        {id}
+        title={$tr('btn.replace.hint')}
+        disabled={$progressRunning}
+        onclick={onReplace}
+    >
+        {$tr('card.replace', { version: plugin.latest_version })}
+    </button>
+{/snippet}
 
 <div class="card-body">
     {#if plugin}
@@ -136,6 +164,15 @@
         </div>
         {#if unknown}
             <p class="card-hint">{$tr('card.unknown_hint')}</p>
+            {#if blind}
+                <!-- The editor is open already, because the version could not
+                     be read. The other way out of the same problem — put the
+                     catalog version in place — has to stand right next to it. -->
+                <div class="card-replace-line">
+                    <span class="card-replace-lead">{$tr('card.replace.lead')}</span>
+                    {@render replaceButton('card-replace-edit')}
+                </div>
+            {/if}
         {/if}
         {#if $cardEditing}
             <div class="card-edit-title">{$tr('editor.title')}</div>
@@ -182,6 +219,13 @@
                     >
                         {$tr('card.update', { version: plugin.latest_version })}
                     </button>
+                {/if}
+                {#if blind}
+                    <!-- Its own action, not the update button in another
+                         colour: putting the catalog version in place of an
+                         unreadable one carries its own warning, and it never
+                         rides along with the batch. -->
+                    {@render replaceButton('card-replace')}
                 {/if}
                 <button
                     type="button"

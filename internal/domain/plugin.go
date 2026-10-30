@@ -70,6 +70,11 @@ type Plugin struct {
 	// console ("Not found: time.Time") on every build. A timestamp crosses the
 	// bridge as an RFC 3339 string, so that is what the generated model says.
 	LastChecked time.Time `json:"last_checked,omitempty" ts_type:"string"`
+	// FileDate is when the plugin file itself was last written on disk. It is a
+	// hint and never a version: a copied or reinstalled file carries the time of
+	// the copy, so it cannot say which build is installed. The GUI names it next
+	// to the warning about an unreadable version, and decides nothing by it.
+	FileDate time.Time `json:"file_date,omitempty" ts_type:"string"`
 }
 
 // UpdateProgress is one event emitted while an update runs, so the GUI can

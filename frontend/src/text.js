@@ -47,13 +47,24 @@ export const formatStamp = (fmt, value) => {
     return Number.isFinite(date.getTime()) ? fmt.format(date) : String(value || '—');
 };
 
+// A date the backend could not resolve crosses the bridge as the zero time
+// ("0001-01-01T00:00:00Z"), which parses as a date and would be drawn as one.
+// No plugin release and no plugin file is that old, so a date before the year
+// 2000 is read as "no date" — one place, so every date on screen agrees.
+const YEAR_ZERO = Date.UTC(2000, 0, 1);
+
+export const hasDate = (value) => {
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) && time >= YEAR_ZERO;
+};
+
 // A release date is useful as "3 days ago" at a glance and as the exact date on
 // hover. Days are the granularity that matters for a version: anything older
 // than a month reads better in months, and past a year in years. `Intl` also
 // localizes the plural form («2 дня назад»), which a hand-built string would not.
 export function releaseDate(value, lang) {
     const date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return null;
+    if (!hasDate(value)) return null;
 
     const days = Math.round((date.getTime() - Date.now()) / 86400000);
     const months = days / 30;
@@ -72,6 +83,18 @@ export function releaseDate(value, lang) {
         text: new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(amount, unit),
         title: new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date),
     };
+}
+
+// The day a file on disk was written, in the user's language. The warning about
+// an unreadable version names the exact day on purpose: "3 months ago" says
+// nothing about which build is newer.
+export function fileDate(value, lang) {
+    if (!hasDate(value)) return '';
+    const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
+    const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(value));
+    // The Russian medium format ends in «г.», and the sentence brings its own
+    // dot: «20 авг. 2026 г..» would be a typo the reader sees.
+    return date.replace(/\.$/, '');
 }
 
 // A dialog link must not navigate the webview. A click hands the address to the

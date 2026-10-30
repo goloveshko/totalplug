@@ -5,9 +5,9 @@
     // guess whether `<tr>` is the element or a component.
     import { lang, tr as msg, trp as plural } from './i18n.js';
     import { scanFailure, scanRunning, searchQuery, updatesOnly } from './catalog.js';
-    import { badgeFor, compareVersions, isUpdatable, matchesQuery } from './plugin.js';
+    import { badgeFor, compareVersions, isBlindUpdatable, isUpdatable, matchesQuery } from './plugin.js';
     import { plugins, progressRunning, settingsOpen } from './state.js';
-    import { activeUpdate, handleUpdate, handleUpdateAll } from './update.js';
+    import { activeUpdate, handleBlindUpdate, handleUpdate, handleUpdateAll } from './update.js';
     import { openCard } from './card.js';
     import PluginRail from './PluginRail.svelte';
     import { releaseDate } from './text.js';
@@ -99,6 +99,14 @@
         const updateBtn = event.target.closest('button.btn-update');
         if (updateBtn) {
             handleUpdate(updateBtn.dataset.update);
+            return;
+        }
+        // The blind action asks its own question before it touches anything, so
+        // it is a button of its own and not the update button in a different
+        // colour.
+        const replaceBtn = event.target.closest('button.btn-replace');
+        if (replaceBtn) {
+            handleBlindUpdate(replaceBtn.dataset.replace);
             return;
         }
         if (event.target.closest('button')) return;
@@ -225,6 +233,7 @@
                         {#each group.rows as { plugin, index } (plugin.id)}
                             {@const mark = badge(plugin.status)}
                             {@const updatable = isUpdatable(plugin)}
+                            {@const blind = isBlindUpdatable(plugin)}
                             {@const released =
                                 updatable && plugin.published_at ? releaseDate(plugin.published_at, $lang) : null}
                             {@const progress = $activeUpdate.id === plugin.id ? rowProgress($activeUpdate) : null}
@@ -275,6 +284,22 @@
                                             disabled={$progressRunning}
                                         >
                                             {$msg('btn.update')}
+                                        </button>
+                                    {:else if blind}
+                                        <!-- Its own button, not the update button
+                                             in another colour: putting the catalog
+                                             version in place of an unreadable one
+                                             is a decision with a warning of its
+                                             own, and it never rides along with
+                                             the batch. -->
+                                        <button
+                                            type="button"
+                                            class="btn-replace"
+                                            data-replace={plugin.id}
+                                            title={$msg('btn.replace.hint')}
+                                            disabled={$progressRunning}
+                                        >
+                                            {$msg('btn.replace')}
                                         </button>
                                     {:else}
                                         <!-- Every row answers here: exceptions carry
