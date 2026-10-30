@@ -310,6 +310,138 @@ func TestGitHubReleaseCacheRoundtrip(t *testing.T) {
 	}
 }
 
+// mdViewSnapshot is the shape the live catalog holds for the two MDView
+// plugins for Total Commander: both install "mdview.wlx", and their version
+// numbers belong to different release lines.
+func mdViewSnapshot() CatalogSnapshot {
+	return CatalogSnapshot{Plugins: []CatalogEntry{
+		{
+			ID:       "mdview",
+			Name:     "MDView (WebView2)",
+			Homepage: "https://github.com/rweijnen/MDView",
+			Match:    MatchRule{Filenames: []string{"mdview.wlx", "mdview.wlx64"}},
+			Resolved: &ResolvedSource{
+				Version:     "0.2.4",
+				DownloadURL: "https://github.com/rweijnen/MDView/releases/download/v0.2.4/MDView-v0.2.4.zip",
+			},
+		},
+		{
+			ID:       "mdview_mshtml",
+			Name:     "MDView (MSHTML)",
+			Homepage: "https://github.com/jumpifequal/mdview-for-Total-Commander",
+			Match:    MatchRule{Filenames: []string{"mdview.wlx", "mdview.wlx64"}},
+			Resolved: &ResolvedSource{
+				Version:     "3.8.2",
+				DownloadURL: "https://totalcmd.net/download.php?id=mdview_lister_extension",
+			},
+		},
+	}}
+}
+
+// The entries that claim the installed file are offered to the user: two
+// plugins can install the same file, and the user knows which one is theirs.
+func TestCheckUpdatesOffersTheEntriesThatClaimTheFile(t *testing.T) {
+	t.Setenv(config.DataDirEnv, t.TempDir())
+	if err := SaveCatalogToCache(mdViewSnapshot(), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	plugins := []domain.Plugin{{
+		ID: "wlx_mdview", Name: "mdview", Path: `C:\tc\plugins\mdview\mdview.wlx`,
+		InstalledVersion: "0.2.4", Confidence: domain.ConfidenceExact, Status: domain.StatusUpToDate,
+	}}
+
+	got, _, err := NewChecker(false, true).CheckUpdates(context.Background(), plugins)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	row := got[0]
+	if len(row.Choices) != 2 {
+		t.Fatalf("choices = %+v, want both entries that claim mdview.wlx", row.Choices)
+	}
+	current := ""
+	for _, c := range row.Choices {
+		if c.Current {
+			current = c.ID
+		}
+	}
+	if current != "mdview" {
+		t.Errorf("current choice = %q, want %q", current, "mdview")
+	}
+}
+
+// A pinned catalogue entry is the user's own answer to the question the file
+// cannot answer, and it wins over the automatic match.
+func TestCheckUpdatesUsesThePinnedCatalogEntry(t *testing.T) {
+	t.Setenv(config.DataDirEnv, t.TempDir())
+	if err := SaveCatalogToCache(mdViewSnapshot(), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	plugins := []domain.Plugin{{
+		ID: "wlx_mdview", Name: "mdview", Path: `C:\tc\plugins\mdview\mdview.wlx`,
+		Confidence: domain.ConfidenceFallback, Status: domain.StatusUpToDate,
+		CustomSource: "catalog:mdview_mshtml",
+	}}
+
+	got, _, err := NewChecker(false, true).CheckUpdates(context.Background(), plugins)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	row := got[0]
+	if row.LatestVersion != "3.8.2" {
+		t.Errorf("latest version = %q, want the pinned entry's 3.8.2", row.LatestVersion)
+	}
+	if row.DownloadURL != "https://totalcmd.net/download.php?id=mdview_lister_extension" {
+		t.Errorf("download url = %q, want the pinned entry's archive", row.DownloadURL)
+	}
+	if row.Source != "catalog:mdview_mshtml" {
+		t.Errorf("source = %q, want the pin to be visible", row.Source)
+	}
+	if len(row.Choices) != 2 {
+		t.Fatalf("choices = %+v, want both entries", row.Choices)
+	}
+	for _, c := range row.Choices {
+		if c.Current != (c.ID == "mdview_mshtml") {
+			t.Errorf("choice %q current = %v, want the pinned one", c.ID, c.Current)
+		}
+	}
+}
+
+// A pinned entry that is not in the catalogue any more must not leave the
+// plugin without an answer: the automatic match takes over, and the row says
+// that it cannot say which plugin this is.
+func TestCheckUpdatesFallsBackWhenThePinnedEntryIsGone(t *testing.T) {
+	t.Setenv(config.DataDirEnv, t.TempDir())
+	if err := SaveCatalogToCache(mdViewSnapshot(), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	plugins := []domain.Plugin{{
+		ID: "wlx_mdview", Name: "mdview", Path: `C:\tc\plugins\mdview\mdview.wlx`,
+		Confidence: domain.ConfidenceFallback, Status: domain.StatusUpToDate,
+		CustomSource: "catalog:mdview_old_name",
+	}}
+
+	got, _, err := NewChecker(false, true).CheckUpdates(context.Background(), plugins)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	row := got[0]
+	if row.DownloadURL != "" {
+		t.Errorf("download url = %q, want none: the file belongs to two plugins", row.DownloadURL)
+	}
+	if row.LatestVersion != "N/A (Several plugins install this file)" {
+		t.Errorf("latest version = %q, want the honest refusal", row.LatestVersion)
+	}
+	if len(row.Choices) != 2 {
+		t.Errorf("choices = %+v, want the entries that claim the file", row.Choices)
+	}
+}
+
 func TestDownloadCandidates(t *testing.T) {
 	entry := CatalogEntry{
 		Resolved: &ResolvedSource{Version: "2.23", DownloadURL: "https://totalcmd.net/download.php?id=fi"},

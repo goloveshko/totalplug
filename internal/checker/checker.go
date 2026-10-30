@@ -375,6 +375,21 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		// 2. Match against community catalog
 		match := matchCatalogEntry(*p, catalog)
 
+		// A pinned catalogue entry wins over the automatic match: the user
+		// says which entry describes this plugin, which is the way out of the
+		// case the file alone cannot solve.
+		if entryID, ok := pinnedCatalogEntry(p.CustomSource); ok {
+			if entry := findCatalogEntry(catalog, entryID); entry != nil && entry.Resolved != nil {
+				match.Entry = entry
+				match.Ambiguous = false
+			}
+		}
+
+		// The entries that claim this file, the one in use marked as current.
+		// The card offers them when there is more than one: two plugins can
+		// install the same file, and the user knows which one is theirs.
+		p.Choices = pluginChoices(match.Candidates, match.Entry)
+
 		if match.Entry != nil && match.Entry.Resolved != nil {
 			matchedEntry := match.Entry
 			p.LatestVersion = matchedEntry.Resolved.Version
@@ -385,6 +400,12 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 			p.Source = resolvedSourceName(*matchedEntry)
 			p.Arch = matchedEntry.Arch
 			p.Description = matchedEntry.Description
+
+			// A pinned entry says so in the source column: the card shows it,
+			// and the user can see that the row answers to their choice.
+			if entryID, ok := pinnedCatalogEntry(p.CustomSource); ok && matchedEntry.ID == entryID {
+				p.Source = "catalog:" + entryID
+			}
 
 			p.Status = classifyUpdate(p.InstalledVersion, matchedEntry.Resolved.Version, p.Confidence)
 		} else {
@@ -408,6 +429,58 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 	}
 
 	return plugins, fromCache, nil
+}
+
+// pinnedCatalogEntry reads a source override that names a catalogue entry:
+// "catalog:<id>" says which entry describes this plugin.
+//
+// It is the way out of the case the file alone cannot solve: two plugins
+// install the same file, and the user knows which one is theirs.
+func pinnedCatalogEntry(source string) (string, bool) {
+	const prefix = "catalog:"
+	if !strings.HasPrefix(source, prefix) {
+		return "", false
+	}
+	id := strings.TrimSpace(strings.TrimPrefix(source, prefix))
+	if id == "" {
+		return "", false
+	}
+	return id, true
+}
+
+// findCatalogEntry finds the catalogue entry with that id.
+func findCatalogEntry(catalog []CatalogEntry, id string) *CatalogEntry {
+	for i := range catalog {
+		if catalog[i].ID == id {
+			return &catalog[i]
+		}
+	}
+	return nil
+}
+
+// pluginChoices lists the catalogue entries that claim the installed file,
+// the one in use marked as current. It is empty when the file belongs to a
+// single entry, which is the case for almost every plugin.
+func pluginChoices(candidates []*CatalogEntry, used *CatalogEntry) []domain.PluginChoice {
+	if len(candidates) == 0 {
+		return nil
+	}
+	choices := make([]domain.PluginChoice, 0, len(candidates))
+	for _, entry := range candidates {
+		choice := domain.PluginChoice{
+			ID:       entry.ID,
+			Name:     entry.Name,
+			Homepage: entry.Homepage,
+		}
+		if entry.Resolved != nil {
+			choice.Version = entry.Resolved.Version
+		}
+		if used != nil && entry.ID == used.ID {
+			choice.Current = true
+		}
+		choices = append(choices, choice)
+	}
+	return choices
 }
 
 // downloadCandidates lists one-shot download URLs for a catalog entry: the

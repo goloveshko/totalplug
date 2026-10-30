@@ -1,8 +1,23 @@
 <script>
     import { tick } from 'svelte';
     import { lang, tr } from './i18n.js';
-    import { badgeFor, confidenceKey, isBlindUpdatable, isUnknownInstalled, isUpdatable } from './plugin.js';
-    import { cardEditing, cardState, requestCardClose, saveCardOverride } from './card.js';
+    import {
+        badgeFor,
+        confidenceKey,
+        isBlindUpdatable,
+        isUnknownInstalled,
+        isUpdatable,
+        pinnedEntryId,
+        sourceChoices,
+    } from './plugin.js';
+    import {
+        cardEditing,
+        cardState,
+        chooseSource,
+        requestCardClose,
+        saveCardOverride,
+        setCustomSource,
+    } from './card.js';
     import { plugins, progressRunning } from './state.js';
     import { handleBlindUpdate, handleUpdate } from './update.js';
     import { interceptLinks, releaseDate, safeHttpUrl, shortUrl } from './text.js';
@@ -32,6 +47,31 @@
     // Each glyph paints itself: a CSS `fill` would override the markup attribute.
     const github = $derived(/^github:/i.test(plugin?.source || ''));
     const srcLabel = $derived(github ? 'GitHub' : $tr('card.source.catalog'));
+
+    // The catalogue entries that claim the installed file. Two plugins can
+    // install the same file — the two MDView plugins for Total Commander do —
+    // and the user knows which one is theirs, so the picker offers them with
+    // the version that tells them apart.
+    const choices = $derived(sourceChoices(plugin));
+
+    // A pin that names an entry the catalogue no longer holds. It stays in
+    // the picker, marked as gone, rather than silently becoming something else.
+    const pinGone = $derived.by(() => {
+        const pinned = pinnedEntryId($cardState.source);
+        if (!pinned) return '';
+        return choices.some((c) => c.id === pinned) ? '' : pinned;
+    });
+
+    // The picker reads the entry by its name and version first: the version is
+    // what tells two plugins on one file apart, and the host says where it
+    // comes from.
+    function choiceLabel(choice) {
+        const host = choice.homepage ? shortUrl(choice.homepage).split('/')[0] : '';
+        const parts = [choice.name];
+        if (choice.version) parts.push(choice.version);
+        if (host) parts.push(host);
+        return parts.join(' · ');
+    }
 
     function onSubmit(event) {
         // method="dialog" would close the card before the async save finishes.
@@ -190,14 +230,37 @@
                 </label>
                 <label>
                     {$tr('editor.source')}
-                    <input
-                        type="text"
-                        id="editor-source"
-                        placeholder={$tr('editor.source.ph')}
-                        autocomplete="off"
-                        bind:value={$cardState.source}
-                    />
+                    <select
+                        id="editor-source-choice"
+                        value={$cardState.sourceChoice}
+                        onchange={(e) => chooseSource(e.currentTarget.value)}
+                    >
+                        <option value="">{$tr('editor.source.auto')}</option>
+                        {#each choices as c (c.id)}
+                            <option value="catalog:{c.id}">{choiceLabel(c)}</option>
+                        {/each}
+                        {#if pinGone}
+                            <option value="catalog:{pinGone}">{$tr('editor.source.pin_gone')}</option>
+                        {/if}
+                        <option value="custom">{$tr('editor.source.custom')}</option>
+                    </select>
                 </label>
+                {#if $cardState.sourceChoice === 'custom'}
+                    <label>
+                        {$tr('editor.source.custom')}
+                        <input
+                            type="text"
+                            id="editor-source"
+                            placeholder={$tr('editor.source.ph')}
+                            autocomplete="off"
+                            value={$cardState.customSource}
+                            oninput={(e) => setCustomSource(e.currentTarget.value)}
+                        />
+                    </label>
+                {/if}
+                {#if pinGone}
+                    <p class="editor-note">{$tr('editor.source.pin_note')}</p>
+                {/if}
                 <p class="editor-hint">{$tr('editor.hint')}</p>
                 <div class="editor-actions">
                     <button type="submit" class="btn-save" id="editor-save" disabled={$cardState.saving}>

@@ -33,11 +33,36 @@ const (
 	ConfidenceFallback VersionConfidence = "Unknown"      // Could not determine
 )
 
+// PluginChoice is one catalogue entry that claims the file an installed
+// plugin came from.
+//
+// Two plugins can install the same file — the two MDView plugins for Total
+// Commander install "mdview.wlx" each — and the installed version is what
+// usually tells them apart. When it cannot, the user picks, and this is the
+// list they pick from.
+type PluginChoice struct {
+	// ID is the catalogue entry's id, and what a source override pins.
+	ID string `json:"id"`
+	// Name is the entry's name, as the catalogue spells it.
+	Name string `json:"name"`
+	// Version is the release the catalogue resolved for the entry.
+	Version string `json:"version,omitempty"`
+	// Homepage is where the plugin lives, so two entries are told apart by
+	// more than their name.
+	Homepage string `json:"homepage,omitempty"`
+	// Current marks the entry the client is using.
+	Current bool `json:"current,omitempty"`
+}
+
 // Override allows user to manually fix name, version, or update source for a plugin.
 type Override struct {
 	CustomName    string `json:"custom_name,omitempty"`    // Override display name
 	CustomVersion string `json:"custom_version,omitempty"` // Override version
-	CustomSource  string `json:"custom_source,omitempty"`  // e.g. "github:Alexey-T/CudaLister"
+	// CustomSource names where the update comes from. It is a "github:"
+	// repository ("github:Owner/Repo"), an address, or "catalog:<id>" — the
+	// catalogue entry that describes this plugin, for the case where the file
+	// alone cannot say which plugin it is.
+	CustomSource string `json:"custom_source,omitempty"` // e.g. "github:Alexey-T/CudaLister"
 }
 
 // Plugin represents an installed Total Commander plugin.
@@ -50,6 +75,10 @@ type Plugin struct {
 	LatestVersion    string            `json:"latest_version,omitempty"`
 	Confidence       VersionConfidence `json:"confidence"`
 	CustomSource     string            `json:"custom_source,omitempty"`
+	// Choices lists the catalogue entries that claim the file this plugin
+	// came from, the one in use marked as current. It is empty when the file
+	// belongs to a single entry, which is the case for almost every plugin.
+	Choices []PluginChoice `json:"choices,omitempty"`
 	DownloadURL      string            `json:"download_url,omitempty"`
 	// DownloadURLs lists ordered candidate sources (primary first, then
 	// catalog mirrors); empty means only DownloadURL is known.

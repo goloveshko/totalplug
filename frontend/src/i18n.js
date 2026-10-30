@@ -43,6 +43,11 @@ const STRINGS = {
         'editor.version.ph': 'e.g. 1.8.6.3',
         'editor.source': 'Update source',
         'editor.source.ph': 'e.g. https://github.com/Owner/Repo',
+        'editor.source.auto': 'Automatic — from the catalog',
+        'editor.source.custom': 'Custom address',
+        'editor.source.pin_gone': 'The pinned entry — not in the catalog',
+        'editor.source.pin_note':
+            'The entry this plugin was pinned to is not in the catalog, so the automatic match is used until you pick another one.',
         'card.path': 'Path',
         'card.source': 'Source',
         'card.site': 'Site',
@@ -211,6 +216,11 @@ const STRINGS = {
         'editor.version.ph': 'например, 1.8.6.3',
         'editor.source': 'Источник обновлений',
         'editor.source.ph': 'например https://github.com/Owner/Repo',
+        'editor.source.auto': 'Автоматически — из каталога',
+        'editor.source.custom': 'Свой адрес',
+        'editor.source.pin_gone': 'Закреплённая запись — её нет в каталоге',
+        'editor.source.pin_note':
+            'Записи, к которой был закреплён этот плагин, в каталоге больше нет, поэтому пока работает автоматический выбор — выберите другую.',
         'card.path': 'Путь',
         'card.source': 'Источник',
         'card.site': 'Сайт',

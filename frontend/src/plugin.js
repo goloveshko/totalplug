@@ -159,3 +159,16 @@ export function displaySource(source) {
     const match = /^github:([\w.-]+\/[\w.-]+)\/?$/i.exec(source || '');
     return match ? `https://github.com/${match[1]}` : source || '';
 }
+
+// The catalogue entries that claim the installed file. Two plugins can
+// install the same file, and the user knows which one is theirs: the picker
+// offers them, and the client tells the two apart by the installed version.
+export const sourceChoices = (plugin) => plugin?.choices || [];
+
+// The catalogue entry a source override pins: "catalog:<id>" names the entry
+// that describes this plugin. It is not an address, so it never reaches the
+// network.
+export const pinnedEntryId = (source) => {
+    const match = /^catalog:(.+)$/i.exec((source || '').trim());
+    return match ? match[1].trim() : '';
+};

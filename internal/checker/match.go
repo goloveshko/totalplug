@@ -24,6 +24,10 @@ type catalogMatch struct {
 	// client says so instead of choosing one: choosing would offer the user
 	// somebody else's plugin.
 	Ambiguous bool
+	// Candidates are the entries that claim the installed file. They are the
+	// list the user picks from when the installed version cannot say which
+	// of them is on the disk.
+	Candidates []*CatalogEntry
 }
 
 // matchCatalogEntry finds the catalog entry that describes the installed
@@ -148,24 +152,24 @@ func bestMatch(catalog []CatalogEntry, local domain.Plugin, accept func(*Catalog
 		return catalogMatch{}
 	}
 	if len(candidates) == 1 {
-		return catalogMatch{Entry: candidates[0]}
+		return catalogMatch{Entry: candidates[0], Candidates: candidates}
 	}
 
 	// Several entries claim the same plugin. That is one plugin in two
 	// releases when the entries are the same plugin, and two plugins that
 	// install the same file when they are not.
 	if !severalPlugins(candidates) {
-		return catalogMatch{Entry: newestOf(candidates)}
+		return catalogMatch{Entry: newestOf(candidates), Candidates: candidates}
 	}
 
 	// Two plugins, one file: the installed version says which one is on the
 	// disk.
 	if !trustedVersion(local) {
-		return catalogMatch{Ambiguous: true}
+		return catalogMatch{Ambiguous: true, Candidates: candidates}
 	}
 	line, ok := versionLine(local.InstalledVersion)
 	if !ok {
-		return catalogMatch{Ambiguous: true}
+		return catalogMatch{Ambiguous: true, Candidates: candidates}
 	}
 
 	// The release line the installed version belongs to. The candidates on it
@@ -177,7 +181,7 @@ func bestMatch(catalog []CatalogEntry, local domain.Plugin, accept func(*Catalog
 		}
 	}
 	if len(sameLine) > 0 {
-		return catalogMatch{Entry: newestOf(sameLine)}
+		return catalogMatch{Entry: newestOf(sameLine), Candidates: candidates}
 	}
 
 	// No candidate is on that line. A candidate whose version the catalog
@@ -185,7 +189,7 @@ func bestMatch(catalog []CatalogEntry, local domain.Plugin, accept func(*Catalog
 	// any line - so nothing is offered rather than the wrong plugin.
 	for _, entry := range candidates {
 		if _, ok := versionLine(entryVersion(entry)); !ok {
-			return catalogMatch{Ambiguous: true}
+			return catalogMatch{Ambiguous: true, Candidates: candidates}
 		}
 	}
 
@@ -196,9 +200,9 @@ func bestMatch(catalog []CatalogEntry, local domain.Plugin, accept func(*Catalog
 	// equally near tell nothing apart.
 	nearest, ok := nearestLine(candidates, line)
 	if !ok {
-		return catalogMatch{Ambiguous: true}
+		return catalogMatch{Ambiguous: true, Candidates: candidates}
 	}
-	return catalogMatch{Entry: nearest}
+	return catalogMatch{Entry: nearest, Candidates: candidates}
 }
 
 // nearestLine returns the candidate whose release line lies nearest to the
