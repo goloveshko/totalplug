@@ -373,9 +373,10 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 		}
 
 		// 2. Match against community catalog
-		matchedEntry := matchCatalogEntry(*p, catalog)
+		match := matchCatalogEntry(*p, catalog)
 
-		if matchedEntry != nil && matchedEntry.Resolved != nil {
+		if match.Entry != nil && match.Entry.Resolved != nil {
+			matchedEntry := match.Entry
 			p.LatestVersion = matchedEntry.Resolved.Version
 			p.PublishedAt = matchedEntry.Resolved.PublishedAt
 			p.DownloadURL = matchedEntry.Resolved.DownloadURL
@@ -387,12 +388,22 @@ func (c *Checker) CheckUpdates(ctx context.Context, plugins []domain.Plugin) ([]
 
 			p.Status = classifyUpdate(p.InstalledVersion, matchedEntry.Resolved.Version, p.Confidence)
 		} else {
-			p.LatestVersion = "N/A (Not in catalog)"
 			// An unmatched (or matched-but-unresolved) plugin was never compared
 			// against a newer release, so the ini default of "up to date" is a
 			// claim we cannot support: report it uncertain so the row shows "?"
 			// instead of a green check that hides a catalog miss.
 			p.Status = domain.StatusUncertain
+			// Nothing to offer: the row has to say why it has nothing.
+			p.DownloadURL = ""
+			p.DownloadURLs = nil
+			if match.Ambiguous {
+				// Several plugins install this file and the installed version
+				// cannot say which one it is. Offering either of them would
+				// offer the user the other plugin.
+				p.LatestVersion = "N/A (Several plugins install this file)"
+			} else {
+				p.LatestVersion = "N/A (Not in catalog)"
+			}
 		}
 	}
 

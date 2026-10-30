@@ -6,6 +6,12 @@ import (
 	"github.com/goloveshko/totalplug/internal/domain"
 )
 
+// matchedEntry is the catalog entry the matcher chose for the installed
+// plugin, or nil when it chose none.
+func matchedEntry(local domain.Plugin, catalog []CatalogEntry) *CatalogEntry {
+	return matchCatalogEntry(local, catalog).Entry
+}
+
 // peViewerCatalog is the shape the live catalog holds for PE Viewer after the
 // builder folded the upload from 2012 into the one from 2025: one entry, the
 // current version, the page of the current upload, and the file name of the
@@ -53,7 +59,7 @@ func TestMatchCatalogEntryFindsTheCurrentUpload(t *testing.T) {
 				InstalledVersion: "3.0.18",
 			}
 
-			entry := matchCatalogEntry(local, catalog)
+			entry := matchedEntry(local, catalog)
 			if entry == nil {
 				t.Fatal("no catalog entry matched")
 			}
@@ -125,7 +131,7 @@ func TestMatchCatalogEntryTellsTheTwoBuildsApart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			entry := matchCatalogEntry(tt.local, catalog)
+			entry := matchedEntry(tt.local, catalog)
 			if entry == nil {
 				t.Fatal("no catalog entry matched")
 			}
@@ -146,7 +152,7 @@ func TestMatchCatalogEntryKeepsTheArchitectureApart(t *testing.T) {
 		Path: `C:\TC\Plug-Ins\wfx\Uninstaller64\uninstaller64.wfx64`,
 	}
 
-	entry := matchCatalogEntry(local, catalog)
+	entry := matchedEntry(local, catalog)
 	if entry == nil {
 		t.Fatal("no catalog entry matched")
 	}
@@ -165,7 +171,7 @@ func TestMatchCatalogEntryRefusesAnEmptyNormalizedName(t *testing.T) {
 
 	local := domain.Plugin{Name: "Архиватор", Path: `C:\TC\Plug-Ins\wfx\Архиватор\arch.wfx`}
 
-	if entry := matchCatalogEntry(local, catalog); entry != nil {
+	if entry := matchedEntry(local, catalog); entry != nil {
 		t.Errorf("matched %q, want no match", entry.ID)
 	}
 }
@@ -192,12 +198,211 @@ func TestMatchCatalogEntryTakesTheNewestRelease(t *testing.T) {
 
 	local := domain.Plugin{Name: "ArchView", Path: `C:\TC\Plug-Ins\wlx\ArchView\archview.wlx`}
 
-	entry := matchCatalogEntry(local, catalog)
+	entry := matchedEntry(local, catalog)
 	if entry == nil {
 		t.Fatal("no catalog entry matched")
 	}
 	if entry.ID != "totalcmd_new" {
 		t.Errorf("matched %q, want %q", entry.ID, "totalcmd_new")
+	}
+}
+
+// mdViewCatalog is the shape the live catalog holds for the two MDView
+// plugins for Total Commander: both install "mdview.wlx", and their version
+// numbers belong to different release lines - the WebView2 plugin counts from
+// zero, the MSHTML one from three.
+func mdViewCatalog() []CatalogEntry {
+	return []CatalogEntry{
+		{
+			ID:       "mdview",
+			Name:     "MDView (WebView2)",
+			Homepage: "https://github.com/rweijnen/MDView",
+			Arch:     "x32+x64",
+			Match: MatchRule{
+				Aliases:   []string{"mdview", "wlx_mdview", "markdown viewer"},
+				Filenames: []string{"mdview.wlx", "mdview.wlx64"},
+			},
+			Resolved: &ResolvedSource{
+				Version:     "0.2.4",
+				DownloadURL: "https://github.com/rweijnen/MDView/releases/download/v0.2.4/MDView-v0.2.4.zip",
+			},
+		},
+		{
+			ID:       "mdview_mshtml",
+			Name:     "MDView (MSHTML)",
+			Homepage: "https://github.com/jumpifequal/mdview-for-Total-Commander",
+			Arch:     "x32+x64",
+			Match: MatchRule{
+				Aliases:   []string{"mdview", "mdview_lister_extension"},
+				Filenames: []string{"mdview.wlx", "mdview.wlx64"},
+			},
+			Resolved: &ResolvedSource{
+				Version:     "3.8.2",
+				DownloadURL: "https://totalcmd.net/download.php?id=mdview_lister_extension",
+			},
+		},
+	}
+}
+
+// Two MDView plugins install the same file, and the newer version number
+// belongs to the other one: the MSHTML plugin is three years ahead of the
+// WebView2 one. The installed version is what tells them apart - and without
+// it, the newer one would be offered to the user of the other plugin.
+func TestMatchCatalogEntryTellsTheTwoMDViewsApart(t *testing.T) {
+	catalog := mdViewCatalog()
+
+	tests := []struct {
+		name    string
+		version string
+		want    string
+	}{
+		{name: "the WebView2 plugin", version: "0.2.4", want: "mdview"},
+		{name: "the WebView2 plugin, as the PE resource states it", version: "0.2.4.0", want: "mdview"},
+		{name: "the MSHTML plugin", version: "3.8.2", want: "mdview_mshtml"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			local := domain.Plugin{
+				Name:             "mdview",
+				Path:             `C:\TC\Plug-Ins\wlx\mdview\mdview.wlx`,
+				InstalledVersion: tt.version,
+				Confidence:       domain.ConfidenceExact,
+			}
+
+			entry := matchedEntry(local, catalog)
+			if entry == nil {
+				t.Fatal("no catalog entry matched")
+			}
+			if entry.ID != tt.want {
+				t.Errorf("matched %q, want %q", entry.ID, tt.want)
+			}
+		})
+	}
+}
+
+// Without a version that can be read there is nothing to tell the two MDView
+// plugins apart, and offering either of them would offer the user the other
+// one. The match is refused and says so.
+func TestMatchCatalogEntryRefusesAnUnreadableVersionForAMultiplePluginFile(t *testing.T) {
+	catalog := mdViewCatalog()
+
+	local := domain.Plugin{
+		Name:       "mdview",
+		Path:       `C:\TC\Plug-Ins\wlx\mdview\mdview.wlx`,
+		Confidence: domain.ConfidenceFallback,
+	}
+
+	match := matchCatalogEntry(local, catalog)
+	if match.Entry != nil {
+		t.Errorf("matched %q, want no match", match.Entry.ID)
+	}
+	if !match.Ambiguous {
+		t.Error("the match is not reported as ambiguous")
+	}
+}
+
+// A version scraped out of a readme is prose about the plugin, not a number
+// about the build that is installed, so it does not tell the two apart either.
+func TestMatchCatalogEntryRefusesAReadmeVersionForAMultiplePluginFile(t *testing.T) {
+	catalog := mdViewCatalog()
+
+	local := domain.Plugin{
+		Name:             "mdview",
+		Path:             `C:\TC\Plug-Ins\wlx\mdview\mdview.wlx`,
+		InstalledVersion: "3.8.2",
+		Confidence:       domain.ConfidenceText,
+	}
+
+	match := matchCatalogEntry(local, catalog)
+	if match.Entry != nil {
+		t.Errorf("matched %q, want no match", match.Entry.ID)
+	}
+	if !match.Ambiguous {
+		t.Error("the match is not reported as ambiguous")
+	}
+}
+
+// One plugin in two rows is not two plugins: the newest release of it still
+// wins, even when the installed copy is on another release line.
+func TestMatchCatalogEntryTakesTheNewestReleaseOfOnePlugin(t *testing.T) {
+	catalog := []CatalogEntry{
+		{
+			ID:       "mdview",
+			Name:     "MDView",
+			Homepage: "https://github.com/rweijnen/MDView",
+			Match:    MatchRule{Filenames: []string{"mdview.wlx"}},
+			Resolved: &ResolvedSource{Version: "1.2.0"},
+		},
+		{
+			ID:       "mdview_0",
+			Name:     "MDView",
+			Homepage: "https://github.com/rweijnen/MDView",
+			Match:    MatchRule{Filenames: []string{"mdview.wlx"}},
+			Resolved: &ResolvedSource{Version: "0.9.1"},
+		},
+	}
+
+	local := domain.Plugin{
+		Name:             "mdview",
+		Path:             `C:\TC\Plug-Ins\wlx\mdview\mdview.wlx`,
+		InstalledVersion: "0.9.1",
+		Confidence:       domain.ConfidenceExact,
+	}
+
+	entry := matchedEntry(local, catalog)
+	if entry == nil {
+		t.Fatal("no catalog entry matched")
+	}
+	if entry.ID != "mdview" {
+		t.Errorf("matched %q, want %q", entry.ID, "mdview")
+	}
+}
+
+// The catalog may be ahead of the installed copy: a plugin that moved from
+// 0.x to 1.0 numbers its releases on another line, and then the line nearest
+// to the installed one is the closest thing to it - the other plugin's line
+// is three numbers away.
+func TestMatchCatalogEntryTakesTheNearestLineWhenTheInstalledOneIsGone(t *testing.T) {
+	catalog := mdViewCatalog()
+	catalog[0].Resolved.Version = "1.0.0"
+
+	local := domain.Plugin{
+		Name:             "mdview",
+		Path:             `C:\TC\Plug-Ins\wlx\mdview\mdview.wlx`,
+		InstalledVersion: "0.2.4",
+		Confidence:       domain.ConfidenceExact,
+	}
+
+	entry := matchedEntry(local, catalog)
+	if entry == nil {
+		t.Fatal("no catalog entry matched")
+	}
+	if entry.ID != "mdview" {
+		t.Errorf("matched %q, want %q", entry.ID, "mdview")
+	}
+}
+
+// Two plugins equally near the installed version tell nothing apart, and the
+// match is refused rather than guessed.
+func TestMatchCatalogEntryRefusesTwoEquallyNearLines(t *testing.T) {
+	catalog := mdViewCatalog()
+	catalog[0].Resolved.Version = "2.0.0"
+	catalog[1].Resolved.Version = "4.0.0"
+
+	local := domain.Plugin{
+		Name:             "mdview",
+		Path:             `C:\TC\Plug-Ins\wlx\mdview\mdview.wlx`,
+		InstalledVersion: "3.0.0",
+		Confidence:       domain.ConfidenceExact,
+	}
+
+	match := matchCatalogEntry(local, catalog)
+	if match.Entry != nil {
+		t.Errorf("matched %q, want no match", match.Entry.ID)
+	}
+	if !match.Ambiguous {
+		t.Error("the match is not reported as ambiguous")
 	}
 }
 
