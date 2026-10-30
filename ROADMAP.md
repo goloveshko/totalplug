@@ -273,6 +273,20 @@ next release (v2), and the accepted debt we deliberately postponed.
   the nearest line when the catalog is ahead of the installed copy, and refuses the
   match outright when the installed version cannot be read: a row that cannot name the
   plugin offers nothing rather than the wrong plugin, and says which of the two happened.
+- The source picker (2026-10-30), naming the catalog entry by hand: the release line the
+  installed version belongs to tells the two MDView plugins apart, but it is evidence about
+  the numbering, not about the plugin — a plugin that moves from 0.x to 1.0 leaves its users
+  on a line the catalog no longer carries, and two plugins whose numbering happens to sit
+  close together cannot be told apart at all. So the card's "Update source" field became a
+  dropdown that lists the catalog entries claiming the installed file — each by name,
+  version and host, so two entries are told apart by more than their name — and picking one
+  pins it as `catalog:<id>`. The pin is the user's own answer to a question the file cannot
+  answer, so it wins over the automatic match: the version on offer, the "In catalog" line
+  and the "Site" link are read from the entry that was picked, so the row cannot contradict
+  itself. "Automatic" and a custom address stay in the list, an empty field still clears the
+  override, and an entry that left the catalog stays in the picker marked as gone rather than
+  being silently swapped for another one — until the user picks another, the automatic match
+  answers, and the note under the list says so.
 
 ## GUI phase — items 1–5 shipped; open work now sits under Next release / Accepted debt
 
@@ -909,4 +923,8 @@ today, and all six are now closed:
   empty or write a company name there, so it can only be one signal among several, and the
   catalog would have to declare which one it expects. Not done: the version line carries the
   case the catalog actually has, and the honest failure (no version to read) is reported
-  instead of guessed.
+  instead of guessed. The line stays automatic and stays the default, and the card's source
+  picker is the way out of it: the user names the catalog entry that describes their plugin,
+  and that answer wins over the automatic match. What is still missing is the machine-readable
+  signal — the PE `ProductName` the catalog would have to declare, so the client could tell
+  the two apart without asking.
