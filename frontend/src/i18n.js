@@ -65,19 +65,12 @@ const STRINGS = {
         'update.insecure_confirm':
             '{name} can only be downloaded over unencrypted HTTP, so the archive could be altered in transit. Download and install it anyway?',
         'update.blind.title': 'Replace {name} with {version}?',
-        'update.blind.explain_unknown':
-            'The installed version could not be read, so TotalPlug cannot tell whether the catalog version is newer than the copy on disk.',
-        'update.blind.explain_text':
-            'The installed version was read out of a text file, and a number found in prose is not something TotalPlug trusts to compare.',
-        'update.blind.catalog': 'The catalog says {version}, released {date}.',
-        'update.blind.catalog_nodate': 'The catalog says {version}.',
-        'update.blind.date_newer':
-            'Your copy is dated {date}, later than that release. A file date is only a hint — copying or reinstalling stamps the copy time — but you may already have a newer build, and this would put an older one in its place.',
-        'update.blind.date_older':
-            'Your copy is dated {date}, before that release. A file date is only a hint — copying or reinstalling stamps the copy time.',
-        'update.blind.date_only':
-            'Your copy is dated {date}. A file date is only a hint — copying or reinstalling stamps the copy time.',
-        'update.blind.remember': 'The version that gets installed is remembered, so the next scan will know it.',
+        'update.blind.risk.unknown':
+            'The installed version could not be read, so this may put an older version in place.',
+        'update.blind.risk.text':
+            'The installed version was read out of a text file and is not trusted, so this may put an older version in place.',
+        'update.blind.date': 'Your copy is dated {date} — only a hint, since a copy stamps its own time.',
+        'update.blind.remember': 'The version that gets installed is remembered.',
         'update.progress.download': 'Downloading',
         'update.progress.extract': 'Extracting archive',
         'update.progress.install': 'Installing files',
@@ -241,19 +234,11 @@ const STRINGS = {
         'update.insecure_confirm':
             '{name} можно скачать только по незашифрованному HTTP, поэтому архив могут подменить в пути. Всё равно скачать и установить?',
         'update.blind.title': 'Заменить {name} на {version}?',
-        'update.blind.explain_unknown':
-            'Установленную версию прочитать не удалось, поэтому TotalPlug не может сказать, новее ли версия из каталога той копии, что лежит на диске.',
-        'update.blind.explain_text':
-            'Установленную версию TotalPlug взял из текстового файла, а число, найденное в тексте, не то, чему он доверяет при сравнении.',
-        'update.blind.catalog': 'В каталоге указана версия {version} от {date}.',
-        'update.blind.catalog_nodate': 'В каталоге указана версия {version}.',
-        'update.blind.date_newer':
-            'Ваша копия датирована {date} — позже этого релиза. Дата файла — лишь намёк (при копировании или переустановке она отражает время копирования), но, возможно, у вас уже более новая сборка, и тогда эта заменит её более старой.',
-        'update.blind.date_older':
-            'Ваша копия датирована {date} — раньше этого релиза. Дата файла — лишь намёк (при копировании или переустановке она отражает время копирования).',
-        'update.blind.date_only':
-            'Ваша копия датирована {date}. Дата файла — лишь намёк (при копировании или переустановке она отражает время копирования).',
-        'update.blind.remember': 'Установленная версия будет запомнена, поэтому следующий скан её увидит.',
+        'update.blind.risk.unknown': 'Установленную версию прочитать не удалось — так можно поставить более старую.',
+        'update.blind.risk.text':
+            'Установленную версию взяли из текстового файла и ей не доверяют — так можно поставить более старую.',
+        'update.blind.date': 'Ваша копия датирована {date} — лишь намёк: при копировании ставится время копии.',
+        'update.blind.remember': 'Установленная версия запомнится.',
         'update.progress.download': 'Загрузка',
         'update.progress.extract': 'Распаковка архива',
         'update.progress.install': 'Установка файлов',

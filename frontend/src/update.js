@@ -127,44 +127,31 @@ async function finishUpdate(plugin, outcome) {
 }
 
 // The warning that stands in front of putting the catalog version in place of
-// a version TotalPlug could not read. The installed version is unknown, so the
-// catalog version may be older than the copy on disk, and only the user can
-// say whether that is acceptable. The date of the installed file is named as a
-// hint and nothing more: a copied or reinstalled file carries the time of the
-// copy, so it cannot say which build is installed, and the dialog says so
-// rather than deciding by it.
+// a version TotalPlug could not read. It is three lines long on purpose: the
+// installed version is unknown, so the catalog version may be older than the
+// copy on disk, and only the user can say whether that is acceptable. The
+// date of the installed file is named as a hint and nothing more — a copied or
+// reinstalled file carries the time of the copy, so it cannot say which build
+// is installed, and the dialog says so rather than deciding by it.
 function blindUpdateHtml(plugin, language) {
     const version = plugin.latest_version || '';
-    const lines = [`<p class="ua-head">${escapeHtml(t('update.blind.title', { name: plugin.name, version }))}</p>`];
+    const parts = [];
 
     // A version read out of prose is a different case than no version at all:
     // it was read, and it is not trusted to compare.
     const guessed = plugin.confidence === 'Readme/INF';
-    lines.push(`<p>${escapeHtml(t(guessed ? 'update.blind.explain_text' : 'update.blind.explain_unknown'))}</p>`);
-
-    const released = fileDate(plugin.published_at, language);
-    if (version) {
-        lines.push(
-            `<p>${
-                released
-                    ? escapeHtml(t('update.blind.catalog', { version, date: released }))
-                    : escapeHtml(t('update.blind.catalog_nodate', { version }))
-            }</p>`,
-        );
-    }
+    parts.push(t(guessed ? 'update.blind.risk.text' : 'update.blind.risk.unknown'));
 
     const dated = fileDate(plugin.file_date, language);
     if (dated) {
-        let key = 'update.blind.date_only';
-        if (released) {
-            const newer = new Date(plugin.file_date).getTime() > new Date(plugin.published_at).getTime();
-            key = newer ? 'update.blind.date_newer' : 'update.blind.date_older';
-        }
-        lines.push(`<p>${escapeHtml(t(key, { date: dated }))}</p>`);
+        parts.push(t('update.blind.date', { date: dated }));
     }
 
-    lines.push(`<p class="blind-note">${escapeHtml(t('update.blind.remember'))}</p>`);
-    return `<div class="blind-warn">${lines.join('')}</div>`;
+    return [
+        `<p class="ua-head">${escapeHtml(t('update.blind.title', { name: plugin.name, version }))}</p>`,
+        `<p class="blind-risk">${escapeHtml(parts.join(' '))}</p>`,
+        `<p class="blind-note">${escapeHtml(t('update.blind.remember'))}</p>`,
+    ].join('');
 }
 
 // A plugin whose installed version could not be read still has a version in

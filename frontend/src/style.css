@@ -1007,16 +1007,15 @@ a.dlg-link:focus-visible {
     color: var(--text-muted);
 }
 
-/* The blind-update warning is several sentences, and the space between them is
-   what makes it readable: a wall of text is what people click through. The
-   last line is the quiet one — it says what happens after, not what to fear. */
-.blind-warn p {
+/* The blind-update warning is three lines on purpose: the risk in one
+   sentence, the hint about the file date in the next, and the quiet line
+   about what happens afterwards — a wall of text is what people click
+   through without reading. */
+.blind-risk {
     margin: 0 0 10px;
 }
-.blind-warn p:last-child {
-    margin-bottom: 0;
-}
-.blind-warn .blind-note {
+.blind-note {
+    margin: 0;
     font-size: 0.82rem;
     color: var(--text-muted);
 }

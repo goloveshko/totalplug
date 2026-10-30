@@ -91,10 +91,7 @@ export function releaseDate(value, lang) {
 export function fileDate(value, lang) {
     if (!hasDate(value)) return '';
     const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
-    const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(value));
-    // The Russian medium format ends in «г.», and the sentence brings its own
-    // dot: «20 авг. 2026 г..» would be a typo the reader sees.
-    return date.replace(/\.$/, '');
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(value));
 }
 
 // A dialog link must not navigate the webview. A click hands the address to the
